@@ -1,0 +1,11 @@
+.venv
+__pycache__
+instance
+*.pyc
+*.pyo
+.env
+/backend/keys
+/frontend/admin-console/credentials.json
+.admin.pid
+.backend.pid
+.sample-app.pid

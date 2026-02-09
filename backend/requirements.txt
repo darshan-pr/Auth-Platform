@@ -1,0 +1,14 @@
+fastapi  # FastAPI framework for building APIs
+uvicorn  # ASGI server for running FastAPI applications (ASGI Fullform : Asynchronous Server Gateway Interface)
+sqlalchemy>=2.0 # SQLAlchemy for database interactions
+alembic # Alembic for database migrations
+psycopg2-binary # PostgreSQL database adapter for Python
+pydantic-settings # Pydantic settings management
+pydantic[email] # Email validation for Pydantic
+redis # Redis client for Python
+python-dotenv # Read key-value pairs from a .env file and set them as environment variables
+passlib[bcrypt] # Password hashing library
+cryptography # Cryptography library for secure password hashing and other cryptographic operations
+PyJWT # JSON Web Token implementation
+pytest  # Testing framework for Python
+httpx # HTTP client for testing
