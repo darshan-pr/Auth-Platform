@@ -3,252 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sample App - Auth Demo</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Notes App</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Setup Page (First time configuration) -->
-        <div id="setupPage" class="page hidden">
-            <div class="login-card setup-card">
-                <div class="logo">⚙️</div>
-                <h1>App Setup</h1>
-                <p class="tagline">Register this app with the Auth Platform</p>
+    <!-- ====== Landing Page (Not logged in) ====== -->
+    <div id="landingPage" class="hidden">
+        <div class="landing">
+            <div class="landing-card">
+                <div class="landing-icon">📝</div>
+                <h1>Notes</h1>
+                <p class="landing-subtitle">A simple notes app.<br>Sign in to save your notes.</p>
 
-                <!-- Register New App Form -->
-                <form id="setupForm" class="auth-form">
-                    <div class="form-group">
-                        <label for="appName">Application Name</label>
-                        <input type="text" id="appName" placeholder="My Sample App" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="appDescription">Description (optional)</label>
-                        <input type="text" id="appDescription" placeholder="A demo application">
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <span id="setupBtnText">Register App</span>
-                        <span id="setupLoader" class="loader hidden"></span>
-                    </button>
-                </form>
-
-                <!-- Use Existing Credentials Form -->
-                <form id="existingCredentialsForm" class="auth-form hidden">
-                    <div class="form-group">
-                        <label for="existingAppId">App ID</label>
-                        <input type="text" id="existingAppId" placeholder="Your app ID" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="existingAppSecret">App Secret</label>
-                        <input type="password" id="existingAppSecret" placeholder="Your app secret" required>
-                    </div>
-                    <button type="button" class="btn btn-primary" onclick="saveExistingCredentials()">
-                        Save Credentials
-                    </button>
-                    <button type="button" class="btn btn-link" onclick="backToSetup()">
-                        ← Register new app instead
-                    </button>
-                </form>
-
-                <div class="divider">
-                    <span>or</span>
-                </div>
-                
-                <button type="button" class="btn btn-secondary" onclick="useExistingCredentials()">
-                    I have existing credentials
+                <button id="loginBtn" class="btn btn-login" onclick="handleLogin()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    Sign in with Auth Platform
                 </button>
 
-                <div id="setupError" class="error-message hidden"></div>
-
-                <div class="setup-info">
-                    <p>💡 This app needs to be registered with the Auth Platform to authenticate users.</p>
-                    <p>You can also create an app from the <a href="http://localhost:3000" target="_blank">Admin Console</a>.</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Login Page -->
-        <div id="loginPage" class="page hidden">
-            <div class="login-card">
-                <div class="logo">🚀</div>
-                <h1 id="loginAppName">Sample App</h1>
-                
-                <!-- Auth Mode Tabs -->
-                <div class="auth-tabs">
-                    <button class="auth-tab active" data-mode="login" onclick="switchAuthMode('login')">Login</button>
-                    <button class="auth-tab" data-mode="signup" onclick="switchAuthMode('signup')">Sign Up</button>
+                <!-- Shown if CLIENT_ID is not set -->
+                <div id="configWarning" class="config-warning hidden">
+                    <p><strong>Setup required:</strong></p>
+                    <ol>
+                        <li>Open the <a href="http://localhost:3000" target="_blank">Admin Console</a> and create an app</li>
+                        <li>Copy the <code>app_id</code> (Client ID)</li>
+                        <li>Paste it in <code>config.js</code> → <code>CLIENT_ID</code></li>
+                        <li>Reload this page</li>
+                    </ol>
                 </div>
 
-                <!-- Login Form -->
-                <form id="loginForm" class="auth-form">
-                    <p class="tagline">Sign in to continue</p>
-                    <div class="form-group">
-                        <label for="loginEmail">Email Address</label>
-                        <input type="email" id="loginEmail" placeholder="you@example.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="loginPassword">Password</label>
-                        <input type="password" id="loginPassword" placeholder="Enter your password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <span id="loginBtnText">Login</span>
-                        <span id="loginLoader" class="loader hidden"></span>
-                    </button>
-                </form>
-
-                <!-- Signup Form -->
-                <form id="signupForm" class="auth-form hidden">
-                    <p class="tagline">Create your account</p>
-                    <div class="form-group">
-                        <label for="signupEmail">Email Address</label>
-                        <input type="email" id="signupEmail" placeholder="you@example.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="signupPassword">Password</label>
-                        <input type="password" id="signupPassword" placeholder="Min 8 chars, upper, lower, number" required minlength="8">
-                        <small class="password-hint">At least 8 characters with uppercase, lowercase, and number</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="signupConfirmPassword">Confirm Password</label>
-                        <input type="password" id="signupConfirmPassword" placeholder="Confirm your password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <span id="signupBtnText">Sign Up</span>
-                        <span id="signupLoader" class="loader hidden"></span>
-                    </button>
-                </form>
-
-                <!-- OTP Step (shown after password login when OTP is enabled) -->
-                <form id="otpForm" class="auth-form hidden">
-                    <p class="otp-info">Enter the 6-digit code sent to <span id="sentEmail"></span></p>
-                    <div class="otp-inputs">
-                        <input type="text" maxlength="1" class="otp-input" data-index="0">
-                        <input type="text" maxlength="1" class="otp-input" data-index="1">
-                        <input type="text" maxlength="1" class="otp-input" data-index="2">
-                        <input type="text" maxlength="1" class="otp-input" data-index="3">
-                        <input type="text" maxlength="1" class="otp-input" data-index="4">
-                        <input type="text" maxlength="1" class="otp-input" data-index="5">
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <span id="otpBtnText">Verify & Login</span>
-                        <span id="otpLoader" class="loader hidden"></span>
-                    </button>
-                    <button type="button" class="btn btn-link" onclick="backToLogin()">
-                        ← Back to login
-                    </button>
-                </form>
-
-                <div id="errorMessage" class="error-message hidden"></div>
-                <div id="successMessage" class="success-message hidden"></div>
-            </div>
-        </div>
-
-        <!-- Home Page (After Login) -->
-        <div id="homePage" class="page hidden">
-            <nav class="navbar">
-                <div class="nav-brand">🚀 Sample App</div>
-                <div class="nav-user">
-                    <span id="userEmail"></span>
-                    <button class="btn btn-logout" onclick="logout()">Logout</button>
-                </div>
-            </nav>
-
-            <main class="main-content">
-                <div class="welcome-section">
-                    <h1>🎉 Welcome!</h1>
-                    <p>You have successfully authenticated using the Auth Platform.</p>
-                </div>
-
-                <div class="info-cards">
-                    <div class="info-card">
-                        <h3>👤 User Info</h3>
-                        <div class="info-item">
-                            <label>Email</label>
-                            <span id="infoEmail">-</span>
-                        </div>
-                        <div class="info-item">
-                            <label>User ID</label>
-                            <span id="infoUserId">-</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Session Valid Until</label>
-                            <span id="infoExpiry">-</span>
-                        </div>
-                    </div>
-
-                    <div class="info-card">
-                        <h3>📱 App Info</h3>
-                        <div class="info-item">
-                            <label>App Name</label>
-                            <span id="infoAppName">-</span>
-                        </div>
-                        <div class="info-item">
-                            <label>App ID</label>
-                            <span id="infoAppId">-</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Issuer</label>
-                            <span id="infoIssuer">-</span>
-                        </div>
-                    </div>
-
-                    <div class="info-card">
-                        <h3>🔑 Token Info</h3>
-                        <div class="info-item">
-                            <label>Token Type</label>
-                            <span>Bearer (JWT RS256)</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Access Token</label>
-                            <code id="tokenPreview">-</code>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="actions-section">
-                    <h3>🔧 Test Actions</h3>
-                    <div class="action-buttons">
-                        <button class="btn btn-secondary" onclick="verifyToken()">Verify Token</button>
-                        <button class="btn btn-secondary" onclick="refreshToken()">Refresh Token</button>
-                        <button class="btn btn-danger" onclick="resetApp()">Reset App</button>
-                    </div>
-                    <div id="actionResult" class="action-result hidden"></div>
-                </div>
-            </main>
-        </div>
-
-        <!-- Credentials Modal -->
-        <div id="credentialsModal" class="modal hidden">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2>🎉 App Registered Successfully!</h2>
-                </div>
-                <div class="modal-body">
-                    <p class="warning-text">⚠️ Save these credentials securely. The App Secret will not be shown again!</p>
-                    
-                    <div class="credentials-display">
-                        <div class="credential-item">
-                            <label>App ID</label>
-                            <code id="modalAppId">-</code>
-                        </div>
-                        <div class="credential-item">
-                            <label>App Secret</label>
-                            <code id="modalAppSecret">-</code>
-                        </div>
-                    </div>
-                    
-                    <button class="btn btn-secondary copy-btn" onclick="copyCredentials()">
-                        📋 Copy Credentials
-                    </button>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-primary" onclick="closeCredentialsModal()">
-                        Continue to Login
-                    </button>
+                <div class="landing-footer">
+                    Secured by <a href="http://localhost:8000/docs" target="_blank">Auth Platform</a> · OAuth 2.0 + PKCE
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- ====== App Page (Logged in) ====== -->
+    <div id="appPage" class="hidden">
+        <!-- Navbar -->
+        <nav class="navbar">
+            <div class="nav-brand">📝 Notes</div>
+            <div class="nav-right">
+                <div class="session-badge" title="Time until token expires">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    <span id="sessionTimer">--:--</span>
+                </div>
+                <span class="nav-email" id="userEmail">user@example.com</span>
+                <button class="btn btn-nav-logout" onclick="handleLogout()">Logout</button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <div class="app-grid">
+                <!-- Left: Notes -->
+                <section class="notes-section">
+                    <div class="section-header">
+                        <h2>My Notes <span class="badge" id="notesCount">0</span></h2>
+                    </div>
+
+                    <!-- New Note Input -->
+                    <div class="note-input-wrap">
+                        <textarea id="noteInput" placeholder="Write a note..." rows="2"></textarea>
+                        <button class="btn btn-add" onclick="addNote()">Add Note</button>
+                    </div>
+
+                    <!-- Notes List -->
+                    <div id="notesList" class="notes-list">
+                        <div class="empty-state">
+                            <span class="empty-icon">📝</span>
+                            <p>No notes yet. Write something!</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Right: Profile & Session -->
+                <aside class="sidebar">
+                    <!-- Profile Card -->
+                    <div class="sidebar-card">
+                        <h3>Profile</h3>
+                        <div class="profile-row">
+                            <span class="profile-label">Email</span>
+                            <span class="profile-value" id="profileEmail">-</span>
+                        </div>
+                        <div class="profile-row">
+                            <span class="profile-label">User ID</span>
+                            <span class="profile-value" id="profileUserId">-</span>
+                        </div>
+                        <div class="profile-row">
+                            <span class="profile-label">Issuer</span>
+                            <span class="profile-value" id="profileIssuer">-</span>
+                        </div>
+                        <div class="profile-row">
+                            <span class="profile-label">Session Expires</span>
+                            <span class="profile-value" id="profileExpiry">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Auth Actions -->
+                    <div class="sidebar-card">
+                        <h3>Auth Actions</h3>
+                        <button id="verifyBtn" class="btn btn-action" onclick="handleVerifyToken()">Verify Token</button>
+                        <button id="refreshBtn" class="btn btn-action" onclick="handleRefreshToken()">Refresh Token</button>
+                    </div>
+
+                    <!-- Integration Info -->
+                    <div class="sidebar-card sidebar-info">
+                        <h3>How this works</h3>
+                        <ul>
+                            <li><code>config.js</code> — your Client ID</li>
+                            <li><code>auth.js</code> — Auth SDK (drop-in)</li>
+                            <li><code>app.js</code> — your app logic</li>
+                        </ul>
+                        <p class="info-note">No app secrets in the browser. OAuth 2.0 + PKCE.</p>
+                    </div>
+                </aside>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts: config → auth SDK → app -->
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

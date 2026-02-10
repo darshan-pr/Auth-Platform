@@ -1,106 +1,158 @@
 # Auth Platform
 
-A microservice for authentication and authorization using OTP, JWT tokens, and multi-tenant apps.
+A self-hosted authentication microservice providing OAuth 2.0 Authorization Code Flow with PKCE, OTP verification, JWT token management (RS256), and multi-tenant application support.
+
+> **Quick Start**: See [QUICK_START.md](QUICK_START.md) for step-by-step setup instructions
 
 ## Features
 
-- Admin login and app management
-- OTP-based authentication
-- JWT tokens (RS256) with refresh tokens
-- Multi-tenant app support with app_id/app_secret
-- PostgreSQL database
-- Redis caching
-- SMTP email sending
+- **OAuth 2.0 + PKCE** &mdash; Secure authorization code flow, no client secrets on the frontend
+- **Hosted Login Page** &mdash; Auth platform renders its own login UI (like Google, GitHub)
+- **Password + OTP** &mdash; Password-based auth with optional email OTP verification
+- **JWT Tokens (RS256)** &mdash; Asymmetric key signing, configurable expiry per app
+- **Multi-Tenant** &mdash; Register multiple apps, each with its own settings and users
+- **Admin Console** &mdash; Password-protected dashboard to manage apps and users
+- **Auto Token Refresh** &mdash; JS SDK handles token lifecycle automatically
 
 ## Quick Start
 
 ### Prerequisites
+
 - Python 3.8+
 - PostgreSQL
 - Redis
-- Node.js (optional, for development)
 
 ### Setup
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   ```
-3. Set up PostgreSQL and Redis
-4. Configure `.env` file (copy from `.env.example`)
-5. Run all services:
-   ```bash
-   ./run.sh
-   ```
-
-## Running Services
-
-The `run.sh` script supports multiple commands:
-
 ```bash
-# Start all services (backend, admin console, sample app)
-./run.sh all
+# 1. Clone and install dependencies
+cd backend
+pip install -r requirements.txt
 
-# Start only the backend API
-./run.sh backend
+# 2. Configure environment
+cp .env.example .env   # Edit with your DB, Redis, SMTP settings
 
-# Start only the admin console
-./run.sh admin
-
-# Start only the sample app
-./run.sh sample-app
-
-# Stop all services
-./run.sh stop
-
-# Show help
-./run.sh help
+# 3. Start services
+./run.sh
 ```
+
+This starts the **Backend API** on port 8000 and the **Admin Console** on port 3000.
 
 ### Service URLs
 
-| Service | URL | Description |
-|---------|-----|-------------|
-| Backend API | http://localhost:8000 | FastAPI backend |
-| API Docs | http://localhost:8000/docs | Swagger documentation |
-| Admin Console | http://localhost:3000 | Admin management UI |
-| Sample App | http://localhost:3001 | Demo application |
+| Service | URL |
+|---------|-----|
+| Backend API | http://localhost:8000 |
+| API Docs (Swagger) | http://localhost:8000/docs |
+| Admin Console | http://localhost:3000 |
+
+## Running Services
+
+```bash
+./run.sh              # Start all services (backend + admin console)
+./run.sh backend      # Start only the backend API
+./run.sh admin        # Start only the admin console
+./run.sh stop         # Stop all services
+./run.sh status       # Show service status
+./run.sh help         # Show help
+```
+
+## Admin Console
+
+The admin console is password-protected. Default password: `Darsh@26`
+
+From the console you can:
+
+- View dashboard statistics (apps, users, active users)
+- Create and manage OAuth applications (Client ID, redirect URIs, session settings)
+- Manage users and their status
+- View app credentials
 
 ## Architecture
 
-### Backend API Endpoints
+```
+auth-platform/
+  backend/
+    app/
+      api/          # Route handlers (auth, admin, oauth, token, health)
+      models/       # SQLAlchemy models (user, app, refresh_token)
+      schemas/      # Pydantic request/response schemas
+      services/     # Business logic (JWT, OTP, OAuth, password, mail)
+      templates/    # Hosted login page (Jinja2)
+    keys/           # RSA key pair for JWT signing
+    migrations/     # SQL migration scripts
+  frontend/
+    admin-console/  # Admin dashboard (vanilla JS + Lucide icons)
+  sample-app/       # Example integration (Notes App)
+  run.sh            # Service runner
+```
 
-- `POST /auth/request-otp` - Request OTP (with optional app credentials)
-- `POST /auth/verify-otp` - Verify OTP and get tokens
-- `POST /token/refresh` - Refresh access token
-- `POST /token/verify` - Verify token validity
-- `GET /admin/apps` - List registered apps
-- `POST /admin/apps` - Create new app
-- `GET /admin/users` - List users
-- `GET /admin/stats` - Dashboard statistics
-- `GET /health` - Health check
+### API Endpoints
 
-### Sample App Flow
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/oauth/authorize` | GET | Start OAuth flow, renders hosted login page |
+| `/oauth/authenticate` | POST | Verify credentials on the login page |
+| `/oauth/token` | POST | Exchange authorization code for tokens (PKCE) |
+| `/auth/request-otp` | POST | Request OTP for an email |
+| `/auth/verify-otp` | POST | Verify OTP and get tokens |
+| `/token/refresh` | POST | Refresh an access token |
+| `/token/verify` | POST | Verify a token's validity |
+| `/admin/apps` | GET/POST | List or create applications |
+| `/admin/apps/{id}` | GET/PUT/DELETE | Manage a specific application |
+| `/admin/users` | GET/POST | List or create users |
+| `/admin/stats` | GET | Dashboard statistics |
 
-1. **Setup**: On first run, the sample app shows a setup page where you can:
-   - Register a new app with the Auth Platform
-   - Or use existing app credentials
+## Integrating with Your App
 
-2. **Authentication**: Once configured, users can:
-   - Enter their email to receive OTP
-   - Verify OTP to get JWT tokens
-   - View token info and test token operations
+### 1. Register your app
 
-3. **Token Management**: 
-   - Access tokens expire in 15 minutes
-   - Refresh tokens expire in 7 days
-   - Tokens include app_id when authenticated via registered app
+Open the Admin Console, create an application, and set the **Redirect URI** to your app's URL. You'll receive a **Client ID**.
+
+### 2. Add the auth SDK
+
+Copy `sample-app/config.js` and `sample-app/auth.js` into your project:
+
+```html
+<script src="config.js"></script>
+<script src="auth.js"></script>
+```
+
+### 3. Configure
+
+```javascript
+// config.js
+const AUTH_CONFIG = {
+    AUTH_SERVER: 'http://localhost:8000',
+    CLIENT_ID: 'your-client-id',
+    REDIRECT_URI: window.location.origin + window.location.pathname,
+};
+```
+
+### 4. Use
+
+```javascript
+const auth = new AuthClient(AUTH_CONFIG);
+
+// Handle callback (on page load)
+await auth.handleCallback();
+
+if (auth.isAuthenticated()) {
+    const user = auth.getUser();
+    console.log('Logged in as', user.email);
+    auth.startAutoRefresh();
+} else {
+    auth.login(); // Redirects to hosted login page
+}
+```
+
+No secrets on the frontend. PKCE ensures security.
+
+See `sample-app/README.md` for a complete integration example.
 
 ## Environment Variables
 
-Create a `.env` file with:
+Create a `.env` file:
 
 ```env
 DATABASE_URL=postgresql://user:password@localhost:5432/auth_platform
@@ -110,41 +162,6 @@ SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
 ```
-
-## Development
-
-### Project Structure
-
-```
-auth-platform/
-├── backend/
-│   ├── app/
-│   │   ├── api/          # API routes
-│   │   ├── models/       # SQLAlchemy models
-│   │   ├── schemas/      # Pydantic schemas
-│   │   └── services/     # Business logic
-│   └── keys/             # JWT RSA keys
-├── frontend/
-│   └── admin-console/    # Admin UI
-├── sample-app/           # Demo application
-└── run.sh               # Service runner
-```
-
-### Adding a New Client App
-
-1. Use the Admin Console to create a new app
-2. Save the `app_id` and `app_secret`
-3. In your app, include these in auth requests:
-   ```javascript
-   fetch('/auth/request-otp', {
-       method: 'POST',
-       body: JSON.stringify({
-           email: 'user@example.com',
-           app_id: 'your-app-id',
-           app_secret: 'your-app-secret'
-       })
-   });
-   ```
 
 ## License
 

@@ -10,5 +10,6 @@ python-dotenv # Read key-value pairs from a .env file and set them as environmen
 passlib[bcrypt] # Password hashing library
 cryptography # Cryptography library for secure password hashing and other cryptographic operations
 PyJWT # JSON Web Token implementation
+jinja2 # Templating for OAuth login page
 pytest  # Testing framework for Python
 httpx # HTTP client for testing

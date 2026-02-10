@@ -19,6 +19,7 @@ class AppCreateRequest(BaseModel):
     otp_enabled: bool = True
     access_token_expiry_minutes: int = 30
     refresh_token_expiry_days: int = 7
+    redirect_uris: Optional[str] = None  # Comma-separated allowed redirect URIs
 
 class AppUpdateRequest(BaseModel):
     name: Optional[str] = None
@@ -26,6 +27,7 @@ class AppUpdateRequest(BaseModel):
     otp_enabled: Optional[bool] = None
     access_token_expiry_minutes: Optional[int] = None
     refresh_token_expiry_days: Optional[int] = None
+    redirect_uris: Optional[str] = None
 
 class AppResponse(BaseModel):
     id: int
@@ -75,7 +77,8 @@ def create_app(request: AppCreateRequest, db: Session = Depends(get_db)):
             description=request.description,
             otp_enabled=request.otp_enabled,
             access_token_expiry_minutes=request.access_token_expiry_minutes,
-            refresh_token_expiry_days=request.refresh_token_expiry_days
+            refresh_token_expiry_days=request.refresh_token_expiry_days,
+            redirect_uris=request.redirect_uris
         )
         db.add(app)
         db.commit()
@@ -89,6 +92,7 @@ def create_app(request: AppCreateRequest, db: Session = Depends(get_db)):
             "otp_enabled": app.otp_enabled,
             "access_token_expiry_minutes": app.access_token_expiry_minutes,
             "refresh_token_expiry_days": app.refresh_token_expiry_days,
+            "redirect_uris": app.redirect_uris,
             "message": "App created successfully"
         }
     except Exception as e:
@@ -131,6 +135,7 @@ def list_apps(
         "otp_enabled": app.otp_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days,
+        "redirect_uris": app.redirect_uris,
         "created_at": app.created_at.isoformat() if app.created_at else None
     } for app in apps]
 
@@ -149,6 +154,7 @@ def get_app(app_id: str, db: Session = Depends(get_db)):
         "otp_enabled": app.otp_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days,
+        "redirect_uris": app.redirect_uris,
         "created_at": app.created_at.isoformat() if app.created_at else None,
         "updated_at": app.updated_at.isoformat() if app.updated_at else None
     }
@@ -170,6 +176,8 @@ def update_app(app_id: str, request: AppUpdateRequest, db: Session = Depends(get
         app.access_token_expiry_minutes = request.access_token_expiry_minutes
     if request.refresh_token_expiry_days is not None:
         app.refresh_token_expiry_days = request.refresh_token_expiry_days
+    if request.redirect_uris is not None:
+        app.redirect_uris = request.redirect_uris
     
     db.commit()
     db.refresh(app)
@@ -182,6 +190,7 @@ def update_app(app_id: str, request: AppUpdateRequest, db: Session = Depends(get
         "otp_enabled": app.otp_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days,
+        "redirect_uris": app.redirect_uris,
         "message": "App updated successfully"
     }
 

@@ -15,5 +15,7 @@ class App(Base):
     # JWT Session Settings
     access_token_expiry_minutes = Column(Integer, default=30, nullable=False)
     refresh_token_expiry_days = Column(Integer, default=7, nullable=False)
+    # OAuth Settings
+    redirect_uris = Column(String, nullable=True)  # Comma-separated allowed redirect URIs
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

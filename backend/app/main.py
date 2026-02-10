@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import admin, auth, health, token
+from app.api import admin, auth, health, token, oauth
 from app.db import engine, Base
 
 # Import all models to ensure they're registered with Base
@@ -32,3 +32,4 @@ app.include_router(health.router, tags=["Health"])
 app.include_router(admin.router, tags=["Admin"])
 app.include_router(auth.router, tags=["Auth"])
 app.include_router(token.router, prefix="/token", tags=["Token"])
+app.include_router(oauth.router, tags=["OAuth"])
