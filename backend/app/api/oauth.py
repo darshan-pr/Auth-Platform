@@ -27,8 +27,8 @@ from app.services.oauth_service import (
     validate_authorization_code,
 )
 from app.services.password_service import hash_password, verify_password
-from app.services.otp_service import generate_otp, verify_otp
-from app.services.mail_service import send_otp_email
+from app.services.otp_service import generate_otp, verify_otp, generate_password_reset_otp, verify_password_reset_otp
+from app.services.mail_service import send_otp_email, send_login_notification_email, send_password_reset_email
 from app.api.auth import generate_tokens_for_user
 
 router = APIRouter(prefix="/oauth")
@@ -81,28 +81,28 @@ def authorize(
     # Validate response_type
     if response_type != "code":
         error_ctx["error"] = "Unsupported response_type. Only 'code' is supported."
-        return templates.TemplateResponse("login.html", error_ctx)
+        return templates.TemplateResponse("auth.html", error_ctx)
 
     # Validate client_id
     app = db.query(App).filter(App.app_id == client_id).first()
     if not app:
         error_ctx["error"] = "Invalid client_id. This application is not registered."
-        return templates.TemplateResponse("login.html", error_ctx)
+        return templates.TemplateResponse("auth.html", error_ctx)
 
     # Validate redirect_uri
     if not validate_redirect_uri(app, redirect_uri):
         error_ctx["error"] = "Invalid redirect_uri. This URI is not registered for this application."
-        return templates.TemplateResponse("login.html", error_ctx)
+        return templates.TemplateResponse("auth.html", error_ctx)
 
     # PKCE is mandatory for security
     if not code_challenge:
         error_ctx["error"] = "PKCE code_challenge is required. Public clients must use PKCE."
-        return templates.TemplateResponse("login.html", error_ctx)
+        return templates.TemplateResponse("auth.html", error_ctx)
 
     # State is mandatory for CSRF protection
     if not state:
         error_ctx["error"] = "state parameter is required for CSRF protection."
-        return templates.TemplateResponse("login.html", error_ctx)
+        return templates.TemplateResponse("auth.html", error_ctx)
 
     # Create OAuth session in Redis
     session_id = create_oauth_session(
@@ -113,7 +113,7 @@ def authorize(
         code_challenge_method=code_challenge_method,
     )
 
-    return templates.TemplateResponse("login.html", {
+    return templates.TemplateResponse("auth.html", {
         "request": request,
         "session_id": session_id,
         "app_name": app.name or "Application",
@@ -127,10 +127,11 @@ def authorize(
 
 class AuthenticateRequest(BaseModel):
     session_id: str
-    action: str  # "login", "signup", "verify_otp"
+    action: str  # "login", "signup", "verify_otp", "forgot_password", "reset_password"
     email: str
     password: Optional[str] = None
     otp: Optional[str] = None
+    new_password: Optional[str] = None
 
 
 @router.post("/authenticate")
@@ -164,14 +165,21 @@ def authenticate(req: AuthenticateRequest, db: Session = Depends(get_db)):
         return _handle_login(req, session, app, db)
     elif req.action == "verify_otp":
         return _handle_verify_otp(req, session, app, db)
+    elif req.action == "forgot_password":
+        return _handle_forgot_password(req, session, app, db)
+    elif req.action == "reset_password":
+        return _handle_reset_password(req, session, app, db)
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
 
 
 def _handle_signup(req: AuthenticateRequest, session: dict, app: App, db: Session):
     """Create a new user account"""
-    # Check if user exists
-    existing = db.query(User).filter(User.email == req.email).first()
+    # Check if user exists for this specific app
+    existing = db.query(User).filter(
+        User.email == req.email,
+        User.app_id == session["client_id"]
+    ).first()
     if existing:
         raise HTTPException(
             status_code=400,
@@ -207,7 +215,10 @@ def _handle_signup(req: AuthenticateRequest, session: dict, app: App, db: Sessio
 
 def _handle_login(req: AuthenticateRequest, session: dict, app: App, db: Session):
     """Verify email + password, then either issue code or request OTP"""
-    user = db.query(User).filter(User.email == req.email).first()
+    user = db.query(User).filter(
+        User.email == req.email,
+        User.app_id == session["client_id"]
+    ).first()
     if not user or not user.password_hash:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
@@ -221,7 +232,7 @@ def _handle_login(req: AuthenticateRequest, session: dict, app: App, db: Session
     if app.otp_enabled:
         try:
             otp = generate_otp(req.email)
-            send_otp_email(req.email, otp)
+            send_otp_email(req.email, otp, app.name or "Auth Platform")
             return {
                 "action": "show_otp",
                 "message": "A verification code has been sent to your email."
@@ -233,7 +244,7 @@ def _handle_login(req: AuthenticateRequest, session: dict, app: App, db: Session
             )
     else:
         # No OTP needed — complete authentication
-        return _complete_auth(session, user, req.session_id)
+        return _complete_auth(session, user, req.session_id, app)
 
 
 def _handle_verify_otp(req: AuthenticateRequest, session: dict, app: App, db: Session):
@@ -244,14 +255,69 @@ def _handle_verify_otp(req: AuthenticateRequest, session: dict, app: App, db: Se
     if not verify_otp(req.email, req.otp):
         raise HTTPException(status_code=401, detail="Invalid or expired verification code")
 
-    user = db.query(User).filter(User.email == req.email).first()
+    user = db.query(User).filter(
+        User.email == req.email,
+        User.app_id == session["client_id"]
+    ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    return _complete_auth(session, user, req.session_id)
+    return _complete_auth(session, user, req.session_id, app)
 
 
-def _complete_auth(session: dict, user: User, session_id: str):
+def _handle_forgot_password(req: AuthenticateRequest, session: dict, app: App, db: Session):
+    """Send password reset OTP to user's email"""
+    user = db.query(User).filter(
+        User.email == req.email,
+        User.app_id == session["client_id"]
+    ).first()
+    if not user or not user.password_hash:
+        raise HTTPException(
+            status_code=404,
+            detail="No account found with this email address."
+        )
+
+    try:
+        otp = generate_password_reset_otp(req.email, session["client_id"])
+        send_password_reset_email(req.email, otp, app.name or "Auth Platform")
+        return {
+            "action": "show_reset_otp",
+            "message": "A password reset code has been sent to your email."
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send reset code: {str(e)}"
+        )
+
+
+def _handle_reset_password(req: AuthenticateRequest, session: dict, app: App, db: Session):
+    """Verify OTP and reset the user's password"""
+    if not req.otp:
+        raise HTTPException(status_code=400, detail="Verification code is required")
+    if not req.new_password or len(req.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+
+    if not verify_password_reset_otp(req.email, session["client_id"], req.otp):
+        raise HTTPException(status_code=401, detail="Invalid or expired verification code")
+
+    user = db.query(User).filter(
+        User.email == req.email,
+        User.app_id == session["client_id"]
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password_hash = hash_password(req.new_password)
+    db.commit()
+
+    return {
+        "action": "password_reset_success",
+        "message": "Password reset successfully. Please sign in with your new password."
+    }
+
+
+def _complete_auth(session: dict, user: User, session_id: str, app: App = None):
     """
     Generate authorization code and return redirect URL.
     This is the final step — the login page redirects the user back to the client app.
@@ -267,6 +333,15 @@ def _complete_auth(session: dict, user: User, session_id: str):
 
     # Clean up the OAuth session
     delete_oauth_session(session_id)
+
+    # Send login notification if enabled
+    if app and app.login_notification_enabled:
+        send_login_notification_email(
+            to=user.email,
+            app_name=app.name or "Auth Platform",
+            access_token_expiry_minutes=app.access_token_expiry_minutes,
+            refresh_token_expiry_days=app.refresh_token_expiry_days,
+        )
 
     # Build redirect URL with code and state
     redirect_uri = session["redirect_uri"]
@@ -319,8 +394,11 @@ def token_exchange(req: TokenExchangeRequest, db: Session = Depends(get_db)):
             detail="Invalid or expired authorization code, or PKCE verification failed."
         )
 
-    # Get user
-    user = db.query(User).filter(User.email == code_data["user_email"]).first()
+    # Get user for this specific app
+    user = db.query(User).filter(
+        User.email == code_data["user_email"],
+        User.app_id == req.client_id
+    ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 

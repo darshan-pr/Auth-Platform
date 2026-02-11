@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from app.api import admin, auth, health, token, oauth
 from app.db import engine, Base
 
@@ -33,3 +35,7 @@ app.include_router(admin.router, tags=["Admin"])
 app.include_router(auth.router, tags=["Auth"])
 app.include_router(token.router, prefix="/token", tags=["Token"])
 app.include_router(oauth.router, tags=["OAuth"])
+
+# Serve static assets (illustrations etc.)
+assets_dir = Path(__file__).resolve().parent / "assets"
+app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")

@@ -19,7 +19,7 @@ const AUTH_CONFIG = {
 
     // Your app's Client ID (obtained from Admin Console)
     // Replace this with your actual app_id
-    CLIENT_ID: '4ef1872a767b06dd',
+    CLIENT_ID: '154af49ec3f5e5ec',
 
     // Where the auth platform redirects after login
     // Must match the redirect_uri registered in Admin Console

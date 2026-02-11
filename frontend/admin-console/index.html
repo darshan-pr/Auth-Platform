@@ -173,6 +173,7 @@
                                 <th>Name</th>
                                 <th>App ID</th>
                                 <th>OTP</th>
+                                <th>Login Alert</th>
                                 <th>Token Expiry</th>
                                 <th>Redirect URIs</th>
                                 <th>Created</th>
@@ -180,7 +181,7 @@
                             </tr>
                         </thead>
                         <tbody id="appsTableBody">
-                            <tr><td colspan="7" class="loading">Loading...</td></tr>
+                            <tr><td colspan="8" class="loading">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -194,6 +195,12 @@
                         <p class="page-desc">Manage authenticated users</p>
                     </div>
                     <div class="page-actions">
+                        <div class="filter-wrap">
+                            <i data-lucide="filter" class="filter-icon"></i>
+                            <select id="userAppFilter" class="filter-select" onchange="onAppFilterChange()">
+                                <option value="">All Applications</option>
+                            </select>
+                        </div>
                         <div class="search-wrap">
                             <i data-lucide="search" class="search-icon"></i>
                             <input type="text" id="userSearch" placeholder="Search users..." class="search-input" oninput="filterUsers()">
@@ -230,7 +237,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="appModalTitle">Create Application</h3>
-                <button class="modal-close" onclick="closeModal('appModal')">
+                <button class="modal-close">
                     <i data-lucide="x"></i>
                 </button>
             </div>
@@ -259,6 +266,13 @@
                                 <span>Enable OTP Verification</span>
                             </label>
                             <small>Users must verify via OTP after password login</small>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="appLoginNotification">
+                                <span>Enable Login Notification Email</span>
+                            </label>
+                            <small>Send an email alert with session details on every successful login</small>
                         </div>
                     </div>
 
@@ -289,7 +303,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>App Credentials</h3>
-                <button class="modal-close" onclick="closeModal('credentialsModal')">
+                <button class="modal-close">
                     <i data-lucide="x"></i>
                 </button>
             </div>
@@ -328,7 +342,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="userModalTitle">Add User</h3>
-                <button class="modal-close" onclick="closeModal('userModal')">
+                <button class="modal-close">
                     <i data-lucide="x"></i>
                 </button>
             </div>
@@ -366,7 +380,7 @@
         <div class="modal-content modal-sm">
             <div class="modal-header modal-header-danger">
                 <h3>Confirm Deletion</h3>
-                <button class="modal-close" onclick="closeModal('deleteModal')">
+                <button class="modal-close">
                     <i data-lucide="x"></i>
                 </button>
             </div>

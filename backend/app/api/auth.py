@@ -3,12 +3,13 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.schemas.auth import (
     OTPRequest, OTPVerifyRequest, AuthResponse,
-    SignupRequest, LoginRequest, LoginResponse, LoginOTPVerifyRequest
+    SignupRequest, LoginRequest, LoginResponse, LoginOTPVerifyRequest,
+    ForgotPasswordRequest, ForgotPasswordResponse, ResetPasswordRequest
 )
-from app.services.otp_service import generate_otp, verify_otp
-from app.services.mail_service import send_otp_email
+from app.services.otp_service import generate_otp, verify_otp, generate_password_reset_otp, verify_password_reset_otp
+from app.services.mail_service import send_otp_email, send_password_reset_email, send_password_reset_token_email, send_login_notification_email
 from app.services.jwt_service import create_access_token, create_refresh_token
-from app.services.password_service import hash_password, verify_password
+from app.services.password_service import hash_password, verify_password, generate_reset_token, verify_reset_token
 from app.db import get_db
 from app.models.user import User
 from app.models.app import App
@@ -65,12 +66,15 @@ def signup(request: SignupRequest, db: Session = Depends(get_db)):
             detail="App credentials are required for signup"
         )
     
-    # Check if user already exists
-    existing_user = db.query(User).filter(User.email == request.email).first()
+    # Check if user already exists for this app
+    existing_user = db.query(User).filter(
+        User.email == request.email,
+        User.app_id == request.app_id
+    ).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email already exists"
+            detail="User with this email already exists for this app"
         )
     
     # Create user with hashed password
@@ -105,8 +109,11 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
             detail="App credentials are required for login"
         )
     
-    # Find user
-    user = db.query(User).filter(User.email == request.email).first()
+    # Find user for this specific app
+    user = db.query(User).filter(
+        User.email == request.email,
+        User.app_id == request.app_id
+    ).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -139,7 +146,7 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
         # Generate and send OTP
         try:
             otp = generate_otp(request.email)
-            send_otp_email(request.email, otp)
+            send_otp_email(request.email, otp, app.name or "Auth Platform")
             return LoginResponse(
                 message="Password verified. OTP sent to your email.",
                 email=request.email,
@@ -153,6 +160,14 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     else:
         # OTP disabled - return tokens directly
         access_token, refresh_token = generate_tokens_for_user(user, app)
+        # Send login notification if enabled
+        if app.login_notification_enabled:
+            send_login_notification_email(
+                to=user.email,
+                app_name=app.name or "Auth Platform",
+                access_token_expiry_minutes=app.access_token_expiry_minutes,
+                refresh_token_expiry_days=app.refresh_token_expiry_days,
+            )
         return LoginResponse(
             message="Login successful",
             email=request.email,
@@ -180,8 +195,11 @@ def login_verify_otp(request: LoginOTPVerifyRequest, db: Session = Depends(get_d
             detail="Invalid or expired OTP"
         )
     
-    # Get user
-    user = db.query(User).filter(User.email == request.email).first()
+    # Get user for this specific app
+    user = db.query(User).filter(
+        User.email == request.email,
+        User.app_id == request.app_id
+    ).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -191,6 +209,15 @@ def login_verify_otp(request: LoginOTPVerifyRequest, db: Session = Depends(get_d
     # Generate tokens
     access_token, refresh_token = generate_tokens_for_user(user, app)
     
+    # Send login notification if enabled
+    if app.login_notification_enabled:
+        send_login_notification_email(
+            to=user.email,
+            app_name=app.name or "Auth Platform",
+            access_token_expiry_minutes=app.access_token_expiry_minutes,
+            refresh_token_expiry_days=app.refresh_token_expiry_days,
+        )
+    
     return AuthResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -198,18 +225,140 @@ def login_verify_otp(request: LoginOTPVerifyRequest, db: Session = Depends(get_d
         app_id=request.app_id
     )
 
+# ============== Forgot Password ==============
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Request password reset for a user.
+    - If OTP is enabled: sends OTP via email
+    - If OTP is disabled: sends reset token via email
+    """
+    # Validate app credentials
+    app = validate_app_credentials(db, request.app_id, request.app_secret)
+    if not app:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="App credentials are required"
+        )
+    
+    # Check if user exists for this app
+    user = db.query(User).filter(
+        User.email == request.email,
+        User.app_id == request.app_id
+    ).first()
+    
+    if not user:
+        # Don't reveal if user exists or not for security
+        # But still return success to prevent email enumeration
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    if not user.password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User does not have a password set"
+        )
+    
+    try:
+        if app.otp_enabled:
+            # Generate and send OTP
+            otp = generate_password_reset_otp(request.email, request.app_id)
+            send_password_reset_email(request.email, otp, app.name or "Auth Platform")
+            return ForgotPasswordResponse(
+                message="Password reset OTP sent to your email",
+                email=request.email,
+                method="otp"
+            )
+        else:
+            # Generate and send reset token
+            token = generate_reset_token(request.email, request.app_id)
+            send_password_reset_token_email(request.email, token, app.name or "Auth Platform")
+            return ForgotPasswordResponse(
+                message="Password reset token sent to your email",
+                email=request.email,
+                method="token"
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send password reset email: {str(e)}"
+        )
+
+@router.post("/reset-password")
+def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Reset password using OTP (if enabled) or token (if OTP disabled).
+    """
+    # Validate app credentials
+    app = validate_app_credentials(db, request.app_id, request.app_secret)
+    if not app:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="App credentials are required"
+        )
+    
+    # Get user for this specific app
+    user = db.query(User).filter(
+        User.email == request.email,
+        User.app_id == request.app_id
+    ).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Verify OTP or token based on app settings
+    if app.otp_enabled:
+        if not request.otp:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="OTP is required for password reset"
+            )
+        if not verify_password_reset_otp(request.email, request.app_id, request.otp):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired OTP"
+            )
+    else:
+        if not request.token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reset token is required for password reset"
+            )
+        if not verify_reset_token(request.email, request.app_id, request.token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired reset token"
+            )
+    
+    # Update user's password
+    user.password_hash = hash_password(request.new_password)
+    db.commit()
+    
+    return {
+        "message": "Password reset successfully",
+        "email": user.email
+    }
+
 # ============== OTP-only Auth (legacy) ==============
 
 @router.post("/request-otp")
 def request_otp(request: OTPRequest, db: Session = Depends(get_db)):
     """Request an OTP to be sent to the provided email"""
     # Validate app credentials if provided
+    app = None
     if request.app_id and request.app_secret:
-        validate_app_credentials(db, request.app_id, request.app_secret)
+        app = validate_app_credentials(db, request.app_id, request.app_secret)
     
     try:
         otp = generate_otp(request.email)
-        send_otp_email(request.email, otp)
+        app_name = app.name if app else "Auth Platform"
+        send_otp_email(request.email, otp, app_name)
         return {"message": "OTP sent successfully", "email": request.email}
     except Exception as e:
         raise HTTPException(
@@ -231,17 +380,23 @@ def verify(request: OTPVerifyRequest, db: Session = Depends(get_db)):
             detail="Invalid or expired OTP"
         )
     
-    # Check if user exists, create if not
-    user = db.query(User).filter(User.email == request.email).first()
+    # Check if user exists for this app, create if not
+    if app:
+        user = db.query(User).filter(
+            User.email == request.email,
+            User.app_id == request.app_id
+        ).first()
+    else:
+        user = db.query(User).filter(User.email == request.email).first()
+    
     if not user:
-        user = User(email=request.email, app_id=request.app_id if app else None)
+        user = User(
+            email=request.email,
+            app_id=request.app_id if app else 'default'
+        )
         db.add(user)
         db.commit()
         db.refresh(user)
-    elif app and not user.app_id:
-        # Associate user with app if not already associated
-        user.app_id = request.app_id
-        db.commit()
     
     # Generate tokens
     access_token, refresh_token = generate_tokens_for_user(user, app)
@@ -269,6 +424,7 @@ def get_app_settings(app_id: str, app_secret: str, db: Session = Depends(get_db)
         "app_id": app.app_id,
         "name": app.name,
         "otp_enabled": app.otp_enabled,
+        "login_notification_enabled": app.login_notification_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days
     }

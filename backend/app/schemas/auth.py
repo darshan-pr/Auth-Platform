@@ -58,3 +58,35 @@ class LoginOTPVerifyRequest(BaseModel):
     otp: str
     app_id: str
     app_secret: str
+
+# Forgot Password schemas
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+    app_id: str
+    app_secret: str
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    email: str
+    method: str  # "otp" or "token"
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    app_id: str
+    app_secret: str
+    new_password: str
+    otp: Optional[str] = None  # Required if OTP is enabled
+    token: Optional[str] = None  # Required if OTP is disabled
+    
+    @field_validator('new_password')
+    @classmethod
+    def password_strength(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one digit')
+        return v

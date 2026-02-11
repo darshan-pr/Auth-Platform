@@ -10,31 +10,25 @@ let users = [];
 let editingAppId = null;
 let editingUserId = null;
 let deleteCallback = null;
+let selectedAppFilter = '';
 
 // ==================== Init ====================
+
+let _renderIconsTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     renderIcons();
     checkSession();
-    
-    // Auto-render icons when DOM changes (more robust)
-    const observer = new MutationObserver(() => {
-        renderIcons();
-    });
-    
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
 });
 
 function renderIcons() {
-    if (typeof lucide !== 'undefined') {
-        // Use setTimeout to ensure DOM is fully updated
-        setTimeout(() => {
-            lucide.createIcons();
-        }, 0);
-    }
+    if (typeof lucide === 'undefined') return;
+    // Debounce: collapse rapid calls into one
+    if (_renderIconsTimer) clearTimeout(_renderIconsTimer);
+    _renderIconsTimer = setTimeout(() => {
+        _renderIconsTimer = null;
+        lucide.createIcons();
+    }, 16);
 }
 
 // ==================== Auth Gate ====================
@@ -132,7 +126,7 @@ function navigateTo(page) {
     switch (page) {
         case 'dashboard': loadDashboard(); break;
         case 'apps':      loadApps();      break;
-        case 'users':     loadUsers();     break;
+        case 'users':     loadAppFilterOptions().then(() => loadUsers()); break;
     }
 }
 
@@ -174,44 +168,60 @@ function animateValue(elementId, target) {
 
 async function loadApps() {
     const tbody = document.getElementById('appsTableBody');
-    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading applications...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">Loading applications...</td></tr>';
 
     try {
         const response = await fetch(`${API_URL}/admin/apps`);
         apps = await response.json();
 
         if (apps.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="loading">No applications yet. Create your first app.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="loading">No applications yet. Create your first app.</td></tr>';
             return;
         }
 
-        tbody.innerHTML = apps.map(app => `
+        tbody.innerHTML = apps.map(app => {
+            const safeAppId = escapeAttr(app.app_id);
+            const safeName = escapeAttr(app.name || 'Unnamed');
+            return `
             <tr>
                 <td class="app-name-cell">${escapeHtml(app.name || 'Unnamed')}</td>
                 <td><code>${app.app_id}</code></td>
                 <td><span class="status-badge ${app.otp_enabled ? 'active' : 'inactive'}">${app.otp_enabled ? 'Enabled' : 'Disabled'}</span></td>
+                <td><span class="status-badge ${app.login_notification_enabled ? 'active' : 'inactive'}">${app.login_notification_enabled ? 'On' : 'Off'}</span></td>
                 <td>${app.access_token_expiry_minutes}m / ${app.refresh_token_expiry_days}d</td>
                 <td class="redirect-uris">${app.redirect_uris ? escapeHtml(app.redirect_uris) : '<span style="color:#94a3b8">Not set</span>'}</td>
                 <td>${formatDate(app.created_at)}</td>
                 <td>
                     <div class="action-btns">
-                        <button class="btn-icon" onclick="showCredentials('${app.app_id}')" title="View Credentials">
+                        <button class="btn-icon" data-action="credentials" data-app-id="${safeAppId}" title="View Credentials">
                             <i data-lucide="key-round"></i>
                         </button>
-                        <button class="btn-icon" onclick="editApp('${app.app_id}')" title="Edit">
+                        <button class="btn-icon" data-action="edit-app" data-app-id="${safeAppId}" title="Edit">
                             <i data-lucide="pencil"></i>
                         </button>
-                        <button class="btn-icon danger" onclick="confirmDeleteApp('${app.app_id}', '${escapeHtml(app.name)}')" title="Delete">
+                        <button class="btn-icon danger" data-action="delete-app" data-app-id="${safeAppId}" data-app-name="${safeName}" title="Delete">
                             <i data-lucide="trash-2"></i>
                         </button>
                     </div>
                 </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
+
+        // Attach event listeners via delegation
+        tbody.querySelectorAll('[data-action]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const action = btn.dataset.action;
+                const appId = btn.dataset.appId;
+                if (action === 'credentials') showCredentials(appId);
+                else if (action === 'edit-app') editApp(appId);
+                else if (action === 'delete-app') confirmDeleteApp(appId, btn.dataset.appName);
+            });
+        });
         renderIcons();
     } catch (error) {
         console.error('Error loading apps:', error);
-        tbody.innerHTML = '<tr><td colspan="7" class="loading">Failed to load applications</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">Failed to load applications</td></tr>';
     }
 }
 
@@ -221,6 +231,7 @@ function showCreateAppModal() {
     document.getElementById('appFormSubmit').textContent = 'Create App';
     document.getElementById('appForm').reset();
     document.getElementById('appOtpEnabled').checked = true;
+    document.getElementById('appLoginNotification').checked = false;
     document.getElementById('appAccessTokenExpiry').value = 30;
     document.getElementById('appRefreshTokenExpiry').value = 7;
     document.getElementById('appRedirectUris').value = '';
@@ -237,6 +248,7 @@ function editApp(appId) {
     document.getElementById('appName').value = app.name || '';
     document.getElementById('appDescription').value = app.description || '';
     document.getElementById('appOtpEnabled').checked = app.otp_enabled !== false;
+    document.getElementById('appLoginNotification').checked = app.login_notification_enabled === true;
     document.getElementById('appAccessTokenExpiry').value = app.access_token_expiry_minutes || 30;
     document.getElementById('appRefreshTokenExpiry').value = app.refresh_token_expiry_days || 7;
     document.getElementById('appRedirectUris').value = app.redirect_uris || '';
@@ -247,6 +259,7 @@ async function saveApp() {
     const name = document.getElementById('appName').value.trim();
     const description = document.getElementById('appDescription').value.trim();
     const otp_enabled = document.getElementById('appOtpEnabled').checked;
+    const login_notification_enabled = document.getElementById('appLoginNotification').checked;
     const access_token_expiry_minutes = parseInt(document.getElementById('appAccessTokenExpiry').value) || 30;
     const refresh_token_expiry_days = parseInt(document.getElementById('appRefreshTokenExpiry').value) || 7;
     const redirect_uris = document.getElementById('appRedirectUris').value.trim();
@@ -254,7 +267,7 @@ async function saveApp() {
     if (!name) { showToast('Please enter an app name', 'error'); return; }
 
     try {
-        const body = { name, description, otp_enabled, access_token_expiry_minutes, refresh_token_expiry_days };
+        const body = { name, description, otp_enabled, login_notification_enabled, access_token_expiry_minutes, refresh_token_expiry_days };
         if (redirect_uris) body.redirect_uris = redirect_uris;
 
         let response;
@@ -320,7 +333,12 @@ function confirmDeleteApp(appId, appName) {
                 closeModal('deleteModal');
                 loadApps();
                 loadDashboard();
-                showToast('Application deleted', 'success');
+                // Refresh user list since users were cascade-deleted
+                if (currentPage === 'users' || selectedAppFilter === appId) {
+                    selectedAppFilter = '';
+                    loadAppFilterOptions().then(() => loadUsers());
+                }
+                showToast('Application and its users deleted', 'success');
             } else {
                 showToast('Failed to delete application', 'error');
             }
@@ -334,15 +352,20 @@ function confirmDeleteApp(appId, appName) {
 
 async function loadUsers() {
     const tbody = document.getElementById('usersTableBody');
-    tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading users...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading users...</td></tr>';
 
     try {
-        const response = await fetch(`${API_URL}/admin/users`);
+        let url = `${API_URL}/admin/users`;
+        const params = [];
+        if (selectedAppFilter) params.push(`app_id=${encodeURIComponent(selectedAppFilter)}`);
+        if (params.length) url += '?' + params.join('&');
+
+        const response = await fetch(url);
         const data = await response.json();
         users = Array.isArray(data) ? data : (data.users || []);
 
         if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="loading">No users yet.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="loading">No users found.</td></tr>';
             return;
         }
 
@@ -350,28 +373,42 @@ async function loadUsers() {
         const appMap = {};
         apps.forEach(a => { appMap[a.app_id] = a.name; });
 
-        tbody.innerHTML = users.map(user => `
+        tbody.innerHTML = users.map(user => {
+            const appName = user.app_id ? (appMap[user.app_id] || user.app_id) : 'None';
+            const safeEmail = escapeAttr(user.email);
+            return `
             <tr>
                 <td class="app-name-cell">${escapeHtml(user.email)}</td>
-                <td>${user.app_id ? `<code>${user.app_id}</code>` : '<span style="color:#94a3b8">None</span>'}</td>
+                <td>${user.app_id ? `<code>${user.app_id}</code><br><small style="color:#94a3b8">${escapeHtml(appName)}</small>` : '<span style="color:#94a3b8">None</span>'}</td>
                 <td><span class="status-badge ${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
                 <td>${formatDate(user.created_at)}</td>
                 <td>
                     <div class="action-btns">
-                        <button class="btn-icon" onclick="editUser(${user.id})" title="Edit">
+                        <button class="btn-icon" data-action="edit-user" data-user-id="${user.id}" title="Edit">
                             <i data-lucide="pencil"></i>
                         </button>
-                        <button class="btn-icon danger" onclick="confirmDeleteUser(${user.id}, '${escapeHtml(user.email)}')" title="Delete">
+                        <button class="btn-icon danger" data-action="delete-user" data-user-id="${user.id}" data-user-email="${safeEmail}" title="Delete">
                             <i data-lucide="trash-2"></i>
                         </button>
                     </div>
                 </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
+
+        // Attach event listeners via delegation
+        tbody.querySelectorAll('[data-action]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const action = btn.dataset.action;
+                const userId = parseInt(btn.dataset.userId);
+                if (action === 'edit-user') editUser(userId);
+                else if (action === 'delete-user') confirmDeleteUser(userId, btn.dataset.userEmail);
+            });
+        });
         renderIcons();
     } catch (error) {
         console.error('Error loading users:', error);
-        tbody.innerHTML = '<tr><td colspan="5" class="loading">Failed to load users</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">Failed to load users</td></tr>';
     }
 }
 
@@ -380,6 +417,7 @@ function showCreateUserModal() {
     document.getElementById('userModalTitle').textContent = 'Add New User';
     document.getElementById('userFormSubmit').textContent = 'Add User';
     document.getElementById('userForm').reset();
+    document.getElementById('userEmail').disabled = false;
     document.getElementById('userAppId').disabled = false;
     document.getElementById('userStatusGroup').classList.add('hidden');
     loadAppsForSelect();
@@ -407,10 +445,13 @@ function editUser(userId) {
     document.getElementById('userModalTitle').textContent = 'Edit User';
     document.getElementById('userFormSubmit').textContent = 'Save Changes';
     document.getElementById('userEmail').value = user.email;
-    document.getElementById('userAppId').value = user.app_id;
+    document.getElementById('userEmail').disabled = true;
     document.getElementById('userAppId').disabled = true;
     document.getElementById('userStatusGroup').classList.remove('hidden');
-    loadAppsForSelect();
+    document.getElementById('userStatus').value = user.is_active ? 'true' : 'false';
+    loadAppsForSelect().then(() => {
+        document.getElementById('userAppId').value = user.app_id || '';
+    });
     openModal('userModal');
 }
 
@@ -419,14 +460,16 @@ async function saveUser() {
     const app_id = document.getElementById('userAppId').value;
 
     if (!email) { showToast('Please enter an email', 'error'); return; }
+    if (!app_id) { showToast('Please select an application', 'error'); return; }
 
     try {
         let response;
         if (editingUserId) {
+            const is_active = document.getElementById('userStatus').value === 'true';
             response = await fetch(`${API_URL}/admin/users/${editingUserId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
+                body: JSON.stringify({ is_active })
             });
         } else {
             response = await fetch(`${API_URL}/admin/users`, {
@@ -473,24 +516,26 @@ function confirmDeleteUser(userId, email) {
 // ==================== Modals ====================
 
 function setupModals() {
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) closeModal(modal.id);
-        });
-    });
-
-    document.querySelectorAll('.modal-close').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const modal = btn.closest('.modal');
-            if (modal) closeModal(modal.id);
-        });
+    // Use event delegation on document for all modal interactions
+    document.addEventListener('click', (e) => {
+        // Close button (X) — match the button or anything inside it
+        const closeBtn = e.target.closest('.modal-close');
+        if (closeBtn) {
+            const modal = closeBtn.closest('.modal');
+            if (modal) { closeModal(modal.id); }
+            return;
+        }
+        // Click on backdrop (the .modal overlay itself)
+        const modal = e.target.closest('.modal');
+        if (modal && e.target === modal) {
+            closeModal(modal.id);
+        }
     });
 }
 
 function openModal(modalId) {
     document.getElementById(modalId).classList.add('show');
-    // Re-render icons after modal opens
-    setTimeout(() => renderIcons(), 10);
+    renderIcons();
 }
 
 function closeModal(modalId) {
@@ -570,6 +615,11 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function escapeAttr(text) {
+    if (!text) return '';
+    return text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function formatDate(dateStr) {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
@@ -592,4 +642,34 @@ function filterUsers() {
     document.querySelectorAll('#usersTableBody tr').forEach(row => {
         row.style.display = row.textContent.toLowerCase().includes(search) ? '' : 'none';
     });
+}
+
+async function loadAppFilterOptions() {
+    const select = document.getElementById('userAppFilter');
+    if (!select) return;
+    try {
+        const response = await fetch(`${API_URL}/admin/apps`);
+        apps = await response.json();
+
+        if (apps.length === 0) {
+            select.innerHTML = '<option value="">No apps available</option>';
+            return;
+        }
+
+        // Always default to first app if no filter is selected
+        if (!selectedAppFilter || !apps.find(a => a.app_id === selectedAppFilter)) {
+            selectedAppFilter = apps[0].app_id;
+        }
+
+        select.innerHTML = apps.map(app =>
+            `<option value="${escapeAttr(app.app_id)}"${app.app_id === selectedAppFilter ? ' selected' : ''}>${escapeHtml(app.name || 'Unnamed App')}</option>`
+        ).join('');
+    } catch (error) {
+        console.error('Error loading apps for filter:', error);
+    }
+}
+
+function onAppFilterChange() {
+    selectedAppFilter = document.getElementById('userAppFilter').value;
+    loadUsers();
 }

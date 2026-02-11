@@ -17,6 +17,7 @@ class AppCreateRequest(BaseModel):
     name: str
     description: Optional[str] = None
     otp_enabled: bool = True
+    login_notification_enabled: bool = False
     access_token_expiry_minutes: int = 30
     refresh_token_expiry_days: int = 7
     redirect_uris: Optional[str] = None  # Comma-separated allowed redirect URIs
@@ -25,6 +26,7 @@ class AppUpdateRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     otp_enabled: Optional[bool] = None
+    login_notification_enabled: Optional[bool] = None
     access_token_expiry_minutes: Optional[int] = None
     refresh_token_expiry_days: Optional[int] = None
     redirect_uris: Optional[str] = None
@@ -76,6 +78,7 @@ def create_app(request: AppCreateRequest, db: Session = Depends(get_db)):
             name=request.name,
             description=request.description,
             otp_enabled=request.otp_enabled,
+            login_notification_enabled=request.login_notification_enabled,
             access_token_expiry_minutes=request.access_token_expiry_minutes,
             refresh_token_expiry_days=request.refresh_token_expiry_days,
             redirect_uris=request.redirect_uris
@@ -90,6 +93,7 @@ def create_app(request: AppCreateRequest, db: Session = Depends(get_db)):
             "app_secret": app_secret,
             "name": app.name,
             "otp_enabled": app.otp_enabled,
+            "login_notification_enabled": app.login_notification_enabled,
             "access_token_expiry_minutes": app.access_token_expiry_minutes,
             "refresh_token_expiry_days": app.refresh_token_expiry_days,
             "redirect_uris": app.redirect_uris,
@@ -133,6 +137,7 @@ def list_apps(
         "description": app.description,
         "is_active": True,  # All apps are active by default
         "otp_enabled": app.otp_enabled,
+        "login_notification_enabled": app.login_notification_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days,
         "redirect_uris": app.redirect_uris,
@@ -152,6 +157,7 @@ def get_app(app_id: str, db: Session = Depends(get_db)):
         "name": app.name,
         "description": app.description,
         "otp_enabled": app.otp_enabled,
+        "login_notification_enabled": app.login_notification_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days,
         "redirect_uris": app.redirect_uris,
@@ -172,6 +178,8 @@ def update_app(app_id: str, request: AppUpdateRequest, db: Session = Depends(get
         app.description = request.description
     if request.otp_enabled is not None:
         app.otp_enabled = request.otp_enabled
+    if request.login_notification_enabled is not None:
+        app.login_notification_enabled = request.login_notification_enabled
     if request.access_token_expiry_minutes is not None:
         app.access_token_expiry_minutes = request.access_token_expiry_minutes
     if request.refresh_token_expiry_days is not None:
@@ -188,6 +196,7 @@ def update_app(app_id: str, request: AppUpdateRequest, db: Session = Depends(get
         "name": app.name,
         "description": app.description,
         "otp_enabled": app.otp_enabled,
+        "login_notification_enabled": app.login_notification_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days,
         "redirect_uris": app.redirect_uris,
@@ -196,15 +205,17 @@ def update_app(app_id: str, request: AppUpdateRequest, db: Session = Depends(get
 
 @router.delete("/apps/{app_id}")
 def delete_app(app_id: str, db: Session = Depends(get_db)):
-    """Delete an application"""
+    """Delete an application and all its associated users"""
     app = db.query(App).filter(App.app_id == app_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
     
+    # Delete all users associated with this app
+    db.query(User).filter(User.app_id == app_id).delete()
     db.delete(app)
     db.commit()
     
-    return {"message": "App deleted successfully"}
+    return {"message": "App and its users deleted successfully"}
 
 @router.get("/apps/{app_id}/credentials", response_model=AppCredentialsResponse)
 def get_app_credentials(app_id: str, db: Session = Depends(get_db)):
@@ -266,10 +277,16 @@ def list_users(
 @router.post("/users", response_model=dict)
 def create_user(request: UserCreateRequest, db: Session = Depends(get_db)):
     """Create a new user"""
-    # Check if user already exists
-    existing = db.query(User).filter(User.email == request.email).first()
+    if not request.app_id:
+        raise HTTPException(status_code=400, detail="app_id is required")
+    
+    # Check if user already exists for this app
+    existing = db.query(User).filter(
+        User.email == request.email,
+        User.app_id == request.app_id
+    ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="User with this email already exists")
+        raise HTTPException(status_code=400, detail="User with this email already exists for this app")
     
     user = User(
         email=request.email,
