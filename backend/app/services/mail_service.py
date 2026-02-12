@@ -35,9 +35,20 @@ def _send_email(to: str, subject: str, body_text: str, body_html: str = None) ->
     if body_html:
         msg.add_alternative(body_html, subtype="html")
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(settings.SMTP_EMAIL, settings.SMTP_PASSWORD)
-        server.send_message(msg)
+    smtp_server = settings.SMTP_SERVER or "smtp.gmail.com"
+    smtp_port = settings.SMTP_PORT or 587
+
+    if smtp_port == 465:
+        # Port 465: implicit SSL
+        with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10) as server:
+            server.login(settings.SMTP_EMAIL, settings.SMTP_PASSWORD)
+            server.send_message(msg)
+    else:
+        # Port 587 (or other): STARTTLS
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
+            server.starttls()
+            server.login(settings.SMTP_EMAIL, settings.SMTP_PASSWORD)
+            server.send_message(msg)
 
     return True
 
