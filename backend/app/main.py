@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from app.api import admin, auth, health, token, oauth
 from app.db import engine, Base
+from app.config import settings
 
 # Import all models to ensure they're registered with Base
 from app.models.app import App
@@ -24,7 +25,7 @@ app = FastAPI(
 # CORS middleware for frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this in production
+    allow_origins=settings.ALLOWED_ORIGINS,  # Configure via ALLOWED_ORIGINS env variable
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

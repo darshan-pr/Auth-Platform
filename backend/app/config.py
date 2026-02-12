@@ -18,18 +18,28 @@ else:
     load_dotenv()  # Try default .env loading
 
 class Settings:
+    # Environment detection
+    ENVIRONMENT: str = os.getenv("RAILWAY_ENVIRONMENT", os.getenv("ENVIRONMENT", "development"))
+    IS_PRODUCTION: bool = os.getenv("RAILWAY_ENVIRONMENT") == "production"
+    
+    # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL")
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
 
+    # JWT Configuration
     JWT_SECRET: str = os.getenv("JWT_SECRET", "your-secret-key-here")
     JWT_ISSUER: str = "auth-platform"
     JWT_ALGORITHM: str = "RS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # SMTP Configuration
     SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
     SMTP_EMAIL: str = os.getenv("SMTP_USER")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD")
+    
+    # CORS Configuration
+    ALLOWED_ORIGINS: list = os.getenv("ALLOWED_ORIGINS", "*").split(",") if os.getenv("ALLOWED_ORIGINS") else ["*"]
 
 settings = Settings()

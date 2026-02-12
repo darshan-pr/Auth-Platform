@@ -163,6 +163,32 @@ SMTP_USER=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
 ```
 
+## Deployment
+
+### Deploy to Railway
+
+This project is ready for deployment on Railway. See the [Railway Deployment Guide](RAILWAY_DEPLOYMENT.md) for detailed instructions.
+
+Quick deployment steps:
+1. Push your code to GitHub
+2. Create a new project on [Railway](https://railway.app)
+3. Connect your repository
+4. Add PostgreSQL and Redis databases
+5. Configure environment variables
+6. Deploy! 🚀
+
+Railway automatically detects the configuration and deploys your application.
+
+### Other Platforms
+
+The application can be deployed to any platform that supports:
+- Python 3.8+
+- PostgreSQL database
+- Redis instance
+- Environment variable configuration
+
+Consider: Heroku, Render, Fly.io, AWS, Google Cloud, Azure, etc.
+
 ## License
 
 MIT

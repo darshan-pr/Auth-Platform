@@ -1,0 +1,29 @@
+# Ignore development files
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.local
+
+# Frontend files (deploy separately if needed)
+frontend/
+sample-app/
+
+# Development scripts
+run.sh
+
+# Git and IDE
+.git/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
