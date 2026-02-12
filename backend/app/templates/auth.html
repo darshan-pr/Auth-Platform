@@ -21,7 +21,6 @@
         body.mode-signup { background: #eefbf5; }
         body.mode-forgot { background: #f0f4fe; }
         body.mode-reset-otp { background: #f0f4fe; }
-        body.mode-otp { background: #f5f0fe; }
 
         /* ====== Error Page ====== */
         .error-page {
@@ -54,7 +53,7 @@
             box-shadow: 0 8px 40px rgba(0,0,0,0.08);
             display: flex;
             overflow: hidden;
-            height: 560px;
+            min-height: 560px;
             animation: cardIn 0.4s ease;
         }
 
@@ -119,9 +118,6 @@
         body.mode-reset-otp .app-badge { background: #eef2fe; color: #3b6ade; }
         body.mode-reset-otp .form-header h1 { color: #3b6ade; }
 
-        body.mode-otp .form-header h1 { color: #7c3aed; }
-        body.mode-otp .app-badge { background: #f3effe; color: #7c3aed; }
-
         /* ====== Right Panel (Illustration) ====== */
         .illustration-panel {
             width: 400px;
@@ -138,7 +134,6 @@
         body.mode-signup .illustration-panel { background: #e5f8ef; }
         body.mode-forgot .illustration-panel,
         body.mode-reset-otp .illustration-panel { background: #e8eefe; }
-        body.mode-otp .illustration-panel { background: #ede5fe; }
 
         .illustration-panel .illust {
             position: absolute;
@@ -164,55 +159,46 @@
             object-fit: contain;
         }
 
-        /* ====== Mobile Illustration ====== */
+        /* ====== Mobile Illustration (hidden) ====== */
         .mobile-illust {
-            display: none;
-            justify-content: center;
-            margin-bottom: 12px;
-        }
-
-        .mobile-illust .m-illust {
-            display: none;
-        }
-
-        .mobile-illust .m-illust.active {
-            display: block;
-        }
-
-        .mobile-illust img {
-            height: 80px;
-            width: auto;
-            object-fit: contain;
+            display: none !important;
         }
 
         /* ====== Form Sections (transition wrapper) ====== */
         .form-section {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
+            display: none;
             opacity: 0;
-            transform: translateX(20px);
+            transform: translateY(10px);
             pointer-events: none;
-            transition: opacity 0.35s ease, transform 0.35s ease;
         }
 
         .form-section.active {
+            display: block;
             opacity: 1;
-            transform: translateX(0);
+            transform: translateY(0);
             pointer-events: auto;
-            position: relative;
+            animation: sectionIn 0.35s ease forwards;
         }
 
         .form-section.leaving {
-            opacity: 0;
-            transform: translateX(-20px);
+            display: block;
+            animation: sectionOut 0.2s ease forwards;
             pointer-events: none;
+        }
+
+        @keyframes sectionIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes sectionOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-10px); }
         }
 
         /* ====== Forms ====== */
         .form-group {
-            margin-bottom: 18px;
+            margin-bottom: 14px;
         }
 
         .form-group label {
@@ -300,7 +286,6 @@
         body.mode-signup .btn-primary { background: #0d9e6d; }
         body.mode-forgot .btn-primary,
         body.mode-reset-otp .btn-primary { background: #3b6ade; }
-        body.mode-otp .btn-primary { background: #7c3aed; }
 
         .btn-primary:hover { opacity: 0.9; }
         .btn-primary:active { transform: scale(0.99); }
@@ -325,12 +310,275 @@
 
         @keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
 
+        /* ====== OTP Inline Section ====== */
+        .otp-inline {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .otp-inline.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .otp-inline .otp-info {
+            text-align: center;
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .otp-inline .otp-info strong { color: #1a1a2e; }
+
+        .otp-inputs {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+
+        .otp-input {
+            width: 42px;
+            height: 48px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: 600;
+            border: 1.5px solid #e0e0e0;
+            border-radius: 10px;
+            outline: none;
+            background: #fafafa;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            color: #1a1a2e;
+        }
+
+        .otp-input:focus {
+            border-color: #e8583e;
+            box-shadow: 0 0 0 3px rgba(232,88,50,0.10);
+            background: #fff;
+        }
+
+        body.mode-reset-otp .otp-input:focus {
+            border-color: #3b6ade;
+            box-shadow: 0 0 0 3px rgba(59,106,222,0.10);
+        }
+
+        /* ====== Passkey Button ====== */
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 14px 0;
+            gap: 12px;
+        }
+
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e2e2e5;
+        }
+
+        .divider span {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .btn-passkey {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid #e2e2e5;
+            border-radius: 10px;
+            background: #fff;
+            color: #1a1a2e;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+            font-family: inherit;
+        }
+
+        .btn-passkey:hover {
+            border-color: #ccc;
+            background: #f8f8fa;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        }
+
+        .btn-passkey:active {
+            transform: scale(0.995);
+        }
+
+        .btn-passkey svg {
+            flex-shrink: 0;
+        }
+
+        .btn-passkey.loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        /* ====== Passkey Auth Overlay ====== */
+        .passkey-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.97);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            border-radius: 12px;
+        }
+
+        .passkey-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .passkey-overlay .pk-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .passkey-overlay .pk-icon.waiting {
+            background: #fef3ee;
+        }
+
+        .passkey-overlay .pk-icon.waiting svg {
+            color: #e8583e;
+            animation: pkPulse 1.5s ease-in-out infinite;
+        }
+
+        .passkey-overlay .pk-icon.success {
+            background: #ecfdf5;
+        }
+
+        .passkey-overlay .pk-icon.success svg {
+            color: #10b981;
+            animation: pkPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .passkey-overlay .pk-icon.error {
+            background: #fef2f2;
+        }
+
+        .passkey-overlay .pk-icon.error svg {
+            color: #ef4444;
+            animation: pkShake 0.4s ease;
+        }
+
+        .passkey-overlay .pk-ring {
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2.5px solid transparent;
+            border-top-color: #e8583e;
+            animation: pkSpin 0.9s linear infinite;
+        }
+
+        .passkey-overlay .pk-status {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1a1a2e;
+            text-align: center;
+        }
+
+        .passkey-overlay .pk-hint {
+            font-size: 12px;
+            color: #999;
+            text-align: center;
+            max-width: 240px;
+            line-height: 1.5;
+        }
+
+        .passkey-overlay .pk-cancel {
+            margin-top: 4px;
+            font-size: 13px;
+            color: #888;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            padding: 6px 16px;
+            border-radius: 8px;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .passkey-overlay .pk-cancel:hover {
+            background: #f5f5f5;
+            color: #555;
+        }
+
+        @keyframes pkPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.15); opacity: 0.7; }
+        }
+
+        @keyframes pkSpin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pkPop {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes pkShake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-6px); }
+            40% { transform: translateX(6px); }
+            60% { transform: translateX(-4px); }
+            80% { transform: translateX(4px); }
+        }
+
+        /* ====== Register Passkey Link ====== */
+        .passkey-register-row {
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .passkey-register-link {
+            font-size: 12px;
+            color: #888;
+            text-decoration: none;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: inherit;
+            padding: 0;
+            transition: color 0.2s;
+        }
+
+        .passkey-register-link:hover { color: #e8583e; text-decoration: underline; }
+
+        .passkey-register-link svg {
+            vertical-align: -2px;
+            margin-right: 4px;
+        }
+
         /* ====== Bottom Row ====== */
         .bottom-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 18px;
+            margin-top: 14px;
             font-size: 13px;
         }
 
@@ -369,7 +617,6 @@
 
         body.mode-forgot .btn-link,
         body.mode-reset-otp .btn-link { color: #3b6ade; }
-        body.mode-otp .btn-link { color: #7c3aed; }
 
         .btn-link:hover { text-decoration: underline; }
 
@@ -378,7 +625,7 @@
             padding: 12px 14px;
             border-radius: 10px;
             font-size: 13px;
-            margin-bottom: 16px;
+            margin-bottom: 10px;
             display: none;
         }
 
@@ -396,50 +643,6 @@
             display: block;
         }
 
-        /* ====== OTP Inputs ====== */
-        .otp-info {
-            text-align: center;
-            font-size: 14px;
-            color: #555;
-            margin-bottom: 24px;
-            line-height: 1.6;
-        }
-
-        .otp-info strong {
-            color: #1a1a2e;
-        }
-
-        .otp-inputs {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-bottom: 24px;
-        }
-
-        .otp-input {
-            width: 48px;
-            height: 54px;
-            text-align: center;
-            font-size: 20px;
-            font-weight: 600;
-            border: 1.5px solid #e0e0e0;
-            border-radius: 10px;
-            outline: none;
-            background: #fafafa;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            color: #1a1a2e;
-        }
-
-        body.mode-otp .otp-input:focus {
-            border-color: #7c3aed;
-            box-shadow: 0 0 0 3px rgba(124,58,237,0.10);
-        }
-
-        body.mode-reset-otp .otp-input:focus {
-            border-color: #3b6ade;
-            box-shadow: 0 0 0 3px rgba(59,106,222,0.10);
-        }
-
         /* ====== Footer ====== */
         .footer {
             text-align: center;
@@ -454,11 +657,9 @@
         /* ====== Responsive ====== */
         @media (max-width: 720px) {
             .illustration-panel { display: none; }
-            .mobile-illust { display: flex; }
 
             .auth-card {
                 border-radius: 20px;
-                height: auto;
                 min-height: unset;
             }
 
@@ -466,25 +667,35 @@
                 padding: 28px 24px 24px;
             }
 
-            .form-body {
-                position: relative;
-                transition: height 0.35s ease;
-                overflow: hidden;
-            }
-
             .form-header h1 { font-size: 24px; }
 
-            .mobile-illust img {
-                height: 72px;
+            .otp-input {
+                width: 38px;
+                height: 44px;
+                font-size: 18px;
             }
+
+            .otp-inputs { gap: 6px; }
         }
 
         @media (max-width: 400px) {
-            .auth-container { padding: 12px; }
-            .form-panel { padding: 24px 18px 22px; }
-            .otp-input { width: 40px; height: 46px; font-size: 18px; }
-            .otp-inputs { gap: 6px; }
-            .mobile-illust img { height: 56px; }
+            .auth-container { padding: 10px; }
+            .form-panel { padding: 22px 16px 20px; }
+            .form-header h1 { font-size: 22px; }
+            .otp-input { width: 36px; height: 42px; font-size: 16px; }
+            .otp-inputs { gap: 5px; }
+            .btn-primary { padding: 13px; font-size: 14px; }
+            .btn-passkey { padding: 11px 12px; font-size: 13px; }
+            .input-field { padding: 12px 14px; font-size: 14px; }
+        }
+
+        @media (max-width: 340px) {
+            .auth-container { padding: 6px; }
+            .form-panel { padding: 18px 14px 16px; }
+            .otp-input { width: 32px; height: 38px; font-size: 15px; border-radius: 8px; }
+            .otp-inputs { gap: 4px; }
+            .form-header h1 { font-size: 20px; }
+            .bottom-row { flex-direction: column; gap: 6px; }
         }
     </style>
 </head>
@@ -505,13 +716,6 @@
         <div class="auth-card">
             <!-- Left: Form Panel -->
             <div class="form-panel">
-                <!-- Mobile illustrations (visible on small screens only) -->
-                <div class="mobile-illust" id="mobileIllust">
-                    <div class="m-illust active" id="mIllustLogin"><img src="/assets/mobile-login.png" alt="Login"></div>
-                    <div class="m-illust" id="mIllustSignup"><img src="/assets/mobile-signup.png" alt="Signup"></div>
-                    <div class="m-illust" id="mIllustForgot"><img src="/assets/mobile-pass-reset.png" alt="Reset Password"></div>
-                    <div class="m-illust" id="mIllustOtp"><img src="/assets/mobile-login.png" alt="Verification"></div>
-                </div>
 
                 <div class="form-header">
                     <h1 id="formTitle">Sign In</h1>
@@ -534,18 +738,58 @@
                             <label for="loginEmail">Email</label>
                             <input type="email" class="input-field" id="loginEmail" placeholder="Email" required autocomplete="email">
                         </div>
-                        <div class="form-group">
-                            <label for="loginPassword">Password</label>
-                            <input type="password" class="input-field" id="loginPassword" placeholder="Password" required autocomplete="current-password">
+
+                        <!-- Password group (hidden when OTP is showing) -->
+                        <div id="loginPasswordGroup">
+                            <div class="form-group">
+                                <label for="loginPassword">Password</label>
+                                <input type="password" class="input-field" id="loginPassword" placeholder="Password" required autocomplete="current-password">
+                            </div>
+                            <div class="password-row">
+                                <button type="button" class="forgot-link" onclick="showSection('forgot')">Forgot password?</button>
+                            </div>
                         </div>
-                        <div class="password-row">
-                            <button type="button" class="forgot-link" onclick="showSection('forgot')">Forgot password?</button>
+
+                        <!-- OTP inline (shown after password verify when OTP enabled) -->
+                        <div id="loginOtpInline" class="otp-inline">
+                            <p class="otp-info">
+                                Enter the 6-digit verification code sent to<br>
+                                <strong id="otpEmailDisplay"></strong>
+                            </p>
+                            <div class="otp-inputs" id="loginOtpInputs">
+                                <input type="text" maxlength="1" class="otp-input" data-index="0" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="1" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="2" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="3" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="4" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="5" inputmode="numeric">
+                            </div>
                         </div>
+
                         <button type="submit" class="btn-primary" id="loginBtn">
                             Login
                             <span class="spinner"></span>
                         </button>
                     </form>
+
+                    <!-- Passkey sign-in (only if passkey is enabled) -->
+                    {% if passkey_enabled %}
+                    <div class="divider"><span>or</span></div>
+                    <button type="button" class="btn-passkey" id="passkeyLoginBtn" onclick="handlePasskeyLogin()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/>
+                            <circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>
+                        </svg>
+                        Sign in with passkey
+                    </button>
+                    <div class="passkey-register-row" id="passkeyRegisterRow">
+                        <button type="button" class="passkey-register-link" onclick="handlePasskeyRegister()">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+                            Set up a passkey for faster sign-in
+                        </button>
+                    </div>
+                    {% endif %}
+
                     <div class="bottom-row">
                         <span class="info-text">Don't have an account?</span>
                         <button class="switch-link" onclick="showSection('signup')">Create account</button>
@@ -579,33 +823,10 @@
                     </div>
                 </div>
 
-                <!-- ========== OTP FORM (Login OTP) ========== -->
-                <div id="otpSection" class="form-section">
-                    <form onsubmit="handleOTP(event)">
-                        <p class="otp-info">
-                            Enter the 6-digit verification code sent to<br>
-                            <strong id="otpEmailDisplay"></strong>
-                        </p>
-                        <div class="otp-inputs" id="loginOtpInputs">
-                            <input type="text" maxlength="1" class="otp-input" data-index="0" inputmode="numeric">
-                            <input type="text" maxlength="1" class="otp-input" data-index="1" inputmode="numeric">
-                            <input type="text" maxlength="1" class="otp-input" data-index="2" inputmode="numeric">
-                            <input type="text" maxlength="1" class="otp-input" data-index="3" inputmode="numeric">
-                            <input type="text" maxlength="1" class="otp-input" data-index="4" inputmode="numeric">
-                            <input type="text" maxlength="1" class="otp-input" data-index="5" inputmode="numeric">
-                        </div>
-                        <button type="submit" class="btn-primary" id="otpBtn">
-                            Verify and Continue
-                            <span class="spinner"></span>
-                        </button>
-                        <button type="button" class="btn-link" onclick="showSection('login')">Back to sign in</button>
-                    </form>
-                </div>
-
                 <!-- ========== FORGOT PASSWORD FORM ========== -->
                 <div id="forgotSection" class="form-section">
                     <form onsubmit="handleForgotPassword(event)">
-                        <p class="otp-info">
+                        <p class="otp-info" style="text-align:left; margin-bottom:14px; color:#555; font-size:14px;">
                             Enter the email address associated with your account and we will send you a verification code to reset your password.
                         </p>
                         <div class="form-group">
@@ -623,7 +844,7 @@
                 <!-- ========== RESET PASSWORD OTP + NEW PASSWORD ========== -->
                 <div id="resetOtpSection" class="form-section">
                     <form onsubmit="handleResetPassword(event)">
-                        <p class="otp-info">
+                        <p class="otp-info" style="text-align:center; margin-bottom:10px; color:#555; font-size:14px;">
                             Enter the 6-digit code sent to<br>
                             <strong id="resetOtpEmailDisplay"></strong>
                         </p>
@@ -652,6 +873,21 @@
                     </form>
                 </div>
                 </div><!-- end form-body -->
+
+                <!-- Passkey Auth Overlay -->
+                {% if passkey_enabled %}
+                <div class="passkey-overlay" id="passkeyOverlay">
+                    <div class="pk-icon waiting" id="pkIcon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/>
+                            <circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>
+                        </svg>
+                        <div class="pk-ring" id="pkRing"></div>
+                    </div>
+                    <div class="pk-status" id="pkStatus">Waiting for passkey...</div>
+                    <div class="pk-hint" id="pkHint">Follow your browser or device prompt</div>
+                </div>
+                {% endif %}
             </div>
 
             <!-- Right: Illustration Panel -->
@@ -659,7 +895,6 @@
                 <div class="illust active" id="illustLogin"><img src="/assets/login.png" alt="Login"></div>
                 <div class="illust" id="illustSignup"><img src="/assets/signup.png" alt="Sign Up"></div>
                 <div class="illust" id="illustForgot"><img src="/assets/reset-password.png" alt="Reset Password"></div>
-                <div class="illust" id="illustOtp"><img src="/assets/login.png" alt="Verification"></div>
             </div>
         </div>
 
@@ -673,111 +908,124 @@
     <script>
         const SESSION_ID = "{{ session_id }}";
         const API_BASE = window.location.origin;
+        const OTP_ENABLED = {{ "true" if otp_enabled else "false" }};
+        const PASSKEY_ENABLED = {{ "true" if passkey_enabled else "false" }};
 
         let currentEmail = "";
         let resetEmail = "";
         let activeSection = "login";
+        let loginState = "password"; // "password" or "otp"
 
         // ==================== Section Transitions ====================
 
         const sectionConfig = {
-            login:    { mode: "login",     title: "Sign In",          subtitle: "Access your account",               illust: "illustLogin",  mIllust: "mIllustLogin" },
-            signup:   { mode: "signup",    title: "Sign Up",          subtitle: "Create your account",               illust: "illustSignup", mIllust: "mIllustSignup" },
-            otp:      { mode: "otp",       title: "Verification",     subtitle: "Confirm your identity",             illust: "illustOtp",    mIllust: "mIllustOtp" },
-            forgot:   { mode: "forgot",    title: "Forgot Password",  subtitle: "Reset your password",               illust: "illustForgot", mIllust: "mIllustForgot" },
-            resetOtp: { mode: "reset-otp", title: "Reset Password",   subtitle: "Enter the code and new password",   illust: "illustForgot", mIllust: "mIllustForgot" }
+            login:    { mode: "login",     title: "Sign In",          subtitle: "Access your account",               illust: "illustLogin" },
+            signup:   { mode: "signup",    title: "Sign Up",          subtitle: "Create your account",               illust: "illustSignup" },
+            forgot:   { mode: "forgot",    title: "Forgot Password",  subtitle: "Reset your password",               illust: "illustForgot" },
+            resetOtp: { mode: "reset-otp", title: "Reset Password",   subtitle: "Enter the code and new password",   illust: "illustForgot" }
         };
 
         const sectionIds = {
             login: "loginSection",
             signup: "signupSection",
-            otp: "otpSection",
             forgot: "forgotSection",
             resetOtp: "resetOtpSection"
         };
-
-        function isMobile() {
-            return window.innerWidth <= 720;
-        }
-
-        function updateFormBodyHeight(sectionEl) {
-            if (!isMobile()) return;
-            const formBody = document.querySelector('.form-body');
-            // Temporarily make section visible to measure
-            sectionEl.style.position = 'relative';
-            sectionEl.style.opacity = '1';
-            sectionEl.style.visibility = 'hidden';
-            const h = sectionEl.scrollHeight;
-            sectionEl.style.position = '';
-            sectionEl.style.opacity = '';
-            sectionEl.style.visibility = '';
-            formBody.style.height = h + 'px';
-        }
 
         function showSection(name) {
             if (name === activeSection) return;
             clearMessages();
 
+            // Reset login state when navigating back to login
+            if (name === "login") {
+                resetLoginToPassword();
+            }
+
             const prevEl = document.getElementById(sectionIds[activeSection]);
             const nextEl = document.getElementById(sectionIds[name]);
             const config = sectionConfig[name];
 
-            // Pre-measure new section height for mobile
-            if (isMobile()) {
-                updateFormBodyHeight(nextEl);
-            }
-
-            // Transition out old section
+            // Animate out the previous section
             prevEl.classList.remove("active");
             prevEl.classList.add("leaving");
+
             setTimeout(() => {
                 prevEl.classList.remove("leaving");
-            }, 350);
-
-            // Transition in new section after brief delay
-            setTimeout(() => {
+                // Animate in the next section
                 nextEl.classList.add("active");
-            }, 150);
+            }, 200);
 
-            // Update body mode
             document.body.className = "mode-" + config.mode;
 
-            // Update header
             document.getElementById("formTitle").textContent = config.title;
             document.getElementById("formSubtitle").textContent = config.subtitle;
 
-            // Update desktop illustration
             document.querySelectorAll(".illust").forEach(el => el.classList.remove("active"));
             document.getElementById(config.illust).classList.add("active");
-
-            // Update mobile illustration
-            document.querySelectorAll(".m-illust").forEach(el => el.classList.remove("active"));
-            document.getElementById(config.mIllust).classList.add("active");
 
             activeSection = name;
         }
 
-        // Set initial form-body height on mobile
-        window.addEventListener('DOMContentLoaded', () => {
-            if (isMobile()) {
-                const activeEl = document.querySelector('.form-section.active');
-                if (activeEl) {
-                    const formBody = document.querySelector('.form-body');
-                    formBody.style.height = activeEl.scrollHeight + 'px';
-                }
-            }
-        });
+        // ==================== Login OTP Inline ====================
 
-        // Re-calc on resize
-        window.addEventListener('resize', () => {
-            const formBody = document.querySelector('.form-body');
-            if (isMobile()) {
-                const activeEl = document.querySelector('.form-section.active');
-                if (activeEl) formBody.style.height = activeEl.scrollHeight + 'px';
-            } else {
-                formBody.style.height = '';
+        function showOtpInline(email) {
+            loginState = "otp";
+            const otpInline = document.getElementById("loginOtpInline");
+            const pwGroup = document.getElementById("loginPasswordGroup");
+            const loginPassword = document.getElementById("loginPassword");
+
+            pwGroup.style.display = "none";
+            loginPassword.removeAttribute("required");
+
+            document.getElementById("otpEmailDisplay").textContent = email;
+            otpInline.classList.add("active");
+
+            document.getElementById("loginBtn").textContent = "Verify & Continue";
+            // Re-add spinner
+            if (!document.querySelector("#loginBtn .spinner")) {
+                document.getElementById("loginBtn").insertAdjacentHTML("beforeend", '<span class="spinner"></span>');
             }
-        });
+
+            // Hide passkey section when showing OTP
+            const passkeyDivider = document.querySelector("#loginSection .divider");
+            const passkeyBtn = document.getElementById("passkeyLoginBtn");
+            const passkeyRegRow = document.getElementById("passkeyRegisterRow");
+            if (passkeyDivider) passkeyDivider.style.display = "none";
+            if (passkeyBtn) passkeyBtn.style.display = "none";
+            if (passkeyRegRow) passkeyRegRow.style.display = "none";
+
+            // Focus first OTP input
+            setTimeout(() => {
+                const first = document.querySelector("#loginOtpInputs .otp-input");
+                if (first) first.focus();
+            }, 100);
+
+        }
+
+        function resetLoginToPassword() {
+            loginState = "password";
+            const otpInline = document.getElementById("loginOtpInline");
+            const pwGroup = document.getElementById("loginPasswordGroup");
+            const loginPassword = document.getElementById("loginPassword");
+
+            otpInline.classList.remove("active");
+            pwGroup.style.display = "";
+            loginPassword.setAttribute("required", "");
+
+            // Clear OTP inputs
+            document.querySelectorAll("#loginOtpInputs .otp-input").forEach(i => { i.value = ""; });
+
+            const loginBtn = document.getElementById("loginBtn");
+            loginBtn.innerHTML = 'Login<span class="spinner"></span>';
+
+            // Restore passkey section
+            const passkeyDivider = document.querySelector("#loginSection .divider");
+            const passkeyBtn = document.getElementById("passkeyLoginBtn");
+            const passkeyRegRow = document.getElementById("passkeyRegisterRow");
+            if (passkeyDivider) passkeyDivider.style.display = "";
+            if (passkeyBtn) passkeyBtn.style.display = "";
+            if (passkeyRegRow) passkeyRegRow.style.display = "";
+        }
 
         // ==================== Signup ====================
 
@@ -834,9 +1082,14 @@
             clearMessages();
 
             const email = document.getElementById("loginEmail").value.trim();
-            const password = document.getElementById("loginPassword").value;
             currentEmail = email;
 
+            // If we're in OTP state, handle OTP verification
+            if (loginState === "otp") {
+                return handleOTPVerify();
+            }
+
+            const password = document.getElementById("loginPassword").value;
             setLoading("loginBtn", true);
 
             try {
@@ -854,11 +1107,8 @@
 
                 if (res.ok) {
                     if (data.action === "show_otp") {
-                        showSection("otp");
-                        document.getElementById("otpEmailDisplay").textContent = email;
-                        setTimeout(() => {
-                            document.querySelector("#loginOtpInputs .otp-input").focus();
-                        }, 350);
+                        // Show OTP inline instead of navigating to separate page
+                        showOtpInline(email);
                         showSuccess(data.message);
                     } else if (data.action === "redirect") {
                         showSuccess("Authentication successful! Redirecting...");
@@ -874,10 +1124,9 @@
             }
         }
 
-        // ==================== OTP Verification ====================
+        // ==================== OTP Verification (Inline) ====================
 
-        async function handleOTP(e) {
-            e.preventDefault();
+        async function handleOTPVerify() {
             clearMessages();
 
             const inputs = document.querySelectorAll("#loginOtpInputs .otp-input");
@@ -885,7 +1134,7 @@
 
             if (otp.length !== 6) { showError("Please enter the complete 6-digit code"); return; }
 
-            setLoading("otpBtn", true);
+            setLoading("loginBtn", true);
 
             try {
                 const res = await fetch(`${API_BASE}/oauth/authenticate`, {
@@ -911,8 +1160,305 @@
             } catch (err) {
                 showError("Connection error. Please try again.");
             } finally {
-                setLoading("otpBtn", false);
+                setLoading("loginBtn", false);
             }
+        }
+
+        // ==================== Passkey ====================
+
+        // ====== Passkey Overlay Helpers ======
+
+        function showPasskeyOverlay(state, status, hint) {
+            const overlay = document.getElementById('passkeyOverlay');
+            const icon = document.getElementById('pkIcon');
+            const ring = document.getElementById('pkRing');
+            const statusEl = document.getElementById('pkStatus');
+            const hintEl = document.getElementById('pkHint');
+            if (!overlay) return;
+
+            icon.className = 'pk-icon ' + state;
+            ring.style.display = state === 'waiting' ? '' : 'none';
+
+            // Swap icon SVG based on state
+            if (state === 'success') {
+                icon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+            } else if (state === 'error') {
+                icon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+            } else {
+                icon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg><div class="pk-ring" id="pkRing"></div>';
+            }
+
+            statusEl.textContent = status;
+            hintEl.textContent = hint || '';
+            overlay.classList.add('active');
+        }
+
+        function hidePasskeyOverlay() {
+            const overlay = document.getElementById('passkeyOverlay');
+            if (overlay) overlay.classList.remove('active');
+        }
+
+        async function handlePasskeyLogin() {
+            if (!PASSKEY_ENABLED) return;
+            clearMessages();
+
+            const btn = document.getElementById("passkeyLoginBtn");
+            btn.classList.add("loading");
+            showPasskeyOverlay('waiting', 'Initiating passkey...', 'Connecting to server');
+
+            try {
+                // 1. Get authentication options from server
+                const rpId = window.location.hostname;
+                const beginRes = await fetch(`${API_BASE}/oauth/authenticate`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        session_id: SESSION_ID,
+                        action: "passkey_auth_begin",
+                        rp_id: rpId
+                    })
+                });
+                const beginData = await beginRes.json();
+
+                if (!beginRes.ok) {
+                    showPasskeyOverlay('error', 'Connection failed', beginData.detail || '');
+                    setTimeout(hidePasskeyOverlay, 1800);
+                    return;
+                }
+
+                // If no passkeys registered, prompt user to create one
+                if (beginData.action === "no_passkeys") {
+                    hidePasskeyOverlay();
+                    showPasskeySetupPrompt();
+                    return;
+                }
+
+                const options = beginData.options;
+
+                showPasskeyOverlay('waiting', 'Waiting for passkey...', 'Follow your browser or device prompt');
+
+                // 2. Call WebAuthn API
+                const publicKeyOptions = {
+                    challenge: base64urlToBuffer(options.challenge),
+                    rpId: options.rpId,
+                    timeout: options.timeout,
+                    userVerification: options.userVerification || "required",
+                };
+
+                if (options.allowCredentials && options.allowCredentials.length > 0) {
+                    publicKeyOptions.allowCredentials = options.allowCredentials.map(c => ({
+                        type: c.type,
+                        id: base64urlToBuffer(c.id),
+                    }));
+                }
+
+                const assertion = await navigator.credentials.get({ publicKey: publicKeyOptions });
+
+                showPasskeyOverlay('waiting', 'Verifying...', 'Almost there');
+
+                // 3. Send assertion to server
+                const completeRes = await fetch(`${API_BASE}/oauth/authenticate`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        session_id: SESSION_ID,
+                        action: "passkey_auth_complete",
+                        rp_id: rpId,
+                        credential: {
+                            id: bufferToBase64url(assertion.rawId),
+                            clientDataJSON: bufferToBase64url(assertion.response.clientDataJSON),
+                            authenticatorData: bufferToBase64url(assertion.response.authenticatorData),
+                            signature: bufferToBase64url(assertion.response.signature),
+                        }
+                    })
+                });
+                const completeData = await completeRes.json();
+
+                if (completeRes.ok && completeData.action === "redirect") {
+                    showPasskeyOverlay('success', 'Authenticated!', 'Redirecting you now...');
+                    setTimeout(() => { window.location.href = completeData.redirect_url; }, 800);
+                } else {
+                    showPasskeyOverlay('error', 'Authentication failed', completeData.detail || '');
+                    setTimeout(hidePasskeyOverlay, 2000);
+                }
+            } catch (err) {
+                if (err.name === "NotAllowedError") {
+                    showPasskeyOverlay('error', 'Cancelled', 'Passkey authentication was cancelled');
+                } else if (err.name === "SecurityError") {
+                    showPasskeyOverlay('error', 'Not available', 'Passkey not available in this context');
+                } else {
+                    console.error("Passkey error:", err);
+                    showPasskeyOverlay('error', 'Failed', 'Try password login instead');
+                }
+                setTimeout(hidePasskeyOverlay, 2000);
+            } finally {
+                btn.classList.remove("loading");
+            }
+        }
+
+        function showPasskeySetupPrompt() {
+            const existingPrompt = document.getElementById("passkeySetupPrompt");
+            if (existingPrompt) { existingPrompt.remove(); }
+
+            const prompt = document.createElement("div");
+            prompt.id = "passkeySetupPrompt";
+            prompt.style.cssText = "animation: fadeIn 0.3s ease; margin-top: 4px;";
+            prompt.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                        <path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/>
+                        <circle cx="16.5" cy="7.5" r=".5" fill="#d97706"/>
+                    </svg>
+                    <div style="flex:1; min-width:0;">
+                        <span style="font-size: 13px; color: #92400e; font-weight: 500;">No passkey found.</span>
+                        <span style="font-size: 12px; color: #a16207;"> Sign in with password, or </span>
+                        <button type="button" onclick="dismissPasskeyPrompt(); handlePasskeyRegister();" 
+                                style="font-size: 12px; color: #d97706; font-weight: 600; background: none; border: none; cursor: pointer; font-family: inherit; padding: 0; text-decoration: underline;">
+                            set one up now</button>
+                    </div>
+                    <button type="button" onclick="dismissPasskeyPrompt()" style="background: none; border: none; cursor: pointer; padding: 2px; color: #d97706; flex-shrink: 0; line-height: 1;" aria-label="Dismiss">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            `;
+
+            // Insert after the passkey button
+            const passkeyBtn = document.getElementById("passkeyLoginBtn");
+            passkeyBtn.parentNode.insertBefore(prompt, passkeyBtn.nextSibling.nextSibling);
+
+            // Hide the passkey register row
+            const passkeyRegRow = document.getElementById("passkeyRegisterRow");
+            if (passkeyRegRow) passkeyRegRow.style.display = "none";
+        }
+
+        function dismissPasskeyPrompt() {
+            const prompt = document.getElementById("passkeySetupPrompt");
+            if (prompt) {
+                prompt.style.animation = 'sectionOut 0.2s ease forwards';
+                setTimeout(() => prompt.remove(), 200);
+            }
+            const passkeyRegRow = document.getElementById("passkeyRegisterRow");
+            if (passkeyRegRow) passkeyRegRow.style.display = "";
+        }
+
+        async function handlePasskeyRegister() {
+            if (!PASSKEY_ENABLED) return;
+            clearMessages();
+
+            const email = document.getElementById("loginEmail").value.trim();
+            if (!email) {
+                showError("Please enter your email first, then set up a passkey.");
+                document.getElementById("loginEmail").focus();
+                return;
+            }
+
+            try {
+                const rpId = window.location.hostname;
+
+                // 1. Get registration options
+                const beginRes = await fetch(`${API_BASE}/oauth/authenticate`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        session_id: SESSION_ID,
+                        action: "passkey_register_begin",
+                        email: email,
+                        rp_id: rpId
+                    })
+                });
+                const beginData = await beginRes.json();
+
+                if (!beginRes.ok) {
+                    showError(beginData.detail || "Failed to start passkey registration");
+                    return;
+                }
+
+                const options = beginData.options;
+
+                // 2. Call WebAuthn API
+                const publicKeyOptions = {
+                    challenge: base64urlToBuffer(options.challenge),
+                    rp: { name: options.rp.name, id: options.rp.id },
+                    user: {
+                        id: base64urlToBuffer(options.user.id),
+                        name: options.user.name,
+                        displayName: options.user.displayName,
+                    },
+                    pubKeyCredParams: options.pubKeyCredParams,
+                    timeout: options.timeout,
+                    authenticatorSelection: options.authenticatorSelection,
+                    attestation: options.attestation || "none",
+                };
+
+                if (options.excludeCredentials) {
+                    publicKeyOptions.excludeCredentials = options.excludeCredentials.map(c => ({
+                        type: c.type,
+                        id: base64urlToBuffer(c.id),
+                    }));
+                }
+
+                const credential = await navigator.credentials.create({ publicKey: publicKeyOptions });
+
+                // 3. Send registration to server
+                const completeRes = await fetch(`${API_BASE}/oauth/authenticate`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        session_id: SESSION_ID,
+                        action: "passkey_register_complete",
+                        email: email,
+                        rp_id: rpId,
+                        credential: {
+                            id: bufferToBase64url(credential.rawId),
+                            clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+                            attestationObject: bufferToBase64url(credential.response.attestationObject),
+                            deviceName: navigator.userAgent.includes("Mac") ? "Mac" :
+                                        navigator.userAgent.includes("iPhone") ? "iPhone" :
+                                        navigator.userAgent.includes("Android") ? "Android" :
+                                        navigator.userAgent.includes("Windows") ? "Windows" : "Device",
+                        }
+                    })
+                });
+                const completeData = await completeRes.json();
+
+                if (completeRes.ok) {
+                    showSuccess(completeData.message || "Passkey registered! You can now use it to sign in.");
+                } else {
+                    showError(completeData.detail || "Passkey registration failed");
+                }
+            } catch (err) {
+                if (err.name === "NotAllowedError") {
+                    showError("Passkey registration was cancelled.");
+                } else if (err.name === "InvalidStateError") {
+                    showError("A passkey already exists for this account on this device.");
+                } else {
+                    console.error("Passkey reg error:", err);
+                    showError("Passkey registration failed.");
+                }
+            }
+        }
+
+        // ==================== WebAuthn Helpers ====================
+
+        function base64urlToBuffer(base64url) {
+            const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+            const padding = '='.repeat((4 - base64.length % 4) % 4);
+            const binary = atob(base64 + padding);
+            const buffer = new ArrayBuffer(binary.length);
+            const view = new Uint8Array(buffer);
+            for (let i = 0; i < binary.length; i++) {
+                view[i] = binary.charCodeAt(i);
+            }
+            return buffer;
+        }
+
+        function bufferToBase64url(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
         }
 
         // ==================== Forgot Password ====================
@@ -995,7 +1541,6 @@
                         showSection("login");
                         document.getElementById("loginEmail").value = resetEmail;
                         document.getElementById("loginPassword").focus();
-                        // Clear reset form
                         inputs.forEach(i => { i.value = ""; });
                         document.getElementById("resetNewPassword").value = "";
                         document.getElementById("resetConfirmPassword").value = "";

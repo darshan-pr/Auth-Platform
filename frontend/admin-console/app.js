@@ -168,14 +168,14 @@ function animateValue(elementId, target) {
 
 async function loadApps() {
     const tbody = document.getElementById('appsTableBody');
-    tbody.innerHTML = '<tr><td colspan="8" class="loading">Loading applications...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading applications...</td></tr>';
 
     try {
         const response = await fetch(`${API_URL}/admin/apps`);
         apps = await response.json();
 
         if (apps.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="loading">No applications yet. Create your first app.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="loading">No applications yet. Create your first app.</td></tr>';
             return;
         }
 
@@ -187,6 +187,7 @@ async function loadApps() {
                 <td class="app-name-cell">${escapeHtml(app.name || 'Unnamed')}</td>
                 <td><code>${app.app_id}</code></td>
                 <td><span class="status-badge ${app.otp_enabled ? 'active' : 'inactive'}">${app.otp_enabled ? 'Enabled' : 'Disabled'}</span></td>
+                <td><span class="status-badge ${app.passkey_enabled ? 'active' : 'inactive'}">${app.passkey_enabled ? 'Enabled' : 'Disabled'}</span></td>
                 <td><span class="status-badge ${app.login_notification_enabled ? 'active' : 'inactive'}">${app.login_notification_enabled ? 'On' : 'Off'}</span></td>
                 <td>${app.access_token_expiry_minutes}m / ${app.refresh_token_expiry_days}d</td>
                 <td class="redirect-uris">${app.redirect_uris ? escapeHtml(app.redirect_uris) : '<span style="color:#94a3b8">Not set</span>'}</td>
@@ -221,7 +222,7 @@ async function loadApps() {
         renderIcons();
     } catch (error) {
         console.error('Error loading apps:', error);
-        tbody.innerHTML = '<tr><td colspan="8" class="loading">Failed to load applications</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="loading">Failed to load applications</td></tr>';
     }
 }
 
@@ -231,6 +232,7 @@ function showCreateAppModal() {
     document.getElementById('appFormSubmit').textContent = 'Create App';
     document.getElementById('appForm').reset();
     document.getElementById('appOtpEnabled').checked = true;
+    document.getElementById('appPasskeyEnabled').checked = false;
     document.getElementById('appLoginNotification').checked = false;
     document.getElementById('appAccessTokenExpiry').value = 30;
     document.getElementById('appRefreshTokenExpiry').value = 7;
@@ -248,6 +250,7 @@ function editApp(appId) {
     document.getElementById('appName').value = app.name || '';
     document.getElementById('appDescription').value = app.description || '';
     document.getElementById('appOtpEnabled').checked = app.otp_enabled !== false;
+    document.getElementById('appPasskeyEnabled').checked = app.passkey_enabled === true;
     document.getElementById('appLoginNotification').checked = app.login_notification_enabled === true;
     document.getElementById('appAccessTokenExpiry').value = app.access_token_expiry_minutes || 30;
     document.getElementById('appRefreshTokenExpiry').value = app.refresh_token_expiry_days || 7;
@@ -259,6 +262,7 @@ async function saveApp() {
     const name = document.getElementById('appName').value.trim();
     const description = document.getElementById('appDescription').value.trim();
     const otp_enabled = document.getElementById('appOtpEnabled').checked;
+    const passkey_enabled = document.getElementById('appPasskeyEnabled').checked;
     const login_notification_enabled = document.getElementById('appLoginNotification').checked;
     const access_token_expiry_minutes = parseInt(document.getElementById('appAccessTokenExpiry').value) || 30;
     const refresh_token_expiry_days = parseInt(document.getElementById('appRefreshTokenExpiry').value) || 7;
@@ -267,7 +271,7 @@ async function saveApp() {
     if (!name) { showToast('Please enter an app name', 'error'); return; }
 
     try {
-        const body = { name, description, otp_enabled, login_notification_enabled, access_token_expiry_minutes, refresh_token_expiry_days };
+        const body = { name, description, otp_enabled, passkey_enabled, login_notification_enabled, access_token_expiry_minutes, refresh_token_expiry_days };
         if (redirect_uris) body.redirect_uris = redirect_uris;
 
         let response;

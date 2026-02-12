@@ -18,6 +18,7 @@ class AppCreateRequest(BaseModel):
     description: Optional[str] = None
     otp_enabled: bool = True
     login_notification_enabled: bool = False
+    passkey_enabled: bool = False
     access_token_expiry_minutes: int = 30
     refresh_token_expiry_days: int = 7
     redirect_uris: Optional[str] = None  # Comma-separated allowed redirect URIs
@@ -27,6 +28,7 @@ class AppUpdateRequest(BaseModel):
     description: Optional[str] = None
     otp_enabled: Optional[bool] = None
     login_notification_enabled: Optional[bool] = None
+    passkey_enabled: Optional[bool] = None
     access_token_expiry_minutes: Optional[int] = None
     refresh_token_expiry_days: Optional[int] = None
     redirect_uris: Optional[str] = None
@@ -79,6 +81,7 @@ def create_app(request: AppCreateRequest, db: Session = Depends(get_db)):
             description=request.description,
             otp_enabled=request.otp_enabled,
             login_notification_enabled=request.login_notification_enabled,
+            passkey_enabled=request.passkey_enabled,
             access_token_expiry_minutes=request.access_token_expiry_minutes,
             refresh_token_expiry_days=request.refresh_token_expiry_days,
             redirect_uris=request.redirect_uris
@@ -94,6 +97,7 @@ def create_app(request: AppCreateRequest, db: Session = Depends(get_db)):
             "name": app.name,
             "otp_enabled": app.otp_enabled,
             "login_notification_enabled": app.login_notification_enabled,
+            "passkey_enabled": app.passkey_enabled,
             "access_token_expiry_minutes": app.access_token_expiry_minutes,
             "refresh_token_expiry_days": app.refresh_token_expiry_days,
             "redirect_uris": app.redirect_uris,
@@ -138,6 +142,7 @@ def list_apps(
         "is_active": True,  # All apps are active by default
         "otp_enabled": app.otp_enabled,
         "login_notification_enabled": app.login_notification_enabled,
+        "passkey_enabled": app.passkey_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days,
         "redirect_uris": app.redirect_uris,
@@ -158,6 +163,7 @@ def get_app(app_id: str, db: Session = Depends(get_db)):
         "description": app.description,
         "otp_enabled": app.otp_enabled,
         "login_notification_enabled": app.login_notification_enabled,
+        "passkey_enabled": app.passkey_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days,
         "redirect_uris": app.redirect_uris,
@@ -180,6 +186,8 @@ def update_app(app_id: str, request: AppUpdateRequest, db: Session = Depends(get
         app.otp_enabled = request.otp_enabled
     if request.login_notification_enabled is not None:
         app.login_notification_enabled = request.login_notification_enabled
+    if request.passkey_enabled is not None:
+        app.passkey_enabled = request.passkey_enabled
     if request.access_token_expiry_minutes is not None:
         app.access_token_expiry_minutes = request.access_token_expiry_minutes
     if request.refresh_token_expiry_days is not None:
@@ -197,6 +205,7 @@ def update_app(app_id: str, request: AppUpdateRequest, db: Session = Depends(get
         "description": app.description,
         "otp_enabled": app.otp_enabled,
         "login_notification_enabled": app.login_notification_enabled,
+        "passkey_enabled": app.passkey_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days,
         "redirect_uris": app.redirect_uris,

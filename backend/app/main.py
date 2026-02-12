@@ -10,6 +10,7 @@ from app.models.app import App
 from app.models.user import User
 from app.models.admin import Admin
 from app.models.refresh_token import RefreshToken
+from app.models.passkey import PasskeyCredential
 
 # Create all tables
 Base.metadata.create_all(bind=engine)

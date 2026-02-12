@@ -173,6 +173,7 @@
                                 <th>Name</th>
                                 <th>App ID</th>
                                 <th>OTP</th>
+                                <th>Passkey</th>
                                 <th>Login Alert</th>
                                 <th>Token Expiry</th>
                                 <th>Redirect URIs</th>
@@ -266,6 +267,13 @@
                                 <span>Enable OTP Verification</span>
                             </label>
                             <small>Users must verify via OTP after password login</small>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="appPasskeyEnabled">
+                                <span>Enable Passkey Authentication</span>
+                            </label>
+                            <small>Allow users to sign in with biometrics or security keys (WebAuthn)</small>
                         </div>
                         <div class="form-group checkbox-group">
                             <label class="checkbox-label">

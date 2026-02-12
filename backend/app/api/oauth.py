@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from app.db import get_db
 from app.models.app import App
 from app.models.user import User
+from app.models.passkey import PasskeyCredential
 from app.services.oauth_service import (
     create_oauth_session,
     get_oauth_session,
@@ -29,6 +30,12 @@ from app.services.oauth_service import (
 from app.services.password_service import hash_password, verify_password
 from app.services.otp_service import generate_otp, verify_otp, generate_password_reset_otp, verify_password_reset_otp
 from app.services.mail_service import send_otp_email, send_login_notification_email, send_password_reset_email
+from app.services.passkey_service import (
+    generate_passkey_registration_challenge,
+    verify_passkey_registration,
+    generate_passkey_auth_challenge,
+    verify_passkey_authentication,
+)
 from app.api.auth import generate_tokens_for_user
 
 router = APIRouter(prefix="/oauth")
@@ -119,6 +126,7 @@ def authorize(
         "app_name": app.name or "Application",
         "app_id": client_id,
         "otp_enabled": app.otp_enabled,
+        "passkey_enabled": app.passkey_enabled,
         "error": None,
     })
 
@@ -127,11 +135,14 @@ def authorize(
 
 class AuthenticateRequest(BaseModel):
     session_id: str
-    action: str  # "login", "signup", "verify_otp", "forgot_password", "reset_password"
-    email: str
+    action: str  # "login", "signup", "verify_otp", "forgot_password", "reset_password", "passkey_register_begin", "passkey_register_complete", "passkey_auth_begin", "passkey_auth_complete"
+    email: Optional[str] = None
     password: Optional[str] = None
     otp: Optional[str] = None
     new_password: Optional[str] = None
+    # Passkey fields
+    credential: Optional[dict] = None
+    rp_id: Optional[str] = None
 
 
 @router.post("/authenticate")
@@ -169,6 +180,14 @@ def authenticate(req: AuthenticateRequest, db: Session = Depends(get_db)):
         return _handle_forgot_password(req, session, app, db)
     elif req.action == "reset_password":
         return _handle_reset_password(req, session, app, db)
+    elif req.action == "passkey_register_begin":
+        return _handle_passkey_register_begin(req, session, app, db)
+    elif req.action == "passkey_register_complete":
+        return _handle_passkey_register_complete(req, session, app, db)
+    elif req.action == "passkey_auth_begin":
+        return _handle_passkey_auth_begin(req, session, app, db)
+    elif req.action == "passkey_auth_complete":
+        return _handle_passkey_auth_complete(req, session, app, db)
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
 
@@ -315,6 +334,162 @@ def _handle_reset_password(req: AuthenticateRequest, session: dict, app: App, db
         "action": "password_reset_success",
         "message": "Password reset successfully. Please sign in with your new password."
     }
+
+
+# ==================== Passkey Handlers ====================
+
+def _handle_passkey_register_begin(req: AuthenticateRequest, session: dict, app: App, db: Session):
+    """Start passkey registration - generate challenge"""
+    if not app.passkey_enabled:
+        raise HTTPException(status_code=400, detail="Passkeys are not enabled for this application")
+
+    if not req.email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    user = db.query(User).filter(
+        User.email == req.email,
+        User.app_id == session["client_id"]
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found. Please sign up first.")
+
+    rp_id = req.rp_id or "localhost"
+    options = generate_passkey_registration_challenge(req.email, session["client_id"], rp_id)
+
+    # Include existing credential IDs to exclude
+    existing_creds = db.query(PasskeyCredential).filter(
+        PasskeyCredential.user_id == user.id,
+        PasskeyCredential.app_id == session["client_id"]
+    ).all()
+    if existing_creds:
+        options["excludeCredentials"] = [
+            {"type": "public-key", "id": cred.credential_id}
+            for cred in existing_creds
+        ]
+
+    return {"action": "passkey_register_options", "options": options}
+
+
+def _handle_passkey_register_complete(req: AuthenticateRequest, session: dict, app: App, db: Session):
+    """Complete passkey registration - verify and store credential"""
+    if not app.passkey_enabled:
+        raise HTTPException(status_code=400, detail="Passkeys are not enabled for this application")
+
+    if not req.email or not req.credential:
+        raise HTTPException(status_code=400, detail="Email and credential data are required")
+
+    user = db.query(User).filter(
+        User.email == req.email,
+        User.app_id == session["client_id"]
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    rp_id = req.rp_id or "localhost"
+    cred = req.credential
+
+    result = verify_passkey_registration(
+        user_email=req.email,
+        app_id=session["client_id"],
+        rp_id=rp_id,
+        credential_id=cred.get("id", ""),
+        client_data_json_b64=cred.get("clientDataJSON", ""),
+        attestation_object_b64=cred.get("attestationObject", ""),
+    )
+
+    if not result:
+        raise HTTPException(status_code=400, detail="Passkey registration verification failed")
+
+    # Store the credential
+    passkey = PasskeyCredential(
+        user_id=user.id,
+        app_id=session["client_id"],
+        credential_id=result["credential_id"],
+        public_key=result["public_key"],
+        sign_count=result["sign_count"],
+        device_name=cred.get("deviceName", "Unknown Device"),
+    )
+    db.add(passkey)
+    db.commit()
+
+    return {
+        "action": "passkey_registered",
+        "message": "Passkey registered successfully! You can now use it to sign in."
+    }
+
+
+def _handle_passkey_auth_begin(req: AuthenticateRequest, session: dict, app: App, db: Session):
+    """Start passkey authentication - generate challenge with allowed credentials"""
+    if not app.passkey_enabled:
+        raise HTTPException(status_code=400, detail="Passkeys are not enabled for this application")
+
+    rp_id = req.rp_id or "localhost"
+
+    # Get all passkey credentials for this app (for discoverable credentials)
+    all_creds = db.query(PasskeyCredential).filter(
+        PasskeyCredential.app_id == session["client_id"]
+    ).all()
+
+    if not all_creds:
+        return {"action": "no_passkeys", "message": "No passkeys registered yet. Set up a passkey to use this feature."}
+
+    credential_ids = [cred.credential_id for cred in all_creds]
+    options = generate_passkey_auth_challenge(session["client_id"], rp_id, credential_ids=credential_ids)
+
+    return {"action": "passkey_auth_options", "options": options}
+
+
+def _handle_passkey_auth_complete(req: AuthenticateRequest, session: dict, app: App, db: Session):
+    """Complete passkey authentication - verify assertion"""
+    if not app.passkey_enabled:
+        raise HTTPException(status_code=400, detail="Passkeys are not enabled for this application")
+
+    if not req.credential:
+        raise HTTPException(status_code=400, detail="Credential data is required")
+
+    cred = req.credential
+    credential_id = cred.get("id", "")
+
+    # Find the stored credential
+    stored_cred = db.query(PasskeyCredential).filter(
+        PasskeyCredential.credential_id == credential_id,
+        PasskeyCredential.app_id == session["client_id"]
+    ).first()
+
+    if not stored_cred:
+        raise HTTPException(status_code=401, detail="Passkey not recognized. Please use password login.")
+
+    rp_id = req.rp_id or "localhost"
+
+    new_sign_count = verify_passkey_authentication(
+        app_id=session["client_id"],
+        rp_id=rp_id,
+        credential_id=credential_id,
+        client_data_json_b64=cred.get("clientDataJSON", ""),
+        authenticator_data_b64=cred.get("authenticatorData", ""),
+        signature_b64=cred.get("signature", ""),
+        stored_public_key_b64=stored_cred.public_key,
+        stored_sign_count=stored_cred.sign_count,
+    )
+
+    if new_sign_count is None:
+        raise HTTPException(status_code=401, detail="Passkey verification failed")
+
+    # Update sign count and last used
+    stored_cred.sign_count = new_sign_count
+    from datetime import datetime, timezone
+    stored_cred.last_used_at = datetime.now(timezone.utc)
+    db.commit()
+
+    # Find the user
+    user = db.query(User).filter(User.id == stored_cred.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="This account has been deactivated")
+
+    return _complete_auth(session, user, req.session_id, app)
 
 
 def _complete_auth(session: dict, user: User, session_id: str, app: App = None):
