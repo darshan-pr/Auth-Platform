@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Auth Platform — Admin Console</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Lucide Icons (lightweight SVG icon library) -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+
+    <!-- ==================== Login Screen ==================== -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-card">
+            <div class="login-logo">
+                <div class="logo-icon"><i data-lucide="shield-check"></i></div>
+                <h1>Auth Platform</h1>
+                <p class="login-subtitle">Admin Console</p>
+            </div>
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <div class="password-wrap">
+                        <input type="password" id="loginPassword" placeholder="Enter admin password" required autofocus>
+                        <button type="button" class="toggle-password" onclick="togglePasswordVisibility()">
+                            <i data-lucide="eye" id="eyeIcon"></i>
+                        </button>
+                    </div>
+                    <p id="loginError" class="login-error hidden">Incorrect password. Please try again.</p>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i data-lucide="log-in"></i> Sign In
+                </button>
+            </form>
+            <p class="login-footer">Protected admin area</p>
+        </div>
+    </div>
+
+    <!-- ==================== Main App (hidden until login) ==================== -->
+    <div id="appContainer" class="app-container hidden">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <i data-lucide="shield-check" class="brand-icon"></i>
+                    <div>
+                        <h1>Auth Platform</h1>
+                        <span class="version">Admin Console</span>
+                    </div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-page="dashboard">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-page="apps">
+                    <i data-lucide="boxes"></i>
+                    <span>Applications</span>
+                </a>
+                <a href="#" class="nav-item" data-page="users">
+                    <i data-lucide="users"></i>
+                    <span>Users</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="api-status">
+                    <span id="statusDot" class="status-dot"></span>
+                    <span id="statusText" class="status-text">Checking...</span>
+                </div>
+                <button class="btn-logout" onclick="adminLogout()">
+                    <i data-lucide="log-out"></i>
+                    <span>Sign Out</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- ========== Dashboard ========== -->
+            <section id="dashboardPage" class="page active">
+                <header class="page-header">
+                    <div>
+                        <h2>Dashboard</h2>
+                        <p class="page-desc">Overview of your auth platform</p>
+                    </div>
+                </header>
+
+                <div class="stats-grid">
+                    <div class="stat-card stat-purple">
+                        <div class="stat-icon-wrap"><i data-lucide="boxes"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="totalApps">-</span>
+                            <span class="stat-label">Applications</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-blue">
+                        <div class="stat-icon-wrap"><i data-lucide="users"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="totalUsers">-</span>
+                            <span class="stat-label">Total Users</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-green">
+                        <div class="stat-icon-wrap"><i data-lucide="user-check"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="activeUsers">-</span>
+                            <span class="stat-label">Active Users</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="card quick-actions">
+                        <div class="card-header">
+                            <h3><i data-lucide="zap"></i> Quick Actions</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="action-buttons">
+                                <button class="btn btn-primary" onclick="navigateTo('apps'); setTimeout(showCreateAppModal, 100)">
+                                    <i data-lucide="plus-circle"></i> New Application
+                                </button>
+                                <button class="btn btn-outline" onclick="navigateTo('users'); setTimeout(showCreateUserModal, 100)">
+                                    <i data-lucide="user-plus"></i> Add User
+                                </button>
+                                <a href="http://localhost:8000/docs" target="_blank" class="btn btn-outline">
+                                    <i data-lucide="file-text"></i> API Docs
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card info-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="info"></i> Getting Started</h3>
+                        </div>
+                        <div class="card-body">
+                            <ol class="getting-started-list">
+                                <li>Create an application to get a <strong>Client ID</strong></li>
+                                <li>Set the <strong>Redirect URI</strong> for your app</li>
+                                <li>Integrate using the <code>auth.js</code> SDK</li>
+                                <li>Users sign in via the hosted login page</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========== Applications ========== -->
+            <section id="appsPage" class="page">
+                <header class="page-header">
+                    <div>
+                        <h2>Applications</h2>
+                        <p class="page-desc">Manage registered OAuth applications</p>
+                    </div>
+                    <div class="page-actions">
+                        <div class="search-wrap">
+                            <i data-lucide="search" class="search-icon"></i>
+                            <input type="text" id="appSearch" placeholder="Search apps..." class="search-input" oninput="filterApps()">
+                        </div>
+                        <button class="btn btn-primary" onclick="showCreateAppModal()">
+                            <i data-lucide="plus"></i> New App
+                        </button>
+                    </div>
+                </header>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>App ID</th>
+                                <th>OTP</th>
+                                <th>Passkey</th>
+                                <th>Login Alert</th>
+                                <th>Token Expiry</th>
+                                <th>Redirect URIs</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="appsTableBody">
+                            <tr><td colspan="8" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ========== Users ========== -->
+            <section id="usersPage" class="page">
+                <header class="page-header">
+                    <div>
+                        <h2>Users</h2>
+                        <p class="page-desc">Manage authenticated users</p>
+                    </div>
+                    <div class="page-actions">
+                        <div class="filter-wrap">
+                            <i data-lucide="filter" class="filter-icon"></i>
+                            <select id="userAppFilter" class="filter-select" onchange="onAppFilterChange()">
+                                <option value="">All Applications</option>
+                            </select>
+                        </div>
+                        <div class="search-wrap">
+                            <i data-lucide="search" class="search-icon"></i>
+                            <input type="text" id="userSearch" placeholder="Search users..." class="search-input" oninput="filterUsers()">
+                        </div>
+                        <button class="btn btn-primary" onclick="showCreateUserModal()">
+                            <i data-lucide="user-plus"></i> Add User
+                        </button>
+                    </div>
+                </header>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>App</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr><td colspan="5" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ==================== Modals ==================== -->
+
+    <!-- Create/Edit App Modal -->
+    <div id="appModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="appModalTitle">Create Application</h3>
+                <button class="modal-close">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form id="appForm">
+                <input type="hidden" id="editAppId">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="appName">App Name *</label>
+                        <input type="text" id="appName" required placeholder="My Application">
+                    </div>
+                    <div class="form-group">
+                        <label for="appDescription">Description</label>
+                        <textarea id="appDescription" placeholder="Describe your application" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="appRedirectUris">Redirect URIs</label>
+                        <input type="text" id="appRedirectUris" placeholder="http://localhost:3001/">
+                        <small>Comma-separated list of allowed redirect URIs for OAuth flow</small>
+                    </div>
+
+                    <div class="form-section">
+                        <h4><i data-lucide="shield"></i> Security</h4>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="appOtpEnabled" checked>
+                                <span>Enable OTP Verification</span>
+                            </label>
+                            <small>Users must verify via OTP after password login</small>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="appPasskeyEnabled">
+                                <span>Enable Passkey Authentication</span>
+                            </label>
+                            <small>Allow users to sign in with biometrics or security keys (WebAuthn)</small>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="appLoginNotification">
+                                <span>Enable Login Notification Email</span>
+                            </label>
+                            <small>Send an email alert with session details on every successful login</small>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h4><i data-lucide="clock"></i> Session Settings</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="appAccessTokenExpiry">Access Token (min)</label>
+                                <input type="number" id="appAccessTokenExpiry" min="1" max="1440" value="30">
+                            </div>
+                            <div class="form-group">
+                                <label for="appRefreshTokenExpiry">Refresh Token (days)</label>
+                                <input type="number" id="appRefreshTokenExpiry" min="1" max="365" value="7">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('appModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="appFormSubmit">Create App</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- App Credentials Modal -->
+    <div id="credentialsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>App Credentials</h3>
+                <button class="modal-close">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i data-lucide="alert-triangle"></i>
+                    <span>Keep these credentials secure. The secret is shown only once.</span>
+                </div>
+                <div class="credential-item">
+                    <label>App ID</label>
+                    <div class="copy-field">
+                        <code id="credAppId"></code>
+                        <button type="button" class="btn-copy" onclick="copyToClipboard('credAppId')">
+                            <i data-lucide="copy"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="credential-item">
+                    <label>App Secret</label>
+                    <div class="copy-field">
+                        <code id="credAppSecret"></code>
+                        <button type="button" class="btn-copy" onclick="copyToClipboard('credAppSecret')">
+                            <i data-lucide="copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal('credentialsModal')">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit User Modal -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="userModalTitle">Add User</h3>
+                <button class="modal-close">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form id="userForm">
+                <input type="hidden" id="editUserId">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="userEmail">Email *</label>
+                        <input type="email" id="userEmail" required placeholder="user@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="userAppId">Associated App</label>
+                        <select id="userAppId">
+                            <option value="">None</option>
+                        </select>
+                    </div>
+                    <div class="form-group hidden" id="userStatusGroup">
+                        <label for="userStatus">Status</label>
+                        <select id="userStatus">
+                            <option value="true">Active</option>
+                            <option value="false">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="userFormSubmit">Add User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirm Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header modal-header-danger">
+                <h3>Confirm Deletion</h3>
+                <button class="modal-close">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body delete-confirm">
+                <div class="delete-icon"><i data-lucide="alert-triangle"></i></div>
+                <p>Are you sure you want to delete:</p>
+                <p class="delete-target" id="deleteTargetName"></p>
+                <p class="delete-warning">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+                <button class="btn btn-danger" id="deleteConfirmBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

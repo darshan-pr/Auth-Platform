@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pathlib import Path
 from app.api import admin, auth, health, token, oauth
 from app.db import engine, Base
@@ -41,3 +42,12 @@ app.include_router(oauth.router, tags=["OAuth"])
 # Serve static assets (illustrations etc.)
 assets_dir = Path(__file__).resolve().parent / "assets"
 app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+# Serve admin console frontend
+static_dir = Path(__file__).resolve().parent / "static"
+if static_dir.exists():
+    @app.get("/admin")
+    async def admin_console_root():
+        return FileResponse(str(static_dir / "index.html"))
+    
+    app.mount("/admin", StaticFiles(directory=str(static_dir), html=True), name="admin-console")
