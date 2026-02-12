@@ -38,17 +38,37 @@ def _send_email(to: str, subject: str, body_text: str, body_html: str = None) ->
     smtp_server = settings.SMTP_SERVER or "smtp.gmail.com"
     smtp_port = settings.SMTP_PORT or 587
 
-    if smtp_port == 465:
-        # Port 465: implicit SSL
-        with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10) as server:
-            server.login(settings.SMTP_EMAIL, settings.SMTP_PASSWORD)
-            server.send_message(msg)
-    else:
-        # Port 587 (or other): STARTTLS
-        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
-            server.starttls()
-            server.login(settings.SMTP_EMAIL, settings.SMTP_PASSWORD)
-            server.send_message(msg)
+    try:
+        if smtp_port == 465:
+            # Port 465: implicit SSL
+            with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=10) as server:
+                server.login(settings.SMTP_EMAIL, settings.SMTP_PASSWORD)
+                server.send_message(msg)
+        else:
+            # Port 587 (or other): STARTTLS
+            try:
+                with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
+                    # Upgrade to TLS
+                    server.starttls()
+                    server.login(settings.SMTP_EMAIL, settings.SMTP_PASSWORD)
+                    server.send_message(msg)
+            except OSError as e:
+                # Fallback for "Network is unreachable" (often IPv6 issues) or connection timeouts
+                # Try Port 465 (Implicit SSL) as a backup
+                if "unreachable" in str(e) or "101" in str(e):
+                    logger.warning(f"Port {smtp_port} failed ({e}), retrying with Port 465 SSL...")
+                    with smtplib.SMTP_SSL(smtp_server, 465, timeout=10) as server:
+                        server.login(settings.SMTP_EMAIL, settings.SMTP_PASSWORD)
+                        server.send_message(msg)
+                else:
+                    raise e
+                    
+    except Exception as e:
+        logger.error(f"SMTP Error: {str(e)}")
+        # If it's the login notification, just log and continue (don't crash the request)
+        if "Login notification" in subject:
+             return False
+        raise
 
     return True
 

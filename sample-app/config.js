@@ -15,11 +15,11 @@
 
 const AUTH_CONFIG = {
     // Auth Platform server URL
-    AUTH_SERVER: 'http://localhost:8000',
+    AUTH_SERVER: 'https://web-production-4d65b.up.railway.app',
 
     // Your app's Client ID (obtained from Admin Console)
     // Replace this with your actual app_id
-    CLIENT_ID: '154af49ec3f5e5ec',
+    CLIENT_ID: '966d46cc8cee30dd',
 
     // Where the auth platform redirects after login
     // Must match the redirect_uri registered in Admin Console
