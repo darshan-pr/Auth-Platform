@@ -8,8 +8,12 @@ from app.config import settings
 import os
 from pathlib import Path
 
-# Key storage directory
-KEYS_DIR = Path(__file__).resolve().parent.parent.parent / "keys"
+# Key storage directory - use /tmp on Railway (read-only filesystem)
+_default_keys_dir = Path(__file__).resolve().parent.parent.parent / "keys"
+if os.getenv("RAILWAY_ENVIRONMENT"):
+    KEYS_DIR = Path("/tmp/keys")
+else:
+    KEYS_DIR = _default_keys_dir
 PRIVATE_KEY_PATH = KEYS_DIR / "private_key.pem"
 PUBLIC_KEY_PATH = KEYS_DIR / "public_key.pem"
 
