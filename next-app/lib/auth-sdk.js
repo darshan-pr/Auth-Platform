@@ -365,3 +365,5 @@ class AuthClient {
         return JSON.parse(json);
     }
 }
+
+export default AuthClient;
