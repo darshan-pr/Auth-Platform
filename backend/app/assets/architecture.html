@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1600">
+<title>Auth Platform — Flow Diagrams</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;
+  --bg2:#ffffff;
+  --bg3:#f4f6fa;
+  --bd:#d8dce8;
+  --bd2:#cdd1db;
+  --text:#1a1c23;
+  --text2:#555870;
+  --text3:#9a9db5;
+  --req:#2563eb;      /* blue  — client→server request */
+  --res:#374151;      /* dark gray — server→client response */
+  --int:#7c3aed;      /* purple — internal server ops */
+  --warn:#b45309;     /* amber — redis/session */
+  --ok:#15803d;       /* green — success */
+  --danger:#b91c1c;   /* red — revoke/delete */
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Inter',sans-serif;color:var(--text)}
+#app{width:100%;height:100%;display:flex;flex-direction:column}
+
+/* ── Header ── */
+#hdr{
+  height:52px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;
+  background:var(--bg2);
+  border-bottom:1.5px solid var(--bd);
+}
+.fid{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:500;letter-spacing:3px;color:var(--text)}
+.fname{font-size:11px;font-weight:400;color:var(--text2);letter-spacing:.6px;margin-left:16px;text-transform:uppercase}
+.fctr{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)}
+
+/* ── Component strip — ONE ROW, NO DUPLICATION ── */
+#strip{
+  height:84px;flex-shrink:0;
+  display:flex;align-items:center;
+  padding:0 32px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--bd);
+  position:relative;
+  z-index:2;
+}
+.ci{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;transition:opacity .28s}
+.ci.dim{opacity:.22}
+.ci.on{opacity:1}
+.ci-box{
+  width:40px;height:40px;border-radius:10px;
+  border:1.5px solid var(--bd);background:var(--bg3);
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color .28s, background .28s;
+}
+.ci.on .ci-box{border-color:#2563eb;background:#eff6ff}
+.ci-box svg{width:18px;height:18px;stroke:var(--text3);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;transition:stroke .28s}
+.ci.on .ci-box svg{stroke:#2563eb}
+.ci-lbl{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text3);text-align:center;line-height:1.4;transition:color .28s}
+.ci.on .ci-lbl{color:var(--text2)}
+/* Redis always uses its brand red */
+.ci-box[data-redis] svg{stroke:#cc2a1c !important}
+.ci[data-cid="4"].on .ci-box{border-color:#cc2a1c !important;background:#fff5f5 !important}
+.ci[data-cid="4"].on .ci-lbl{color:#cc2a1c}
+
+/* ── Layout ── */
+#main{flex:1;display:flex;overflow:hidden;min-height:0}
+.side{
+  width:52px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg);
+}
+.side.l{border-right:1px solid var(--bd)}
+.side.r{border-left:1px solid var(--bd)}
+.nbtn{
+  width:34px;height:34px;border-radius:8px;
+  border:1.5px solid var(--bd);background:transparent;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--text2);transition:all .18s;outline:none;
+}
+.nbtn:hover{border-color:#2563eb;color:#2563eb;background:#eff6ff}
+.nbtn:disabled{opacity:.2;cursor:default}
+.nbtn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+#vp{flex:1;position:relative;overflow:hidden;background:var(--bg)}
+
+/* ── Slides ── */
+.slide{position:absolute;inset:0;transition:transform .6s cubic-bezier(.77,0,.23,1),opacity .5s ease}
+.slide svg{display:block;width:100%;height:100%}
+.slide.sr{transform:translateX(100%);opacity:0;pointer-events:none}
+.slide.sa{transform:translateX(0);opacity:1}
+.slide.sl{transform:translateX(-100%);opacity:0;pointer-events:none}
+
+/* ── Bottom nav ── */
+#bot{
+  height:44px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  background:var(--bg2);border-top:1px solid var(--bd);
+}
+.dot{width:6px;height:6px;border-radius:3px;background:var(--bd2);border:none;cursor:pointer;outline:none;transition:all .28s}
+.dot.on{background:var(--text2);width:18px}
+
+/* ── Animations ── */
+@keyframes draw{from{stroke-dashoffset:var(--d,800)}to{stroke-dashoffset:0}}
+@keyframes fin{from{opacity:0}to{opacity:1}}
+@keyframes up{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+@keyframes march{to{stroke-dashoffset:-24}}
+@keyframes flow{to{stroke-dashoffset:-18}}
+.ad{animation:draw .28s ease-out both}
+.af{animation:fin .2s ease-out both}
+.au{animation:up .2s ease-out both}
+.ll{stroke-dasharray:4 7;animation:flow 2.8s linear infinite}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="hdr">
+    <div style="display:flex;align-items:baseline">
+      <span class="fname" id="fname" style="margin-left:0;font-size:12px;font-weight:500;color:var(--text);letter-spacing:.8px">Admin Onboarding — First-Time Setup</span>
+    </div>
+    <span class="fctr" id="fctr">1 / 8</span>
+  </div>
+
+  <div id="strip"></div>
+
+  <div id="main">
+    <div class="side l"><button class="nbtn" id="bp" disabled>
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    </button></div>
+    <div id="vp"></div>
+    <div class="side r"><button class="nbtn" id="bn">
+      <svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+    </button></div>
+  </div>
+
+  <div id="bot"></div>
+</div>
+
+<script>
+const NS='http://www.w3.org/2000/svg';
+const C={req:'#2563eb',res:'#374151',int:'#7c3aed',warn:'#b45309',ok:'#15803d',danger:'#b91c1c'};
+const LIGHT={bg:'#ffffff',bg2:'#ffffff',bd:'#d8dce8',text:'#1a1c23',text2:'#555870',text3:'#9a9db5'};
+
+const COMPS=[
+  {id:0,n:'Admin',       ic:`<circle cx="12" cy="8" r="3.5"/><path d="M5 20v-1.2C5 15.6 8.2 13 12 13s7 2.6 7 5.8V20"/>`},
+  {id:1,n:'Admin\nConsole',ic:`<rect x="2" y="3" width="20" height="13" rx="2"/><polyline points="8 21 12 17 16 21"/><line x1="12" y1="17" x2="12" y2="16"/>`},
+  {id:2,n:'Auth\nServer', ic:`<rect x="2" y="2" width="20" height="8" rx="1.5"/><rect x="2" y="14" width="20" height="8" rx="1.5"/><circle cx="6" cy="6" r=".9" fill="currentColor" stroke="none"/><circle cx="6" cy="18" r=".9" fill="currentColor" stroke="none"/><line x1="9.5" y1="6" x2="15" y2="6"/><line x1="9.5" y1="18" x2="15" y2="18"/>`},
+  {id:3,n:'Database',    ic:`<ellipse cx="12" cy="5" rx="9" ry="2.5"/><path d="M3 5v14c0 1.38 4.03 2.5 9 2.5s9-1.12 9-2.5V5"/><path d="M3 12c0 1.38 4.03 2.5 9 2.5s9-1.12 9-2.5"/>`},
+  {id:4,n:'Redis',       ic:`<ellipse cx="12" cy="17" rx="8" ry="2.2"/><path d="M4 17v-3c0-1.21 3.58-2.2 8-2.2s8 .99 8 2.2v3"/><ellipse cx="12" cy="14" rx="8" ry="2.2"/><path d="M4 14v-3c0-1.21 3.58-2.2 8-2.2s8 .99 8 2.2v3"/><ellipse cx="12" cy="11" rx="8" ry="2.2"/><path d="M4 11V8c0-1.21 3.58-2.2 8-2.2s8 .99 8 2.2v3"/><ellipse cx="12" cy="8" rx="8" ry="2.2"/>`,isRedis:true},
+  {id:5,n:'Email\nService',ic:`<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,4 12,13 2,4"/>`},
+  {id:6,n:'Client\nBrowser',ic:`<circle cx="12" cy="12" r="9.5"/><line x1="2.5" y1="12" x2="21.5" y2="12"/><path d="M12 2.5a14.5 14.5 0 014 9.5 14.5 14.5 0 01-4 9.5 14.5 14.5 0 01-4-9.5 14.5 14.5 0 014-9.5"/>`},
+  {id:7,n:'Auth-\nenticator',ic:`<path d="M12 2L3 7v6c0 5.14 3.86 9.96 9 11.29C17.14 22.96 21 18.14 21 13V7z"/><polyline points="9 12 11 14 15 10"/>`},
+  {id:8,n:'Client\nApp',  ic:`<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="9" y1="21" x2="15" y2="21" stroke-width="2.2"/>`},
+];
+
+const FLOWS=[
+{id:'A',n:'Admin Onboarding — First-Time Setup',on:[0,1,2,3,5],steps:[
+  {a:1,f:0,t:1,l:'GET /console',c:'req'},
+  {a:1,f:1,t:2,l:'ConsoleAuthMiddleware — check admin_token cookie',c:'int',d:1},
+  {a:1,f:1,t:0,l:'302 redirect → /login  (no cookie found)',c:'res',d:1},
+  {g:1},
+  {s:'Step 2 — Login',c:'warn'},
+  {a:1,f:0,t:2,l:'POST /admin/login  { email, password }',c:'req'},
+  {a:1,f:2,t:3,l:'SELECT FROM admins — bcrypt.verify(password, hash)',c:'int',d:1},
+  {a:1,f:2,t:0,l:'Set admin_token cookie  JWT { type:"admin_access", exp:24h, httpOnly }',c:'res'},
+  {g:1},
+  {s:'Step 3 — Access Console',c:'warn'},
+  {a:1,f:0,t:1,l:'GET /console  (cookie present)',c:'req'},
+  {a:1,f:1,t:2,l:'Decode JWT → type=="admin_access" → pass through',c:'int',d:1},
+  {a:1,f:1,t:0,l:'Serve admin-auth.html',c:'res',d:1},
+  {g:1},
+  {s:'Step 4 — Create App',c:'warn'},
+  {a:1,f:0,t:2,l:'POST /admin/apps  { name, redirect_uris }',c:'req'},
+  {a:1,f:2,t:3,l:'INSERT INTO apps (tenant_id, app_id, hashed_secret)',c:'int',d:1},
+  {a:1,f:2,t:0,l:'{ app_id, app_secret }  — displayed ONCE only',c:'warn'},
+  {g:1},
+  {s:'Step 5 — Create User (Optional)',c:'warn'},
+  {a:1,f:0,t:2,l:'POST /admin/users  { email }',c:'req'},
+  {a:1,f:2,t:5,l:'Send set-password email with magic link token',c:'int'},
+]},
+
+{id:'B',n:'Password Login — MFA with OTP',on:[2,3,4,5,8],steps:[
+  {a:1,f:8,t:2,l:'POST /auth/login  { email, password, app_id, app_secret }',c:'req'},
+  {a:1,f:2,t:3,l:'validate_app_credentials(app_id, app_secret)',c:'int',d:1},
+  {a:1,f:2,t:3,l:'SELECT user WHERE email=? AND tenant_id=app.tenant_id',c:'int',d:1},
+  {a:1,f:2,sl:1,l:'bcrypt.verify(password, hash)  +  check is_active==TRUE',c:'int'},
+  {g:1},
+  {s:'IF app.otp_enabled == TRUE',c:'warn'},
+  {a:1,f:2,t:4,l:'SET otp:{email}:{app_id} = random 6-digit   EX:300s',c:'warn'},
+  {a:1,f:2,t:5,l:'send_otp_email(alice@x.com, otp_code)',c:'int'},
+  {a:1,f:2,t:8,l:'{ otp_required:true, message:"OTP sent to email" }',c:'res',d:1},
+  {g:1},
+  {a:1,f:8,t:2,l:'POST /auth/login/verify-otp  { email, otp_code, app_id }',c:'req'},
+  {a:1,f:2,t:4,l:'GET otp:{email}:{app_id}  →  compare submitted code',c:'warn',d:1},
+  {a:1,f:2,t:4,l:'DEL otp:{email}:{app_id}  (consumed — one-time use)',c:'danger'},
+  {g:1},
+  {a:1,f:2,sl:1,l:'generate_tokens()  RS256 signed  access_token + refresh_token',c:'ok'},
+  {a:1,f:2,t:3,l:'INSERT RefreshToken (is_revoked flag for revocation)',c:'int',d:1},
+  {a:1,f:2,t:4,l:'SET user:online:{user_id}:{tenant_id}   EX: expiry+60s',c:'warn'},
+  {a:1,f:2,t:8,l:'{ access_token, refresh_token, token_type:"bearer" }',c:'ok'},
+]},
+
+{id:'C',n:'OAuth 2.0 — Authorization Code + PKCE',on:[2,3,4,6,8],steps:[
+  {a:1,f:8,sl:1,l:'code_verifier = base64url(random 32 bytes)',c:'int'},
+  {a:1,f:8,sl:1,l:'code_challenge = base64url(SHA256(code_verifier))',c:'int'},
+  {a:1,f:8,t:6,l:'Redirect browser → GET /oauth/authorize?client_id&code_challenge&state',c:'req'},
+  {a:1,f:6,t:2,l:'GET /oauth/authorize',c:'req'},
+  {a:1,f:2,t:3,l:'Validate: app exists, redirect_uri whitelisted',c:'int',d:1},
+  {a:1,f:2,t:4,l:'SET oauth:session:{id} { client_id, challenge, state }  EX:600s',c:'warn'},
+  {a:1,f:2,t:6,l:'Render auth.html — hosted Jinja2 login page',c:'res',d:1},
+  {g:1},
+  {a:1,f:6,t:2,l:'POST /oauth/authenticate  { session_id, email, password }',c:'req'},
+  {a:1,f:2,t:4,l:'GET oauth:session:{id}  →  verify app + bcrypt credentials',c:'warn',d:1},
+  {a:1,f:2,t:4,l:'SET oauth:code:{code} { user_id, challenge }  EX:300s',c:'warn'},
+  {a:1,f:2,t:4,l:'DEL oauth:session:{id}',c:'danger'},
+  {a:1,f:2,t:6,l:'{ redirect_url: "myapp.com/callback?code=CODE&state=STATE" }',c:'ok'},
+  {a:1,f:6,t:8,l:'Browser follows redirect → client receives code + state',c:'res',d:1},
+  {g:1},
+  {a:1,f:8,sl:1,l:'Verify state param (CSRF protection)',c:'int'},
+  {a:1,f:8,t:2,l:'POST /oauth/token  { code, code_verifier, client_id, redirect_uri }',c:'req'},
+  {a:1,f:2,t:4,l:'GET oauth:code  →  DEL immediately (one-time use)',c:'danger'},
+  {a:1,f:2,sl:1,l:'PKCE: SHA256(code_verifier) == stored code_challenge  ✓',c:'ok'},
+  {a:1,f:2,t:8,l:'{ access_token, refresh_token }',c:'ok'},
+]},
+
+{id:'D',n:'WebAuthn / Passkey — FIDO2',on:[2,3,4,6,7],steps:[
+  {s:'Registration',c:'warn'},
+  {a:1,f:6,t:2,l:'POST /oauth/passkey/register/challenge  { session_id, email }',c:'req'},
+  {a:1,f:2,t:4,l:'SET passkey:reg:{app_id}:{email} = challenge  EX:300s',c:'warn'},
+  {a:1,f:2,t:6,l:'PublicKeyCredentialCreationOptions { challenge, rp, pubKeyCredParams:[ES256,RS256] }',c:'res',d:1},
+  {a:1,f:6,t:7,l:'navigator.credentials.create(options)',c:'req'},
+  {a:1,f:7,t:6,l:'Attestation response  (TouchID / FaceID / Windows Hello)',c:'ok',d:1},
+  {a:1,f:6,t:2,l:'POST /passkey/register/verify  { credential_id, clientDataJSON, attestationObject }',c:'req'},
+  {a:1,f:2,t:4,l:'GET passkey:reg  →  verify type=="webauthn.create" + challenge match',c:'warn',d:1},
+  {a:1,f:2,t:3,l:'INSERT PasskeyCredential { credential_id, public_key, sign_count:0 }',c:'int',d:1},
+  {g:1},
+  {s:'Authentication',c:'ok'},
+  {a:1,f:6,t:2,l:'POST /oauth/passkey/auth/challenge  { session_id, email }',c:'req'},
+  {a:1,f:2,t:3,l:'Fetch PasskeyCredential records for user',c:'int',d:1},
+  {a:1,f:2,t:4,l:'SET passkey:auth:{app_id}:{email} = new_challenge  EX:300s',c:'warn'},
+  {a:1,f:2,t:6,l:'{ challenge, allowCredentials: [{ id: credential_id }] }',c:'res',d:1},
+  {a:1,f:6,t:7,l:'navigator.credentials.get(options)',c:'req'},
+  {a:1,f:7,t:6,l:'Assertion: challenge signed with private key',c:'ok',d:1},
+  {a:1,f:6,t:2,l:'POST /passkey/auth/verify  { signature, authenticatorData, clientDataJSON }',c:'req'},
+  {a:1,f:2,t:4,l:'Verify challenge + origin + UP/UV flags + sign_count > stored',c:'warn',d:1},
+  {a:1,f:2,t:3,l:'Verify ECDSA signature  →  UPDATE sign_count in DB',c:'int',d:1},
+  {a:1,f:2,t:6,l:'redirect: callback?code=CODE&state=STATE  →  exchange for tokens',c:'ok'},
+]},
+
+{id:'E',n:'Token Refresh',on:[2,3,4,8],steps:[
+  {a:1,f:8,t:2,l:'Any API request  →  401 Unauthorized (access_token expired)',c:'danger',d:1},
+  {g:1},
+  {a:1,f:8,t:2,l:'POST /refresh  { refresh_token }',c:'req'},
+  {a:1,f:2,sl:1,l:'verify_token()  — decode RSA-256 JWT, check exp + iss',c:'int'},
+  {a:1,f:2,sl:1,l:'Assert payload.type == "refresh"',c:'int'},
+  {a:1,f:2,t:3,l:'SELECT RefreshToken WHERE token=? AND is_revoked=FALSE',c:'int',d:1},
+  {a:1,f:2,t:4,l:'CHECK user:blacklist:{user_id}:{tenant_id}  →  NOT EXISTS',c:'warn',d:1},
+  {g:1},
+  {a:1,f:2,sl:1,l:'create_access_token({ sub, user_id, app_id, tenant_id })',c:'ok'},
+  {a:1,f:2,t:4,l:'SET user:online:{user_id}:{tenant_id}  EX: extended TTL',c:'warn'},
+  {a:1,f:2,t:8,l:'{ access_token, token_type:"bearer" }',c:'ok'},
+]},
+
+{id:'F',n:'Admin Force-Logout — Session Revocation',on:[0,2,3,4,8],steps:[
+  {a:1,f:0,t:2,l:'POST /admin/users/{user_id}/force-logout    Authorization: Bearer admin_JWT',c:'req'},
+  {a:1,f:2,sl:1,l:'verify admin JWT — type=="admin_access" + tenant_id match',c:'int'},
+  {a:1,f:2,t:4,l:'DEL  user:online:{user_id}:{tenant_id}',c:'danger'},
+  {a:1,f:2,t:4,l:'SET  user:blacklist:{user_id}:{tenant_id}  EX: refresh_expiry_days × 86400',c:'danger'},
+  {a:1,f:2,t:0,l:'200 OK — session revoked',c:'ok'},
+  {g:1},
+  {s:"User's Next API Call",c:'danger'},
+  {a:1,f:8,t:2,l:'POST /verify  { access_token }',c:'req'},
+  {a:1,f:2,t:4,l:'is_user_blacklisted()  →  TRUE',c:'danger',d:1},
+  {a:1,f:2,t:8,l:'401  "Session has been revoked by administrator"',c:'danger'},
+  {g:1},
+  {s:'Refresh Attempt',c:'danger'},
+  {a:1,f:8,t:2,l:'POST /refresh  { refresh_token }',c:'req'},
+  {a:1,f:2,t:4,l:'Check blacklist  →  exists!',c:'danger',d:1},
+  {a:1,f:2,t:8,l:'401  Refresh rejected  →  user fully logged out',c:'danger'},
+]},
+
+{id:'G',n:'Password Reset — OTP Method',on:[2,3,4,5,8],steps:[
+  {a:1,f:8,t:2,l:'POST /auth/forgot-password  { email, app_id, app_secret }',c:'req'},
+  {a:1,f:2,t:3,l:'Validate app + find user by email + tenant_id',c:'int',d:1},
+  {a:1,f:2,t:4,l:'SET otp:reset:{email}:{app_id} = 6-digit OTP   EX:600s',c:'warn'},
+  {a:1,f:2,t:5,l:'send_password_reset_email(email, otp_code)',c:'int'},
+  {a:1,f:2,t:8,l:'200 OK  (identical response — prevents user enumeration)',c:'res',d:1},
+  {g:1},
+  {a:1,f:8,t:2,l:'POST /auth/reset-password  { email, otp_code, new_password, app_id }',c:'req'},
+  {a:1,f:2,t:4,l:'GET otp:reset:{email}:{app_id}  →  compare submitted OTP',c:'warn',d:1},
+  {a:1,f:2,t:4,l:'DEL key  (consumed — prevent reuse)',c:'danger'},
+  {a:1,f:2,t:3,l:'bcrypt.hash(new_password)  →  UPDATE user.password_hash',c:'int',d:1},
+  {a:1,f:2,t:8,l:'200 OK — password updated successfully',c:'ok'},
+  {g:1},
+  {s:'Token Method Alternative',c:'warn'},
+  {a:1,f:2,t:5,l:'Send magic-link: /reset-password?token=HMAC_SIGNED_TOKEN',c:'warn'},
+  {a:1,f:8,t:2,l:'POST /auth/reset-password-token  { token, new_password }',c:'req'},
+  {a:1,f:2,sl:1,l:'verify_reset_token(token)  →  extract email  →  update password_hash',c:'ok'},
+]},
+
+{id:'H',n:'Multi-Tenant Isolation',on:[0,1,2,3,8],steps:[
+  {s:'Hierarchy:  Tenant → Admin → Apps → Users',c:'warn'},
+  {g:1},
+  {a:1,f:0,t:2,l:'Admin registers  →  Tenant record created with unique slug',c:'req'},
+  {a:1,f:2,t:3,l:'INSERT Tenant { id, slug }  +  INSERT Admin { tenant_id }',c:'int',d:1},
+  {g:1},
+  {a:1,f:0,t:2,l:'POST /admin/apps  →  App inherits admin tenant_id',c:'req'},
+  {a:1,f:2,t:3,l:'INSERT App { tenant_id, app_id, app_secret_hash }',c:'int',d:1},
+  {g:1},
+  {a:1,f:8,t:2,l:'User registers via App  →  User inherits tenant_id from App',c:'req'},
+  {a:1,f:2,t:3,l:'ALL queries scoped:  WHERE tenant_id = app.tenant_id',c:'warn',d:1},
+  {g:1},
+  {s:'Same email — fully isolated across tenants',c:'ok'},
+  {a:1,f:2,t:3,l:'SELECT * FROM users WHERE email="alice@x.com" AND tenant_id=7',c:'warn',d:1},
+  {a:1,f:2,t:3,l:'SELECT * FROM users WHERE email="alice@x.com" AND tenant_id=12',c:'warn',d:1},
+  {g:1},
+  {s:'JWT: { sub, user_id, app_id, tenant_id }  — always tenant-scoped',c:'ok'},
+  {a:1,f:0,t:2,l:'Admin can ONLY see/manage resources in own tenant_id',c:'req'},
+]},
+];
+
+/* ═══ SVG helpers ═══ */
+function mk(tag,attrs){
+  const e=document.createElementNS(NS,tag);
+  for(const[k,v] of Object.entries(attrs||{})) e.setAttribute(k,String(v));
+  return e;
+}
+
+/* ═══ Render one flow into an SVG element ═══ */
+function renderSVG(flow,svg){
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  const W=svg.clientWidth||1380, H=svg.clientHeight||600;
+  // Align lanes with component strip icons.
+  // Strip: 32px padding, 9 flex items across full window width.
+  // SVG viewport = window - 104px (52px side navs each side).
+  // Icon[i] center in strip = 32 + (W+40)*(2i+1)/18
+  // In SVG coords (subtract 52 for left nav): PAD = (W+40)/18 - 20, LW = (W+40)/9
+  const N=9;
+  const LW=(W+40)/N;
+  const PAD=(W+40)/(N*2)-20;
+  const lx=i=>PAD+i*LW;
+
+  /* count rows */
+  let rows=0;
+  flow.steps.forEach(s=>{ rows+=s.g?0.3:1; });
+  const FSTART=22;
+  const SH=Math.min(40,Math.max(19,(H-FSTART-8)/Math.max(rows,1)));
+  const TOP=0;
+
+  /* defs */
+  const defs=mk('defs');
+  Object.keys(C).forEach(k=>{
+    const m=mk('marker',{id:'m'+k,markerWidth:'7',markerHeight:'6',refX:'6.5',refY:'3',orient:'auto'});
+    m.innerHTML=`<path d="M0,0.5 L6.5,3 L0,5.5 Z" fill="${C[k]}"/>`;
+    defs.appendChild(m);
+  });
+  /* subtle label bg */
+  const gr=mk('linearGradient',{id:'lbg',x1:'0',y1:'0',x2:'1',y2:'0'});
+  gr.innerHTML=`<stop offset="0" stop-color="${LIGHT.bg}" stop-opacity="0"/>
+    <stop offset="0.08" stop-color="${LIGHT.bg}" stop-opacity="0.95"/>
+    <stop offset="0.92" stop-color="${LIGHT.bg}" stop-opacity="0.95"/>
+    <stop offset="1" stop-color="${LIGHT.bg}" stop-opacity="0"/>`;
+  defs.appendChild(gr);
+  svg.appendChild(defs);
+
+  /* lifelines — from y=0 (flush with strip) to bottom */
+  const llg=mk('g',{opacity:'.7'});
+  COMPS.forEach((_,i)=>{
+    const l=mk('line',{x1:lx(i),y1:TOP,x2:lx(i),y2:H,
+      stroke:'#c2c6d8','stroke-width':'1',class:'ll'});
+    l.style.animationDelay=`${-i*0.3}s`;
+    llg.appendChild(l);
+    // small cap circle where lifeline meets the strip
+    const cap=mk('circle',{cx:lx(i),cy:2,r:'2',fill:'#c2c6d8',opacity:'0.6'});
+    llg.appendChild(cap);
+  });
+  svg.appendChild(llg);
+
+  /* legend — top right */
+  const legG=mk('g',{class:'af'});
+  const LEG=[['req',false,'Request →'],['res',true,'Response ←'],['int',true,'Internal']];
+  LEG.forEach(([k,dash,label],i)=>{
+    const lx2=W-PAD-200+i*72, ly=10;
+    const line=mk('line',{x1:lx2,y1:ly,x2:lx2+18,y2:ly,stroke:C[k],'stroke-width':'1.5'});
+    if(dash) line.setAttribute('stroke-dasharray','5 3');
+    else {
+      const mm=mk('marker',{id:'mleg'+i,markerWidth:'6',markerHeight:'5',refX:'6',refY:'2.5',orient:'auto'});
+      mm.innerHTML=`<path d="M0,0.5 L6,2.5 L0,4.5 Z" fill="${C[k]}"/>`;
+      defs.appendChild(mm);
+      line.setAttribute('marker-end',`url(#mleg${i})`);
+    }
+    legG.appendChild(line);
+    const t=mk('text',{x:lx2+22,y:ly+4,'font-family':'JetBrains Mono, monospace',
+      'font-size':'7.5',fill:C[k]});
+    t.textContent=label;
+    legG.appendChild(t);
+  });
+  svg.appendChild(legG);
+
+  /* steps */
+  let y=FSTART;
+  flow.steps.forEach((step,si)=>{
+    const delay=si*0.048;
+
+    /* gap */
+    if(step.g){ y+=SH*0.3; return; }
+
+    /* section label */
+    if(step.s!==undefined){
+      const col=C[step.c]||C.warn;
+      const g=mk('g',{class:'au'}); g.style.animationDelay=`${delay}s`;
+      /* divider */
+      const dl=mk('line',{x1:PAD,y1:y+4,x2:W-PAD,y2:y+4,stroke:col,'stroke-width':'0.6',opacity:'0.25'});
+      g.appendChild(dl);
+      const t=mk('text',{x:PAD,y:y+14,
+        'font-family':'JetBrains Mono, monospace','font-size':'8','font-weight':'500',
+        fill:col,'letter-spacing':'1.2'});
+      t.textContent='▸  '+step.s;
+      g.appendChild(t);
+      svg.appendChild(g);
+      y+=SH*0.7; return;
+    }
+
+    /* arrow */
+    if(step.a){
+      const col=C[step.c]||C.req;
+      const ay=y+SH*0.52;
+      y+=SH;
+
+      if(step.sl){
+        /* self loop */
+        const fx=lx(step.f), lp=LW*0.38, hh=SH*0.28;
+        const pl=lp*2+hh*1.4;
+        const path=mk('path',{
+          d:`M${fx},${ay-hh} Q${fx+lp},${ay-hh} ${fx+lp},${ay} Q${fx+lp},${ay+hh} ${fx},${ay+hh}`,
+          fill:'none',stroke:col,'stroke-width':'1.2',
+          'marker-end':`url(#m${step.c||'int'})`,
+          'stroke-dasharray':pl,'stroke-dashoffset':pl,class:'ad'});
+        path.style.setProperty('--d',pl);
+        path.style.animationDelay=`${delay}s`;
+        svg.appendChild(path);
+        labelClamped(svg,fx+lp+5,ay,step.l,col,delay,W,'start');
+
+      } else {
+        const fx=lx(step.f), tx=lx(step.t);
+        const dir=tx>fx?1:-1;
+        const len=Math.abs(tx-fx);
+        // x1/x2 exactly on the lifeline — arrowhead refX handles the tip
+        const x1=fx, x2=tx;
+        const line=mk('line',{x1,y1:ay,x2,y2:ay,stroke:col,'stroke-width':'1.2',
+          'marker-end':`url(#m${step.c||'req'})`});
+        if(step.d){
+          line.setAttribute('stroke-dasharray','6 4');
+          line.setAttribute('class','af');
+          line.style.animationDelay=`${delay}s`;
+          line.addEventListener('animationend',()=>{
+            line.style.animation='march 1.8s linear infinite';
+          },{once:true});
+        } else {
+          line.setAttribute('stroke-dasharray',`${len} ${len}`);
+          line.setAttribute('stroke-dashoffset',`${len}`);
+          line.style.setProperty('--d',len);
+          line.setAttribute('class','ad');
+          line.style.animationDelay=`${delay}s`;
+        }
+        svg.appendChild(line);
+        /* source dot exactly on lifeline */
+        const dot=mk('circle',{cx:fx,cy:ay,r:'2.2',fill:col,opacity:'0.55',class:'af'});
+        dot.style.animationDelay=`${delay}s`;
+        svg.appendChild(dot);
+        labelClamped(svg,(fx+tx)/2,ay-3,step.l,col,delay,W);
+      }
+    }
+  });
+}
+
+function label(svg,x,y,text,col,delay,anchor){
+  labelClamped(svg,x,y,text,col,delay,99999,anchor);
+}
+function labelClamped(svg,x,y,text,col,delay,svgW,anchor){
+  anchor=anchor||'middle';
+  const s=text.length>92?text.slice(0,89)+'…':text;
+  const fs=8;
+  const aw=s.length*fs*0.515+14;
+  // clamp so label never bleeds off left or right edge
+  const MARGIN=6;
+  let cx=x;
+  if(anchor==='middle'){
+    cx=Math.max(aw/2+MARGIN, Math.min(svgW-aw/2-MARGIN, x));
+  } else {
+    cx=Math.max(MARGIN, Math.min(svgW-aw-MARGIN, x));
+  }
+  const rx=anchor==='middle'?cx-aw/2:cx-2;
+  const bg=mk('rect',{x:rx,y:y-fs-1.5,width:aw,height:fs+5,fill:'url(#lbg)',class:'af'});
+  bg.style.animationDelay=`${delay+0.06}s`;
+  svg.appendChild(bg);
+  const t=mk('text',{x:cx,y,
+    'font-family':'JetBrains Mono, monospace','font-size':fs,'font-weight':'300',
+    fill:col,'text-anchor':anchor,class:'au'});
+  t.style.animationDelay=`${delay+0.06}s`;
+  t.textContent=s;
+  svg.appendChild(t);
+}
+
+/* ═══ App init ═══ */
+let cur=0;
+const slides=[], rendered=new Set();
+
+function init(){
+  /* Build component strip */
+  const strip=document.getElementById('strip');
+  COMPS.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='ci dim'; d.dataset.cid=c.id;
+    const redisColor=c.isRedis?'stroke="#cc2a1c"':'';
+    d.innerHTML=`<div class="ci-box" ${c.isRedis?'data-redis="1"':''}><svg viewBox="0 0 24 24" xmlns="${NS}" ${redisColor}>${c.ic}</svg></div>
+      <span class="ci-lbl">${c.n.replace('\n','<br>')}</span>`;
+    strip.appendChild(d);
+  });
+
+  /* Build slides + dot nav */
+  const vp=document.getElementById('vp');
+  const bot=document.getElementById('bot');
+  FLOWS.forEach((f,i)=>{
+    const div=document.createElement('div');
+    div.className='slide '+(i===0?'sa':'sr');
+    div.innerHTML=`<svg xmlns="${NS}"></svg>`;
+    vp.appendChild(div); slides.push(div);
+    const d=document.createElement('button');
+    d.className='dot'+(i===0?' on':'');
+    d.onclick=()=>go(i); bot.appendChild(d);
+  });
+
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    renderSlide(0); activate(FLOWS[0].on); updateHdr(0);
+  }));
+
+  document.getElementById('bp').onclick=()=>go(cur-1);
+  document.getElementById('bn').onclick=()=>go(cur+1);
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key==='ArrowDown') go(cur+1);
+    if(e.key==='ArrowLeft'||e.key==='ArrowUp') go(cur-1);
+  });
+  new ResizeObserver(()=>{
+    rendered.forEach(i=>renderSVG(FLOWS[i],slides[i].querySelector('svg')));
+  }).observe(vp);
+}
+
+function renderSlide(i){
+  if(!rendered.has(i)){
+    renderSVG(FLOWS[i],slides[i].querySelector('svg'));
+    rendered.add(i);
+  }
+}
+function activate(arr){
+  document.querySelectorAll('.ci').forEach(el=>{
+    el.className='ci '+(arr.includes(+el.dataset.cid)?'on':'dim');
+  });
+}
+function updateHdr(i){
+  document.getElementById('fname').textContent=FLOWS[i].n;
+  document.getElementById('fctr').textContent=`${i+1} / ${FLOWS.length}`;
+  document.getElementById('bp').disabled=i===0;
+  document.getElementById('bn').disabled=i===FLOWS.length-1;
+}
+function go(i){
+  if(i<0||i>=FLOWS.length) return;
+  const dir=i>cur?1:-1;
+  slides[cur].className='slide '+(dir>0?'sl':'sr');
+  document.querySelectorAll('.dot')[cur].classList.remove('on');
+  cur=i;
+  slides[cur].className='slide sa';
+  document.querySelectorAll('.dot')[cur].classList.add('on');
+  updateHdr(cur);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    renderSlide(cur); activate(FLOWS[cur].on);
+  }));
+}
+
+const st=document.createElement('style');
+st.textContent='@keyframes march{to{stroke-dashoffset:-24}}';
+document.head.appendChild(st);
+
+window.addEventListener('load',init);
+</script>
+</body>
+</html>

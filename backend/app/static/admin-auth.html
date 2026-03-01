@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/assets/logo.png">
+    <script>(function(){var img=new Image();img.onload=function(){var c=document.createElement('canvas');c.width=c.height=64;var ctx=c.getContext('2d');ctx.beginPath();ctx.arc(32,32,32,0,Math.PI*2);ctx.clip();ctx.drawImage(img,0,0,64,64);var l=document.querySelector("link[rel='icon']");if(l)l.href=c.toDataURL();};img.src='/assets/logo.png';})();</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>Auth Platform — Admin Portal</title>
@@ -366,7 +368,7 @@
             if (res.ok) {
                 // Token is valid — sync cookie and redirect
                 document.cookie = `admin_token=${tk}; path=/; SameSite=Lax; max-age=86400`;
-                window.location.href = '/console/';
+                window.location.href = '/dashboard/';
             } else {
                 // Token expired/invalid — clear everything, stay on login
                 localStorage.removeItem('admin_token');
@@ -464,7 +466,7 @@
                 localStorage.setItem('tenant_name', data.tenant_name || '');
                 document.cookie = `admin_token=${data.access_token}; path=/; SameSite=Lax; max-age=86400`;
                 showSuccess('Login successful! Redirecting\u2026');
-                setTimeout(() => { window.location.href = '/console/'; }, 500);
+                setTimeout(() => { window.location.href = '/dashboard/'; }, 500);
             } else {
                 showError(data.detail || 'Invalid email or password.');
             }
@@ -503,8 +505,8 @@
                 localStorage.setItem('tenant_id', String(data.tenant_id));
                 localStorage.setItem('tenant_name', data.tenant_name || '');
                 document.cookie = `admin_token=${data.access_token}; path=/; SameSite=Lax; max-age=86400`;
-                showSuccess('Account created! Redirecting to console\u2026');
-                setTimeout(() => { window.location.href = '/console/'; }, 800);
+                showSuccess('Account created! Redirecting to dashboard…');
+                setTimeout(() => { window.location.href = '/dashboard/'; }, 800);
             } else {
                 showError(data.detail || 'Registration failed. Please try again.');
             }

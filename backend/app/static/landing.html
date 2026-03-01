@@ -1,165 +1,982 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auth Platform | Identity Infrastructure That Teams Can Operate</title>
-    <link rel="stylesheet" href="/static/landing.css">
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <script>(function(){var img=new Image();img.onload=function(){var c=document.createElement('canvas');c.width=c.height=64;var ctx=c.getContext('2d');ctx.beginPath();ctx.arc(32,32,32,0,Math.PI*2);ctx.clip();ctx.drawImage(img,0,0,64,64);var l=document.querySelector("link[rel='icon']");if(l)l.href=c.toDataURL();};img.src='/assets/logo.png';})();</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auth Platform | Identity Infrastructure That Teams Can Operate</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink: #0f0f0f;
+      --ink-2: #3a3a3a;
+      --muted: #6b6b6b;
+      --line: #e2e2e2;
+      --line-2: #f0f0f0;
+      --surface: #fafafa;
+      --white: #ffffff;
+      --accent: #4a4af4;
+      --accent-2: #7c3aed;
+      --accent-subtle: rgba(74,74,244,0.07);
+      --hero-bg: #080c1a;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      color: var(--ink);
+      background: var(--white);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ─── TOP BAR ─────────────────────────────────────────────── */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(8,12,26,0.92);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .topbar-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px; height: 56px;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 8px;
+      text-decoration: none; color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 600; font-size: 0.95rem; letter-spacing: -0.01em;
+    }
+    .logo-img {
+      width: 26px; height: 26px; border-radius: 6px;
+      object-fit: cover; flex-shrink: 0;
+    }
+    .menu { display: flex; align-items: center; gap: 24px; }
+    .menu a {
+      color: rgba(255,255,255,0.65); text-decoration: none;
+      font-size: 0.85rem; font-weight: 400;
+      transition: color 0.2s;
+    }
+    .menu a:hover { color: #fff; }
+    .menu-login {
+      background: #fff; color: #0f0f0f !important;
+      padding: 7px 18px; border-radius: 6px;
+      font-weight: 600 !important; font-size: 0.83rem !important;
+      transition: opacity 0.2s !important;
+    }
+    .menu-login:hover { opacity: 0.88; }
+
+    .nav-toggle { display: none; background: none; border: none; cursor: pointer; padding: 4px; }
+    .nav-toggle svg { width: 20px; height: 20px; stroke: rgba(255,255,255,0.7); }
+    .icon-close { display: none; }
+    .mobile-nav {
+      display: none; flex-direction: column;
+      padding: 10px 24px 16px; gap: 2px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .mobile-nav a {
+      color: rgba(255,255,255,0.7); text-decoration: none;
+      font-size: 0.88rem; padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .mobile-nav .menu-login {
+      margin-top: 10px; text-align: center; display: block;
+      background: #fff; color: #0f0f0f;
+      border-radius: 6px; border: none; padding: 10px;
+    }
+    body.nav-open .mobile-nav { display: flex; }
+    body.nav-open .icon-menu { display: none; }
+    body.nav-open .icon-close { display: block; }
+
+    @media (max-width: 640px) {
+      .menu { display: none; }
+      .nav-toggle { display: flex; }
+    }
+
+    /* ─── HERO ─────────────────────────────────────────────────── */
+    .hero-section {
+      background: var(--hero-bg);
+      padding: 120px 24px 180px;
+      position: relative;
+    }
+    .hero-section::before {
+      content: '';
+      position: absolute; inset: 0; overflow: hidden;
+      background: radial-gradient(ellipse 80% 60% at 30% 40%, rgba(74,74,244,0.12) 0%, transparent 65%),
+                  radial-gradient(ellipse 50% 50% at 75% 60%, rgba(124,58,237,0.09) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    /* Semicircle only on desktop */
+    .hero-section::after {
+      content: '';
+      position: absolute; bottom: -1px; left: -8%; right: -8%;
+      height: 140px;
+      background: var(--white);
+      border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .hero-content {
+      max-width: 1200px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 420px; gap: 60px; align-items: center;
+      position: relative; z-index: 1;
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.72rem; font-weight: 600;
+      letter-spacing: 0.16em; text-transform: uppercase;
+      color: rgba(162,148,255,0.9);
+      background: rgba(74,74,244,0.12);
+      border: 1px solid rgba(74,74,244,0.2);
+      padding: 5px 12px; border-radius: 20px;
+      margin-bottom: 22px;
+    }
+    .hero-copy h1 {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-weight: 400; line-height: 1.1;
+      color: #fff; letter-spacing: -0.02em;
+      margin-bottom: 18px;
+    }
+    .hero-copy h1 span { color: #7c7cf8; font-style: italic; }
+    .hero-text {
+      color: rgba(255,255,255,0.55); font-size: 0.96rem;
+      line-height: 1.7; max-width: 480px; margin-bottom: 28px;
+    }
+    .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 11px 22px; border-radius: 7px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.88rem; font-weight: 600;
+      text-decoration: none; cursor: pointer; border: none;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #4a4af4; color: #fff;
+      box-shadow: 0 0 0 1px rgba(74,74,244,0.3), 0 4px 16px rgba(74,74,244,0.3);
+    }
+    .btn-primary:hover { background: #3b3bd6; transform: translateY(-1px); }
+    .btn-secondary {
+      background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+    .hero-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+    .hero-meta span {
+      font-size: 0.73rem; color: rgba(255,255,255,0.45);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 4px 11px; border-radius: 20px;
+    }
+    .hero-panel {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 14px; padding: 26px 24px;
+      backdrop-filter: blur(8px);
+    }
+    .hero-panel h2 {
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.14em;
+      text-transform: uppercase; color: rgba(255,255,255,0.35);
+      margin-bottom: 18px;
+    }
+    .hero-panel ol { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+    .hero-panel li {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding: 12px 14px; border-radius: 9px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .hero-panel .step-num {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(74,74,244,0.25); border: 1px solid rgba(74,74,244,0.35);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.73rem; font-weight: 700; color: #9898f8; flex-shrink: 0; margin-top: 1px;
+    }
+    .hero-panel li strong {
+      display: block; font-size: 0.88rem; font-weight: 600;
+      color: rgba(255,255,255,0.88); margin-bottom: 3px;
+    }
+    .hero-panel li p { font-size: 0.78rem; color: rgba(255,255,255,0.4); line-height: 1.5; }
+
+    /* ─── FLOW ARC TAGLINE ───────────────────────────────────── */
+    .flow-arc-wrap {
+      position: relative;
+      background: transparent;
+      margin-top: -28px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 24px 48px;
+    }
+    .flow-arc-row {
+      display: flex; align-items: center; gap: 0;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(74,74,244,0.12);
+      border-radius: 50px;
+      padding: 10px 24px;
+      box-shadow: 0 2px 20px rgba(74,74,244,0.07);
+    }
+    .flow-step {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.82rem; font-weight: 500; color: var(--ink-2);
+      padding: 4px 10px;
+    }
+    .flow-step .num {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--accent-subtle);
+      border: 1px solid rgba(74,74,244,0.2);
+      font-size: 0.68rem; font-weight: 700; color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .flow-arrow {
+      color: var(--muted); font-size: 0.75rem; padding: 0 4px; opacity: 0.3;
+    }
+    .flow-step:last-child .step-label { color: var(--accent); font-weight: 600; }
+
+    /* ─── SECTION SHARED ─────────────────────────────────────── */
+    .section-label {
+      font-size: 0.7rem; font-weight: 700;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 12px;
+    }
+    .section-title {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(1.7rem, 3.5vw, 2.6rem);
+      font-weight: 400; line-height: 1.2;
+      letter-spacing: -0.02em; color: var(--ink);
+      margin-bottom: 16px;
+    }
+    .section-sub {
+      font-size: 0.93rem; color: var(--muted);
+      line-height: 1.7; max-width: 560px;
+    }
+
+    /* ─── TRUST STRIP ─────────────────────────────────────────── */
+    .trust-section {
+      padding: 64px 24px;
+      border-bottom: 1px solid var(--line-2);
+    }
+    .trust-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center;
+    }
+    .trust-inner .section-sub { max-width: 100%; font-size: 1rem; line-height: 1.8; }
+    .trust-stats {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      padding: 24px 20px;
+      position: relative; overflow: hidden;
+    }
+    .stat-card:first-child { border-radius: 12px 0 0 0; }
+    .stat-card:nth-child(2) { border-radius: 0 12px 0 0; }
+    .stat-card:nth-child(3) { border-radius: 0 0 0 12px; }
+    .stat-card:last-child { border-radius: 0 0 12px 0; }
+    .stat-num {
+      font-family: 'Instrument Serif', serif;
+      font-size: 2rem; color: var(--ink);
+      line-height: 1; margin-bottom: 6px;
+    }
+    .stat-label { font-size: 0.76rem; color: var(--muted); font-weight: 500; }
+
+    /* ─── FEATURES ───────────────────────────────────────────── */
+    .features-section {
+      padding: 80px 24px;
+      background: var(--white);
+    }
+    .features-inner { max-width: 1200px; margin: 0 auto; }
+    .features-header { margin-bottom: 48px; }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .feat {
+      padding: 36px 30px;
+      background: var(--white);
+      position: relative; overflow: hidden;
+      transition: background 0.25s;
+    }
+    .feat:hover { background: var(--surface); }
+    .feat::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .feat:hover::before { opacity: 1; }
+    .feat-icon {
+      width: 42px; height: 42px; border-radius: 10px;
+      background: var(--accent-subtle);
+      border: 1px solid rgba(74,74,244,0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; margin-bottom: 18px;
+    }
+    .feat h3 {
+      font-family: 'Instrument Serif', serif;
+      font-size: 1.15rem; font-weight: 400;
+      color: var(--ink); margin-bottom: 10px; line-height: 1.3;
+    }
+    .feat p { font-size: 0.85rem; color: var(--muted); line-height: 1.7; }
+
+    /* ─── DETAILS / HOW IT WORKS ─────────────────────────────── */
+    .details-section {
+      padding: 80px 24px;
+      background: var(--surface);
+      border-top: 1px solid var(--line-2);
+      border-bottom: 1px solid var(--line-2);
+    }
+    .details-inner { max-width: 1200px; margin: 0 auto; }
+    .details-header { max-width: 600px; margin-bottom: 56px; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+    .detail-card {
+      padding: 26px 22px;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      position: relative;
+      transition: box-shadow 0.25s, transform 0.25s;
+    }
+    .detail-card:hover {
+      box-shadow: 0 8px 32px rgba(0,0,0,0.06);
+      transform: translateY(-3px);
+    }
+    .detail-card .tag {
+      font-size: 0.66rem; font-weight: 700;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 10px;
+    }
+    .detail-card h4 {
+      font-family: 'Instrument Serif', serif;
+      font-size: 1rem; font-weight: 400;
+      color: var(--ink); margin-bottom: 8px;
+    }
+    .detail-card p { font-size: 0.8rem; color: var(--muted); line-height: 1.65; }
+
+    /* ─── ARCHITECTURE — hidden on mobile ────────────────────── */
+    .arch-section {
+      padding: 80px 24px;
+      background: var(--white);
+    }
+    .arch-inner { max-width: 1100px; margin: 0 auto; }
+    .arch-header { text-align: center; margin-bottom: 48px; }
+    .arch-header .section-label { justify-content: center; display: flex; }
+    .arch-frame-wrap {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      background: #f8f9fc;
+      box-shadow: 0 2px 24px rgba(0,0,0,0.05);
+    }
+    .arch-frame-wrap iframe {
+      width: 100%; height: 640px;
+      border: none; display: block;
+    }
+
+    /* ─── AI PROMPT ──────────────────────────────────────────── */
+    .prompt-section {
+      padding: 80px 24px;
+      background: var(--surface);
+      border-top: 1px solid var(--line-2);
+    }
+    .prompt-inner {
+      max-width: 720px; margin: 0 auto; text-align: center;
+    }
+    .prompt-inner .section-title { margin-bottom: 10px; }
+    .prompt-inner .section-sub { margin: 0 auto 36px; text-align: center; }
+    .prompt-box {
+      background: #16172b;
+      border-radius: 14px;
+      overflow: hidden;
+      text-align: left;
+      position: relative;
+      cursor: pointer;
+      transition: box-shadow 0.25s;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.12);
+    }
+    .prompt-box:hover { box-shadow: 0 8px 48px rgba(0,0,0,0.18); }
+    .prompt-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .prompt-dots { display: flex; gap: 6px; }
+    .prompt-dots span {
+      width: 10px; height: 10px; border-radius: 50%;
+    }
+    .prompt-dots span:nth-child(1) { background: #ff5f57; }
+    .prompt-dots span:nth-child(2) { background: #febc2e; }
+    .prompt-dots span:nth-child(3) { background: #28c840; }
+    .prompt-title { font-size: 0.73rem; color: rgba(255,255,255,0.35); font-family: 'DM Sans', sans-serif; }
+    .copy-btn {
+      font-size: 0.7rem; color: rgba(255,255,255,0.4);
+      padding: 4px 10px; border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 5px; cursor: pointer; font-family: 'DM Sans', sans-serif;
+      background: none; transition: all 0.2s;
+    }
+    .copy-btn:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+    .prompt-code {
+      padding: 20px 20px 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.76rem; line-height: 1.85; color: #a0aec0;
+      overflow-x: auto;
+    }
+    .c-comment { color: #4a5568; }
+    .c-var { color: #90cdf4; }
+    .c-str { color: #fbd38d; }
+    .c-fn { color: #9ae6b4; }
+    .c-kw { color: #c084fc; }
+    .prompt-point {
+      display: block;
+      padding: 4px 0 4px 10px;
+      border-left: 2px solid rgba(74,74,244,0.35);
+      margin: 2px 0;
+    }
+    .prompt-note {
+      font-size: 0.75rem; color: var(--muted);
+      margin-top: 14px;
+    }
+
+    /* ─── CTA ────────────────────────────────────────────────── */
+    .cta-section {
+      padding: 80px 24px;
+      background: var(--white);
+      border-top: 1px solid var(--line-2);
+    }
+    .cta-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center;
+    }
+    .cta-inner .section-title { margin-bottom: 12px; }
+    .cta-inner .section-sub { margin-bottom: 28px; }
+    .cta-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn-light {
+      background: var(--surface); color: var(--ink);
+      border: 1px solid var(--line); font-size: 0.88rem; font-weight: 500;
+    }
+    .btn-light:hover { background: var(--line-2); }
+    .cta-flow {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: 14px; padding: 28px 24px;
+    }
+    .cta-flow-title {
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--muted);
+      margin-bottom: 20px;
+    }
+    .cta-steps { display: flex; flex-direction: column; gap: 0; }
+    .cta-step {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line-2);
+      opacity: 0; transform: translateX(16px);
+      transition: opacity 0.5s, transform 0.5s;
+    }
+    .cta-step:last-child { border-bottom: none; }
+    .cta-step.visible { opacity: 1; transform: none; }
+    .cta-step-num {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: var(--accent-subtle);
+      border: 1.5px solid rgba(74,74,244,0.2);
+      font-size: 0.7rem; font-weight: 700;
+      color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .cta-step-text strong {
+      display: block; font-size: 0.86rem; font-weight: 600;
+      color: var(--ink); margin-bottom: 3px;
+    }
+    .cta-step-text span { font-size: 0.78rem; color: var(--muted); }
+
+    /* ─── FOOTER ─────────────────────────────────────────────── */
+    .footer {
+      background: var(--ink);
+      border-top: 1px solid rgba(255,255,255,0.07);
+      padding: 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px;
+    }
+    .footer p { font-size: 0.78rem; color: rgba(255,255,255,0.3); }
+    .footer div { display: flex; gap: 20px; }
+    .footer a {
+      font-size: 0.78rem; color: rgba(255,255,255,0.4);
+      text-decoration: none; transition: color 0.2s;
+    }
+    .footer a:hover { color: rgba(255,255,255,0.8); }
+
+    /* ─── SCROLL ANIMATIONS ──────────────────────────────────── */
+    .reveal {
+      opacity: 0; transform: translateY(24px);
+      transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1),
+                  transform 0.6s cubic-bezier(0.22,1,0.36,1);
+    }
+    .reveal.visible { opacity: 1; transform: none; }
+    .reveal-d1 { transition-delay: 0.08s; }
+    .reveal-d2 { transition-delay: 0.16s; }
+    .reveal-d3 { transition-delay: 0.24s; }
+    .reveal-d4 { transition-delay: 0.32s; }
+
+    /* ══════════════════════════════════════════════════════════
+       MOBILE RESPONSIVE STYLES
+    ══════════════════════════════════════════════════════════ */
+
+    /* ── Tablet: 641px–900px ───────────────────────────── */
+    @media (max-width: 900px) {
+      .hero-content { grid-template-columns: 1fr; gap: 36px; }
+      .trust-inner { grid-template-columns: 1fr; gap: 36px; }
+      .features-grid { grid-template-columns: 1fr 1fr; }
+      .detail-grid { grid-template-columns: 1fr 1fr; }
+      .cta-inner { grid-template-columns: 1fr; gap: 40px; }
+    }
+
+    /* ── Mobile: ≤640px ────────────────────────────────── */
+    @media (max-width: 640px) {
+
+      /* Remove hero semicircle on mobile */
+      .hero-section::after { display: none; }
+
+      /* Adjust hero padding */
+      .hero-section { padding: 96px 18px 64px; }
+
+      /* Hide flow arc on mobile (sits on top of semicircle) */
+      .flow-arc-wrap { display: none; }
+
+      /* Hide architecture section on mobile */
+      .arch-section { display: none; }
+
+      /* ─ Hero ─ */
+      .hero-content { grid-template-columns: 1fr; gap: 28px; }
+      .hero-copy h1 { font-size: 2rem; }
+      .hero-text { font-size: 0.87rem; margin-bottom: 22px; }
+      .hero-actions { gap: 8px; }
+      .btn { padding: 10px 18px; font-size: 0.84rem; }
+      .hero-meta span { font-size: 0.68rem; padding: 3px 9px; }
+      .hero-panel { padding: 20px 18px; }
+      .hero-panel h2 { font-size: 0.66rem; }
+      .hero-panel li { padding: 10px 12px; gap: 10px; }
+      .hero-panel li strong { font-size: 0.83rem; }
+      .hero-panel li p { font-size: 0.74rem; }
+
+      /* ─ Sections global ─ */
+      .section-title { font-size: 1.7rem; }
+      .section-sub { font-size: 0.87rem; }
+      .section-label { font-size: 0.66rem; }
+
+      /* ─ Trust ─ */
+      .trust-section { padding: 48px 18px; }
+      .trust-inner { gap: 28px; }
+      .trust-inner .section-sub { font-size: 0.9rem; }
+      .stat-num { font-size: 1.7rem; }
+      .stat-label { font-size: 0.72rem; }
+      .stat-card { padding: 18px 14px; }
+
+      /* ─ Features ─ */
+      .features-section { padding: 56px 18px; }
+      .features-grid { grid-template-columns: 1fr; }
+      .feat { padding: 28px 22px; }
+      .feat h3 { font-size: 1.05rem; }
+      .feat p { font-size: 0.82rem; }
+      .feat-icon { width: 38px; height: 38px; font-size: 1rem; margin-bottom: 14px; }
+
+      /* ─ Details ─ */
+      .details-section { padding: 56px 18px; }
+      .details-header { margin-bottom: 36px; }
+      .detail-grid { grid-template-columns: 1fr; gap: 14px; }
+      .detail-card { padding: 20px 18px; }
+      .detail-card h4 { font-size: 0.96rem; }
+      .detail-card p { font-size: 0.78rem; }
+
+      /* ─ AI Prompt ─ */
+      .prompt-section { padding: 56px 18px; }
+      .prompt-code { font-size: 0.68rem; padding: 16px 14px 20px; line-height: 1.8; }
+      .prompt-inner .section-sub { font-size: 0.85rem; }
+
+      /* ─ CTA ─ */
+      .cta-section { padding: 56px 18px; }
+      .cta-inner { gap: 32px; }
+      .cta-flow { padding: 22px 18px; }
+      .cta-step-text strong { font-size: 0.82rem; }
+      .cta-step-text span { font-size: 0.75rem; }
+
+      /* ─ Footer ─ */
+      .footer { flex-direction: column; align-items: flex-start; gap: 10px; padding: 20px 18px; }
+    }
+
+    /* ── Very small: ≤380px ─────────────────────────────── */
+    @media (max-width: 380px) {
+      .hero-copy h1 { font-size: 1.8rem; }
+      .section-title { font-size: 1.5rem; }
+      .prompt-code { font-size: 0.62rem; }
+      .hero-actions { flex-direction: column; }
+      .hero-actions .btn { width: 100%; justify-content: center; }
+      .cta-actions { flex-direction: column; }
+      .cta-actions .btn { width: 100%; justify-content: center; }
+    }
+  </style>
 </head>
+
 <body>
-    <!-- ==================== Top Bar ==================== -->
-    <header class="topbar">
-        <div class="topbar-inner">
-            <a href="/" class="logo">
-                <span class="logo-dot"></span>
-                <span>Auth Platform</span>
-            </a>
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="/" class="logo">
+        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5pF6mvGTNGG6kynoXrOrcQWJ31LkuEv7YJQ&s" alt="Auth Platform" class="logo-img">
+        <span>Auth Platform</span>
+      </a>
+      <nav class="menu">
+        <a href="/api/docs">Developer Docs</a>
+        <a href="/docs">OpenAPI</a>
+        <a href="/login" class="menu-login">Login</a>
+      </nav>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <svg class="icon-menu" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        <svg class="icon-close" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <nav class="mobile-nav">
+      <a href="/api/docs">Developer Docs</a>
+      <a href="/docs">OpenAPI</a>
+      <a href="/login" class="menu-login">Login</a>
+    </nav>
+  </header>
 
-            <!-- Desktop nav -->
-            <nav class="menu">
-                <a href="/api/docs">Developer Docs</a>
-                <a href="/docs">OpenAPI</a>
-                <a href="/login" class="menu-login">Login</a>
-            </nav>
-
-            <!-- Mobile hamburger -->
-            <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
-                <svg class="icon-menu" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="3" y1="6"  x2="21" y2="6"/>
-                    <line x1="3" y1="12" x2="21" y2="12"/>
-                    <line x1="3" y1="18" x2="21" y2="18"/>
-                </svg>
-                <svg class="icon-close" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6"  x2="6"  y2="18"/>
-                    <line x1="6"  y1="6"  x2="18" y2="18"/>
-                </svg>
-            </button>
+  <!-- HERO -->
+  <section class="hero-section">
+    <div class="hero-content">
+      <div class="hero-copy">
+        <h1>Build auth once.<br><span>Keep control forever.</span></h1>
+        <p class="hero-text">
+          Auth Platform gives your team a practical identity layer: hosted login, OAuth 2.0 with PKCE,
+          RS256 JWT sessions, OTP verification, and app-level isolation managed from one dashboard.
+        </p>
+        <div class="hero-actions">
+          <a href="/login" class="btn btn-primary">Open Dashboard</a>
+          <a href="/api/docs" class="btn btn-secondary">Read Docs</a>
         </div>
-
-        <!-- Mobile nav drawer -->
-        <nav class="mobile-nav">
-            <a href="/api/docs">Developer Docs</a>
-            <a href="/docs">OpenAPI</a>
-            <a href="/login" class="menu-login">Login</a>
-        </nav>
-    </header>
-
-    <!-- ==================== Hero (dark bg) ==================== -->
-    <section class="hero-section">
-        <div class="hero-content">
-            <div class="hero-copy">
-                <p class="eyebrow">Self-hosted authentication</p>
-                <h1>Build auth once.<br><span>Keep control forever.</span></h1>
-                <p class="hero-text">
-                    Auth Platform gives your team a practical identity layer: hosted login, OAuth 2.0 with PKCE,
-                    RS256 JWT sessions, OTP verification, and app-level isolation managed from one console.
-                </p>
-                <div class="hero-actions">
-                    <a href="/login" class="btn btn-primary">Open Console</a>
-                    <a href="/api/docs" class="btn btn-secondary">Read Docs</a>
-                </div>
-                <div class="hero-meta">
-                    <span>OAuth 2.0 + PKCE</span>
-                    <span>RS256 tokens</span>
-                    <span>Multi-tenant apps</span>
-                </div>
+        <div class="hero-meta">
+          <span>OAuth 2.0 + PKCE</span>
+          <span>RS256 tokens</span>
+          <span>Multi-tenant apps</span>
+        </div>
+      </div>
+      <aside class="hero-panel">
+        <h2>What teams usually do first</h2>
+        <ol>
+          <li>
+            <span class="step-num">1</span>
+            <div>
+              <strong>Create an application</strong>
+              <p>Generate a client ID and define allowed redirect URIs.</p>
             </div>
+          </li>
+          <li>
+            <span class="step-num">2</span>
+            <div>
+              <strong>Set auth policy</strong>
+              <p>Configure OTP, passkeys, login notifications, and token expiry.</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-num">3</span>
+            <div>
+              <strong>Integrate in frontend</strong>
+              <p>Drop in the SDK and redirect users to the hosted login flow.</p>
+            </div>
+          </li>
+        </ol>
+      </aside>
+    </div>
+  </section>
 
-            <aside class="hero-panel">
-                <h2>What teams usually do first</h2>
-                <ol>
-                    <li>
-                        <strong>Create an application</strong>
-                        <p>Generate a client ID and define allowed redirect URIs.</p>
-                    </li>
-                    <li>
-                        <strong>Set auth policy</strong>
-                        <p>Configure OTP, passkeys, login notifications, and token expiry.</p>
-                    </li>
-                    <li>
-                        <strong>Integrate in frontend</strong>
-                        <p>Drop in the SDK and redirect users to the hosted login flow.</p>
-                    </li>
-                </ol>
-            </aside>
+  <!-- FLOW TAGLINE — hidden on mobile via CSS -->
+  <div class="flow-arc-wrap">
+    <div class="flow-arc-row">
+      <div class="flow-step"><span class="num">1</span><span class="step-label">Register</span></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step"><span class="num">2</span><span class="step-label">Download SDK</span></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step"><span class="num">3</span><span class="step-label">Paste Prompt</span></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step"><span class="num">4</span><span class="step-label">Done</span></div>
+    </div>
+  </div>
+
+  <main>
+
+    <!-- TRUST -->
+    <section class="trust-section">
+      <div class="trust-inner">
+        <div class="reveal">
+          <p class="section-label">Built for teams</p>
+          <p class="section-sub">Designed for product teams, platform engineers, and security-conscious startups that need control without rebuilding auth from scratch. Own your stack completely.</p>
         </div>
+        <div class="trust-stats reveal reveal-d1">
+          <div class="stat-card">
+            <div class="stat-num">OAuth 2.0</div>
+            <div class="stat-label">with PKCE by default</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num">RS256</div>
+            <div class="stat-label">signed JWT sessions</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num">Multi</div>
+            <div class="stat-label">tenant app isolation</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num">Self</div>
+            <div class="stat-label">hosted, your infra</div>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <!-- ==================== Main content ==================== -->
-    <main class="page">
-        <section class="trust">
-            <p>Designed for product teams, platform engineers, and security-conscious startups that need control without rebuilding auth from scratch.</p>
-        </section>
-
-        <section class="features">
-            <article class="feature">
-                <div class="feature-icon">&#128274;</div>
-                <h3>Hosted login that your app can trust</h3>
-                <p>Users sign in through a dedicated flow while your frontend receives standards-based authorization codes and secure tokens.</p>
-            </article>
-            <article class="feature">
-                <div class="feature-icon">&#127757;</div>
-                <h3>Per-app tenancy and policy boundaries</h3>
-                <p>Each application keeps separate users, redirect URIs, and session settings so teams can ship safely across environments.</p>
-            </article>
-            <article class="feature">
-                <div class="feature-icon">&#9881;</div>
-                <h3>Operational console for real workflows</h3>
-                <p>Create apps, onboard users, rotate credentials, and inspect health without leaving your own infrastructure.</p>
-            </article>
-        </section>
-
-        <section class="details">
-            <div class="details-block">
-                <h2>Built for clear handoff between teams</h2>
-                <p>Product teams get a smoother sign-in journey. Security teams keep policy control. Developers keep a simple integration surface.</p>
-            </div>
-            <div class="detail-grid">
-                <div>
-                    <h4>Authentication</h4>
-                    <p>Hosted login, OTP, passkey-ready model.</p>
-                </div>
-                <div>
-                    <h4>Token lifecycle</h4>
-                    <p>RS256 JWTs, refresh tokens, configurable TTL.</p>
-                </div>
-                <div>
-                    <h4>Integration</h4>
-                    <p>JavaScript SDK, callback handling, session helpers.</p>
-                </div>
-                <div>
-                    <h4>Control plane</h4>
-                    <p>Admin console for apps, users, and policies.</p>
-                </div>
-            </div>
-        </section>
-
-        <section class="cta">
-            <h2>Start from the console, then scale with confidence.</h2>
-            <p>Use your own infrastructure, keep your own data, and iterate without identity becoming a bottleneck.</p>
-            <a href="/login" class="btn btn-primary">Go to Console</a>
-        </section>
-    </main>
-
-    <footer class="footer">
-        <p>&copy; <span id="year"></span> Auth Platform</p>
-        <div>
-            <a href="/api/docs">Docs</a>
-            <a href="/docs">OpenAPI</a>
-            <a href="/login">Console</a>
+    <!-- FEATURES -->
+    <section class="features-section">
+      <div class="features-inner">
+        <div class="features-header reveal">
+          <p class="section-label">Capabilities</p>
+          <h2 class="section-title">Everything identity.<br>Nothing you don't need.</h2>
         </div>
-    </footer>
+        <div class="features-grid">
+          <article class="feat reveal">
+            <div class="feat-icon">🔒</div>
+            <h3>Hosted login that your app can trust</h3>
+            <p>Users sign in through a dedicated flow while your frontend receives standards-based authorization codes and secure tokens.</p>
+          </article>
+          <article class="feat reveal reveal-d1">
+            <div class="feat-icon">🌐</div>
+            <h3>Per-app tenancy and policy boundaries</h3>
+            <p>Each application keeps separate users, redirect URIs, and session settings so teams can ship safely across environments.</p>
+          </article>
+          <article class="feat reveal reveal-d2">
+            <div class="feat-icon">⚙️</div>
+            <h3>Operational dashboard for real workflows</h3>
+            <p>Create apps, onboard users, rotate credentials, and inspect health without leaving your own infrastructure.</p>
+          </article>
+        </div>
+      </div>
+    </section>
 
-    <script>
-        document.getElementById('year').textContent = new Date().getFullYear();
+    <!-- DETAILS -->
+    <section class="details-section">
+      <div class="details-inner">
+        <div class="details-header reveal">
+          <p class="section-label">Clear handoff</p>
+          <h2 class="section-title">Built for every layer of your team.</h2>
+          <p class="section-sub">Product teams get smoother sign-in. Security teams keep policy control. Developers keep a simple integration surface.</p>
+        </div>
+        <div class="detail-grid">
+          <div class="detail-card reveal">
+            <div class="tag">Layer 1</div>
+            <h4>Authentication</h4>
+            <p>Hosted login, OTP, passkey-ready model — all configurable per app.</p>
+          </div>
+          <div class="detail-card reveal reveal-d1">
+            <div class="tag">Layer 2</div>
+            <h4>Token lifecycle</h4>
+            <p>RS256 JWTs, refresh tokens, configurable TTL — sensible defaults.</p>
+          </div>
+          <div class="detail-card reveal reveal-d2">
+            <div class="tag">Layer 3</div>
+            <h4>Integration</h4>
+            <p>JavaScript SDK, callback handling, session helpers. Works in &lt;5 lines.</p>
+          </div>
+          <div class="detail-card reveal reveal-d3">
+            <div class="tag">Layer 4</div>
+            <h4>Control plane</h4>
+            <p>Admin dashboard for apps, users, and policies from one interface.</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-        // Mobile nav toggle
-        var navToggle = document.getElementById('navToggle');
-        if (navToggle) {
-            navToggle.addEventListener('click', function () {
-                document.body.classList.toggle('nav-open');
-            });
+    <!-- ARCHITECTURE — hidden on mobile via CSS -->
+    <section class="arch-section">
+      <div class="arch-inner">
+        <div class="arch-header reveal">
+          <p class="section-label">Platform Architecture</p>
+          <h2 class="section-title">Every flow, documented.</h2>
+        </div>
+        <div class="arch-frame-wrap reveal reveal-d1">
+          <iframe src="/assets/architecture.html" title="Auth Platform Architecture" loading="lazy"></iframe>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI PROMPT -->
+    <section class="prompt-section">
+      <div class="prompt-inner">
+        <div class="reveal">
+          <p class="section-label" style="display:block; margin-bottom:12px;">Zero dependencies · Drop-in · OAuth 2.0 PKCE</p>
+          <h2 class="section-title">Auth in &lt;5 lines.<br><em>Your users deserve it.</em></h2>
+          <p class="section-sub">One tiny JS file. No npm, no bundler, no backend changes. Paste the prompt below into your AI editor of choice.</p>
+        </div>
+        <div class="prompt-box reveal reveal-d1" id="ai-prompt-box" onclick="copyPrompt()">
+          <div class="prompt-bar">
+            <div class="prompt-dots">
+              <span></span><span></span><span></span>
+            </div>
+            <span class="prompt-title">AI Integration Prompt</span>
+            <button class="copy-btn" id="copy-hint">Copy</button>
+          </div>
+          <div class="prompt-code">
+<span class="c-comment"># Paste into GitHub Copilot / Cursor / Claude</span><br><br>
+I have <span class="c-fn">auth-sdk.js</span> from Auth Platform (self-hosted OAuth 2.0 + PKCE).<br>
+<span class="c-var">AUTH_SERVER</span>=<span class="c-str">"https://your-auth-server.com"</span>, <span class="c-var">CLIENT_ID</span>=<span class="c-str">"app_xxxx"</span>.<br>
+<span class="c-comment">Please:</span>
+<span class="prompt-point"><span class="c-kw">1.</span> Add <span class="c-str">&lt;script src="auth-sdk.js"&gt;&lt;/script&gt;</span> to my HTML</span>
+<span class="prompt-point"><span class="c-kw">2.</span> Init <span class="c-fn">AuthClient</span> with <span class="c-var">AUTH_SERVER</span>, <span class="c-var">CLIENT_ID</span>, <span class="c-var">REDIRECT_URI</span>=<span class="c-kw">window</span>.location.origin</span>
+<span class="prompt-point"><span class="c-kw">3.</span> Call <span class="c-fn">auth.handleCallback</span>() on page load</span>
+<span class="prompt-point"><span class="c-kw">4.</span> Show protected content if <span class="c-fn">auth.isAuthenticated</span>(), else call <span class="c-fn">auth.login</span>()</span>
+<span class="prompt-point"><span class="c-kw">5.</span> Add Logout → <span class="c-fn">auth.logout</span>() &amp; auto-refresh → <span class="c-fn">auth.startAutoRefresh</span>()</span><br>
+<span class="c-comment"># Docs: https://your-auth-server.com/api/docs</span>
+          </div>
+        </div>
+        <p class="prompt-note reveal">Works with GitHub Copilot, Cursor, Windsurf, Claude, ChatGPT</p>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+      <div class="cta-inner">
+        <div class="reveal">
+          <p class="section-label">Get started</p>
+          <h2 class="section-title">Start from the dashboard.<br>Scale with confidence.</h2>
+          <p class="section-sub">Use your own infrastructure, keep your own data, and iterate without identity becoming a bottleneck.</p>
+          <div class="cta-actions">
+            <a href="/login" class="btn btn-primary">Go to Dashboard</a>
+            <a href="/api/docs" class="btn btn-light">Read the Docs</a>
+          </div>
+        </div>
+        <div class="cta-flow reveal reveal-d1">
+          <div class="cta-flow-title">Getting started in 4 steps</div>
+          <div class="cta-steps" id="ctaSteps">
+            <div class="cta-step">
+              <div class="cta-step-num">1</div>
+              <div class="cta-step-text">
+                <strong>Register</strong>
+                <span>Create your admin account and set up the platform.</span>
+              </div>
+            </div>
+            <div class="cta-step">
+              <div class="cta-step-num">2</div>
+              <div class="cta-step-text">
+                <strong>Download SDK</strong>
+                <span>Grab auth-sdk.js — no build step needed.</span>
+              </div>
+            </div>
+            <div class="cta-step">
+              <div class="cta-step-num">3</div>
+              <div class="cta-step-text">
+                <strong>Paste Prompt</strong>
+                <span>Drop the AI prompt into Copilot, Cursor, or Claude.</span>
+              </div>
+            </div>
+            <div class="cta-step">
+              <div class="cta-step-num">4</div>
+              <div class="cta-step-text">
+                <strong>Done</strong>
+                <span>Your users can sign in. You own the whole stack.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <p>&copy; <span id="year"></span> Auth Platform</p>
+    <div>
+      <a href="/api/docs">Docs</a>
+      <a href="/docs">OpenAPI</a>
+      <a href="/login">Dashboard</a>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Mobile nav
+    var navToggle = document.getElementById('navToggle');
+    if (navToggle) {
+      navToggle.addEventListener('click', function() {
+        document.body.classList.toggle('nav-open');
+      });
+      // Close nav when a link is tapped
+      document.querySelectorAll('.mobile-nav a').forEach(function(link) {
+        link.addEventListener('click', function() {
+          document.body.classList.remove('nav-open');
+        });
+      });
+    }
+
+    // Scroll reveal
+    var revealEls = document.querySelectorAll('.reveal');
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
         }
-    </script>
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+    revealEls.forEach(function(el) { observer.observe(el); });
+
+    // CTA steps stagger
+    var ctaSection = document.querySelector('.cta-section');
+    var ctaObserver = new IntersectionObserver(function(entries) {
+      if (entries[0].isIntersecting) {
+        var steps = document.querySelectorAll('.cta-step');
+        steps.forEach(function(step, i) {
+          setTimeout(function() { step.classList.add('visible'); }, i * 120);
+        });
+        ctaObserver.disconnect();
+      }
+    }, { threshold: 0.15 });
+    ctaObserver.observe(ctaSection);
+
+    // Copy prompt
+    function copyPrompt() {
+      var hint = document.getElementById('copy-hint');
+      var code = document.querySelector('.prompt-code');
+      var text = code.innerText;
+      navigator.clipboard.writeText(text).then(function() {
+        hint.textContent = '✓ Copied';
+        hint.style.color = '#9ae6b4';
+        hint.style.borderColor = 'rgba(154,230,180,0.3)';
+        setTimeout(function() {
+          hint.textContent = 'Copy';
+          hint.style.color = '';
+          hint.style.borderColor = '';
+        }, 2200);
+      });
+    }
+  </script>
 </body>
 </html>

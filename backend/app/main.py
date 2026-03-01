@@ -62,12 +62,12 @@ except Exception as e:
     logger.error(f"Migration runner failed: {e}")
 
 
-# ============== Console Auth Middleware ==============
+# ============== Dashboard Auth Middleware ==============
 class ConsoleAuthMiddleware(BaseHTTPMiddleware):
-    """Protects the /console page — redirects to /login if no valid admin JWT cookie.
+    """Protects the /dashboard page — redirects to /login if no valid admin JWT cookie.
     Only guards the HTML entry-point; static assets (CSS/JS) are served freely."""
 
-    PROTECTED_PATHS = ("/console", "/console/", "/console/index.html")
+    PROTECTED_PATHS = ("/dashboard", "/dashboard/", "/dashboard/index.html")
 
     async def dispatch(self, request: Request, call_next):
         if request.url.path in self.PROTECTED_PATHS:
@@ -104,7 +104,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Console auth middleware — server-side gate for /console routes
+# Dashboard auth middleware — server-side gate for /dashboard routes
 app.add_middleware(ConsoleAuthMiddleware)
 
 # Include routers
@@ -143,6 +143,8 @@ async def admin_login_page():
         with open(auth_file, 'r', encoding='utf-8') as f:
             return HTMLResponse(content=f.read())
     return RedirectResponse(url="/docs")
+
+
 
 
 # Jinja2 templates for the reset password page
@@ -191,9 +193,15 @@ app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 # Serve static files (CSS, JS, SDK downloads)
 static_dir = Path(__file__).resolve().parent / "static"
 if static_dir.exists():
-    @app.get("/console", include_in_schema=False)
-    async def admin_console_redirect():
-        return RedirectResponse(url="/console/")
+    @app.get("/dashboard", include_in_schema=False)
+    async def admin_dashboard_redirect():
+        return RedirectResponse(url="/dashboard/")
+
+    @app.get("/api/config", include_in_schema=False)
+    async def public_config():
+        """Return public client-side config (e.g. auth server URL) sourced from env."""
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"AUTH_SERVER_URL": settings.AUTH_SERVER_URL})
     
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-    app.mount("/console", StaticFiles(directory=str(static_dir), html=True), name="admin-console")
+    app.mount("/dashboard", StaticFiles(directory=str(static_dir), html=True), name="admin-dashboard")

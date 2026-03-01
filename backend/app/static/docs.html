@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="/assets/logo.png">
+    <script>(function(){var img=new Image();img.onload=function(){var c=document.createElement('canvas');c.width=c.height=64;var ctx=c.getContext('2d');ctx.beginPath();ctx.arc(32,32,32,0,Math.PI*2);ctx.clip();ctx.drawImage(img,0,0,64,64);var l=document.querySelector("link[rel='icon']");if(l)l.href=c.toDataURL();};img.src='/assets/logo.png';})();</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auth Platform — API Documentation</title>
     <link rel="stylesheet" href="/static/docs.css">
@@ -16,7 +18,7 @@
             <i class="fas fa-bars"></i>
         </button>
         <span class="docs-mobile-title">API Docs</span>
-        <a href="/console" class="docs-mobile-console">Console</a>
+        <a href="/dashboard" class="docs-mobile-console">Dashboard</a>
     </div>
     <!-- Sidebar backdrop -->
     <div class="docs-overlay" id="docsOverlay"></div>
@@ -29,7 +31,7 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <button onclick="location.href='/console'" class="btn-secondary docs-sidebar-console">Console</button>
+            <button onclick="location.href='/dashboard'" class="btn-secondary docs-sidebar-console">Dashboard</button>
             <div class="sidebar-header">
                 <p>Auth Platform</p>
                 <span class="version">v1.0.0</span>
@@ -43,7 +45,6 @@
                 </div>
                 <div class="nav-section">
                     <h3>Authentication</h3>
-                    <a href="#oauth-flow" class="nav-item">OAuth 2.0 + PKCE</a>
                     <a href="#integration" class="nav-item">Integration Guide</a>
                     <a href="#sdk-reference" class="nav-item">SDK Reference</a>
                 </div>
@@ -57,6 +58,7 @@
                 <div class="nav-section">
                     <h3>Resources</h3>
                     <a href="#examples" class="nav-item">Code Examples</a>
+                    <a href="#architecture" class="nav-item">Architecture</a>
                     <a href="/docs" class="nav-item external">OpenAPI Spec ↗</a>
                 </div>
             </nav>
@@ -100,9 +102,8 @@
                         <div class="step-number">1</div>
                         <div class="step-content">
                             <h3>Register Your Application</h3>
-                            <p>Open the <a href="https://web-production-4d65b.up.railway.app/console/">Admin Console</a> and create a new application. You'll receive a <strong>Client ID</strong>.</p>
-                            <pre><code class="language-text">Admin Console: https://web-production-4d65b.up.railway.app/console/
-Default Password: Darsh@26</code></pre>
+                            <p>Open the <a id="dashboard-link" href="#">Admin Dashboard</a> and create a new application. You'll receive a <strong>Client ID</strong>.</p>
+                            <pre><code class="language-text">Admin Dashboard: __AUTH_SERVER__/dashboard/</code></pre>
                         </div>
                     </div>
                     <div class="step">
@@ -124,7 +125,7 @@ Default Password: Darsh@26</code></pre>
                             <pre><code class="language-html">&lt;script src="auth-sdk.js"&gt;&lt;/script&gt;
 &lt;script&gt;
   const auth = new AuthClient({
-    AUTH_SERVER: 'https://web-production-4d65b.up.railway.app',
+    AUTH_SERVER: '__AUTH_SERVER__',
     CLIENT_ID: 'your-client-id',
     REDIRECT_URI: window.location.origin
   });
@@ -173,37 +174,6 @@ Default Password: Darsh@26</code></pre>
                         </ul>
                     </div>
                 </section>
-                <!-- OAuth Flow -->
-                <section id="oauth-flow" class="doc-section">
-                    <h2>OAuth 2.0 Flow</h2>
-                    <p>Standard Authorization Code Flow with PKCE for public clients (SPAs, mobile apps).</p>
-                    <div class="flow-diagram">
-                        <pre>┌─────────────┐ ┌──────────────┐
-│ Your App    │ │ Auth Platform│
-└──────┬──────┘ └──────┬───────┘
-       │                │
-       │ 1. auth.login() │
-       │ + Generate PKCE pair │
-       ├─────────────────────────────────►
-       │ GET /oauth/authorize      │
-       │ ?code_challenge=xxx       │
-       │                           │
-       │ 2. Show Login             ◄┤
-       │ User signs in             │
-       │◄─────────────────────────────────┤
-       │ 3. Redirect with code     │
-       │ ?code=abc&state=xyz       │
-       │                           │
-       │ 4. auth.handleCallback()  │
-       │ POST /oauth/token         │
-       │ + code_verifier           │
-       ├─────────────────────────────────►
-       │                           │
-       │◄─────────────────────────────────┤
-       │ 5. Returns tokens         │
-       │ { access_token, refresh_token }</pre>
-                    </div>
-                </section>
                 <!-- Integration Guide -->
                 <section id="integration" class="doc-section">
                     <h2>Integration Guide</h2>
@@ -211,7 +181,7 @@ Default Password: Darsh@26</code></pre>
                     <h3>1. Basic Setup</h3>
                     <pre><code class="language-javascript">// config.js
 const AUTH_CONFIG = {
-  AUTH_SERVER: 'https://web-production-4d65b.up.railway.app',
+  AUTH_SERVER: '__AUTH_SERVER__',
   CLIENT_ID: 'app_xxxxxxxxxxxx',
   REDIRECT_URI: window.location.origin + window.location.pathname
 };
@@ -253,7 +223,7 @@ if (auth.isAuthenticated()) {
                         <h3>AuthClient(config)</h3>
                         <p>Initialize the authentication client.</p>
                         <pre><code class="language-javascript">const auth = new AuthClient({
-  AUTH_SERVER: 'https://web-production-4d65b.up.railway.app',
+  AUTH_SERVER: '__AUTH_SERVER__',
   CLIENT_ID: 'your-client-id',
   REDIRECT_URI: window.location.origin
 });</code></pre>
@@ -545,10 +515,24 @@ app.get('/api/protected', authenticateToken, (req, res) => {
   res.json({ message: 'Protected data', user: req.user });
 });</code></pre>
                 </section>
+                <!-- Architecture & Flow Diagrams -->
+                <section id="architecture" class="doc-section">
+                    <h2>Architecture &amp; Flow Diagrams</h2>
+                    <p>Interactive sequence diagrams for all authentication flows — OAuth 2.0, OTP, WebAuthn, token refresh, multi-tenant isolation, and more.</p>
+                    <div style="border:1px solid #e5e7eb; border-radius:12px; overflow:hidden; background:#ffffff;">
+                        <iframe
+                            src="/assets/architecture.html"
+                            title="Auth Platform Architecture &amp; Flow Diagrams"
+                            style="width:100%; height:780px; border:none; display:block;"
+                            loading="lazy"
+                        ></iframe>
+                    </div>
+                </section>
+
                 <!-- Footer -->
                 <footer class="doc-footer">
                     <div class="footer-links">
-                        <a href="/console">Admin Console</a>
+                        <a href="/dashboard">Admin Dashboard</a>
                         <a href="/docs">OpenAPI Spec</a>
                         <a href="https://github.com">GitHub</a>
                     </div>
@@ -563,51 +547,85 @@ app.get('/api/protected', authenticateToken, (req, res) => {
         </main>
     </div>
     <script>
-        // Syntax highlighting
-        hljs.highlightAll();
-        // Smooth scroll
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                   
-                    // Update active nav item
-                    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-                    this.classList.add('active');
+        (async function init() {
+            // ── 1. Fetch auth server URL from env (via /api/config) ──
+            const FALLBACK = window.location.origin;
+            let authServerUrl = FALLBACK;
+            try {
+                const res = await fetch('/api/config');
+                if (res.ok) {
+                    const cfg = await res.json();
+                    authServerUrl = (cfg.AUTH_SERVER_URL || FALLBACK).replace(/\/$/, '');
+                }
+            } catch (_) { /* use fallback */ }
+
+            // ── 2. Replace __AUTH_SERVER__ in raw <code> elements BEFORE highlight.js ──
+            document.querySelectorAll('code').forEach(el => {
+                if (el.textContent.includes('__AUTH_SERVER__')) {
+                    el.textContent = el.textContent.split('__AUTH_SERVER__').join(authServerUrl);
                 }
             });
-        });
-        // Generate table of contents
-        const tocNav = document.getElementById('toc-nav');
-        const headings = document.querySelectorAll('.content h2, .content h3');
-        headings.forEach(heading => {
-            const link = document.createElement('a');
-            link.href = `#${heading.parentElement.id}`;
-            link.textContent = heading.textContent;
-            link.className = heading.tagName === 'H3' ? 'toc-sub' : 'toc-main';
-            tocNav.appendChild(link);
-        });
-        // Intersection observer for active nav
-        const observerOptions = {
-            threshold: 0.5,
-            rootMargin: '-100px 0px -66%'
-        };
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    const id = entry.target.id;
-                    document.querySelectorAll('.nav-item').forEach(item => {
-                        item.classList.remove('active');
-                        if (item.getAttribute('href') === `#${id}`) {
-                            item.classList.add('active');
-                        }
-                    });
+
+            // ── 3. Replace in non-code text nodes (links, paragraphs) ──
+            function replaceInTextNodes(node, from, to) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    if (node.textContent.includes(from)) {
+                        node.textContent = node.textContent.split(from).join(to);
+                    }
+                } else if (!['CODE', 'SCRIPT', 'STYLE'].includes(node.nodeName)) {
+                    node.childNodes.forEach(child => replaceInTextNodes(child, from, to));
                 }
+            }
+            replaceInTextNodes(document.body, '__AUTH_SERVER__', authServerUrl);
+
+            // ── 4. Update dashboard anchor href ──
+            const dashLink = document.getElementById('dashboard-link');
+            if (dashLink) dashLink.href = authServerUrl + '/dashboard/';
+
+            // ── 5. Now run syntax highlighting (URLs are already correct) ──
+            hljs.highlightAll();
+
+            // ── 6. Smooth scroll ──
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                        this.classList.add('active');
+                    }
+                });
             });
-        }, observerOptions);
-        document.querySelectorAll('.doc-section').forEach(section => observer.observe(section));
+
+            // ── 7. Generate table of contents ──
+            const tocNav = document.getElementById('toc-nav');
+            const headings = document.querySelectorAll('.content h2, .content h3');
+            headings.forEach(heading => {
+                const link = document.createElement('a');
+                link.href = `#${heading.parentElement.id}`;
+                link.textContent = heading.textContent;
+                link.className = heading.tagName === 'H3' ? 'toc-sub' : 'toc-main';
+                tocNav.appendChild(link);
+            });
+
+            // ── 8. Intersection observer for active nav ──
+            const observerOptions = { threshold: 0.5, rootMargin: '-100px 0px -66%' };
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.id;
+                        document.querySelectorAll('.nav-item').forEach(item => {
+                            item.classList.remove('active');
+                            if (item.getAttribute('href') === `#${id}`) {
+                                item.classList.add('active');
+                            }
+                        });
+                    }
+                });
+            }, observerOptions);
+            document.querySelectorAll('.doc-section').forEach(section => observer.observe(section));
+        })();
     </script>
 
     <!-- Mobile sidebar toggle -->

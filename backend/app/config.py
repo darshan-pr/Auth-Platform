@@ -42,4 +42,7 @@ class Settings:
     # CORS Configuration
     ALLOWED_ORIGINS: list = os.getenv("ALLOWED_ORIGINS", "*").split(",") if os.getenv("ALLOWED_ORIGINS") else ["*"]
 
+    # Public server URL (used in docs, SDK examples, etc.)
+    AUTH_SERVER_URL: str = os.getenv("AUTH_SERVER_URL", "http://localhost:8000")
+
 settings = Settings()
