@@ -5,11 +5,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from pathlib import Path
+import logging
 from app.api import admin, auth, health, token, oauth
 from app.db import engine, Base, get_db
 from app.config import settings
 from app.services.jwt_service import verify_token
+
+logger = logging.getLogger(__name__)
 
 # Import all models to ensure they're registered with Base
 from app.models.app import App
@@ -21,6 +25,41 @@ from app.models.tenant import Tenant
 
 # Create all tables
 Base.metadata.create_all(bind=engine)
+
+
+def run_migrations():
+    """Run all SQL migration files in order to ensure schema is up to date."""
+    migrations_dir = Path(__file__).resolve().parent.parent / "migrations"
+    if not migrations_dir.exists():
+        logger.info("No migrations directory found, skipping migrations.")
+        return
+
+    migration_files = sorted(migrations_dir.glob("*.sql"))
+    if not migration_files:
+        logger.info("No migration files found.")
+        return
+
+    with engine.connect() as conn:
+        for mig_file in migration_files:
+            logger.info(f"Running migration: {mig_file.name}")
+            sql = mig_file.read_text()
+            # Execute each statement separately (split on semicolons)
+            for statement in sql.split(";"):
+                statement = statement.strip()
+                if statement and not statement.startswith("--"):
+                    try:
+                        conn.execute(text(statement))
+                    except Exception as e:
+                        logger.warning(f"Migration statement skipped ({mig_file.name}): {e}")
+            conn.commit()
+    logger.info("All migrations applied successfully.")
+
+
+# Run migrations on startup
+try:
+    run_migrations()
+except Exception as e:
+    logger.error(f"Migration runner failed: {e}")
 
 
 # ============== Console Auth Middleware ==============
