@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Auth Platform — Admin Portal</title>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --primary: #7c3aed;
+            --primary-hover: #6d28d9;
+            --primary-glow: rgba(124, 58, 237, 0.25);
+            --danger: #f43f5e;
+            --success: #34d399;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --text-muted: #64748b;
+            --surface: #111111;
+            --card: #1a1a1a;
+            --input-bg: #0d0d0d;
+            --input-border: #2a2a2a;
+            --input-focus: #3b3b3b;
+            --radius: 10px;
+            --radius-sm: 7px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+            min-height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000000;
+            padding: 16px;
+            -webkit-font-smoothing: antialiased;
+            color: var(--text);
+        }
+
+        .auth-card {
+            background: var(--card);
+            border: 1px solid #222;
+            border-radius: 16px;
+            padding: 32px 28px 28px;
+            width: 100%;
+            max-width: 360px;
+            animation: cardIn 0.3s ease;
+        }
+
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(8px) scale(0.98); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* ===== Logo ===== */
+        .auth-logo { text-align: center; margin-bottom: 22px; }
+
+        .logo-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            background: var(--primary);
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+        .logo-icon svg { color: #fff; width: 22px; height: 22px; }
+
+        .auth-logo h1 { font-size: 1.15rem; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+        .auth-logo p  { font-size: 0.75rem; color: var(--text-muted); margin-top: 3px; }
+
+        /* ===== Tabs ===== */
+        .auth-tabs {
+            display: flex;
+            border-radius: var(--radius-sm);
+            background: var(--input-bg);
+            padding: 3px;
+            margin-bottom: 20px;
+            gap: 3px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 5px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: transparent;
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }
+
+        .auth-tab.active {
+            background: var(--card);
+            color: var(--text);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .auth-tab:hover:not(.active) { color: var(--text-dim); }
+
+        /* ===== Forms ===== */
+        .auth-form { display: none; }
+        .auth-form.active { display: block; animation: fadeIn 0.15s ease; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-group { margin-bottom: 14px; }
+
+        .form-group label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            margin-bottom: 5px;
+            letter-spacing: 0.02em;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid var(--input-border);
+            border-radius: var(--radius-sm);
+            font-size: 0.82rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            color: var(--text);
+            background: var(--input-bg);
+            font-family: inherit;
+        }
+
+        .form-group input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--primary-glow);
+        }
+
+        .form-group input::placeholder { color: var(--text-muted); }
+
+        .form-hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+
+        .input-wrap { position: relative; }
+        .input-wrap input { padding-right: 38px; }
+
+        .toggle-pw {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 3px;
+        }
+        .toggle-pw svg { width: 15px; height: 15px; }
+
+        /* ===== Submit Button ===== */
+        .btn-submit {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: var(--primary);
+            color: #fff;
+            transition: background 0.2s, transform 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 18px;
+        }
+
+        .btn-submit:hover { background: var(--primary-hover); }
+        .btn-submit:active { transform: scale(0.98); }
+        .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-submit svg { width: 15px; height: 15px; }
+
+        /* ===== Messages ===== */
+        .msg {
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 0.78rem;
+            margin-bottom: 14px;
+            display: none;
+            align-items: center;
+            gap: 7px;
+        }
+        .msg.show { display: flex; }
+        .msg svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+        .msg.error   { background: rgba(244, 63, 94, 0.1); color: var(--danger); border: 1px solid rgba(244, 63, 94, 0.2); }
+        .msg.success { background: rgba(52, 211, 153, 0.1); color: var(--success); border: 1px solid rgba(52, 211, 153, 0.2); }
+
+        /* ===== Footer ===== */
+        .auth-footer {
+            text-align: center;
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            margin-top: 20px;
+        }
+
+        /* ===== Spinner ===== */
+        .spinner {
+            width: 15px;
+            height: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ===== Divider ===== */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 14px 0;
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--input-border);
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 400px) {
+            body { padding: 12px; }
+            .auth-card {
+                padding: 24px 20px 22px;
+                border-radius: 14px;
+            }
+            .logo-icon { width: 38px; height: 38px; border-radius: 10px; margin-bottom: 10px; }
+            .logo-icon svg { width: 19px; height: 19px; }
+            .auth-logo h1 { font-size: 1.05rem; }
+            .auth-logo p { font-size: 0.7rem; }
+            .auth-tabs { margin-bottom: 16px; }
+            .auth-tab { padding: 7px; font-size: 0.73rem; }
+            .form-group { margin-bottom: 12px; }
+            .form-group label { font-size: 0.7rem; }
+            .form-group input { padding: 8px 10px; font-size: 0.78rem; }
+            .btn-submit { padding: 9px; font-size: 0.78rem; margin-top: 14px; }
+            .msg { padding: 7px 10px; font-size: 0.73rem; }
+            .auth-footer { font-size: 0.63rem; margin-top: 16px; }
+        }
+
+        @media (max-width: 320px) {
+            .auth-card { padding: 20px 16px 18px; }
+            .auth-logo { margin-bottom: 16px; }
+            .auth-logo h1 { font-size: 0.95rem; }
+        }
+
+        /* ===== Tall screens — prevent excessive whitespace ===== */
+        @media (min-height: 700px) {
+            body { padding-bottom: 10vh; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="auth-card">
+    <!-- Logo -->
+    <div class="auth-logo">
+        <div class="logo-icon"><i data-lucide="shield-check"></i></div>
+        <h1>Auth Platform</h1>
+        <p>Admin Portal</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="signin" onclick="switchTab('signin')">Sign In</button>
+        <button class="auth-tab" data-tab="signup" onclick="switchTab('signup')">Create Account</button>
+    </div>
+
+    <!-- Messages -->
+    <div id="errorMsg" class="msg error">
+        <i data-lucide="alert-circle"></i>
+        <span id="errorText"></span>
+    </div>
+    <div id="successMsg" class="msg success">
+        <i data-lucide="check-circle"></i>
+        <span id="successText"></span>
+    </div>
+
+    <!-- ========== Sign In Form ========== -->
+    <form id="signinForm" class="auth-form active" onsubmit="handleSignIn(event)">
+        <div class="form-group">
+            <label for="siEmail">Email</label>
+            <input type="email" id="siEmail" placeholder="admin@company.com" required autofocus autocomplete="email">
+        </div>
+        <div class="form-group">
+            <label for="siPassword">Password</label>
+            <div class="input-wrap">
+                <input type="password" id="siPassword" placeholder="Enter password" required autocomplete="current-password">
+                <button type="button" class="toggle-pw" onclick="togglePw('siPassword', this)">
+                    <i data-lucide="eye"></i>
+                </button>
+            </div>
+        </div>
+        <button type="submit" class="btn-submit" id="signinBtn">
+            <i data-lucide="log-in"></i> Sign In
+        </button>
+    </form>
+
+    <!-- ========== Sign Up Form ========== -->
+    <form id="signupForm" class="auth-form" onsubmit="handleSignUp(event)">
+        <div class="form-group">
+            <label for="suOrgName">Organization Name</label>
+            <input type="text" id="suOrgName" placeholder="My Company" required>
+            <p class="form-hint">Creates your tenant workspace</p>
+        </div>
+        <div class="divider">admin credentials</div>
+        <div class="form-group">
+            <label for="suEmail">Email</label>
+            <input type="email" id="suEmail" placeholder="admin@company.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+            <label for="suPassword">Password</label>
+            <div class="input-wrap">
+                <input type="password" id="suPassword" placeholder="Create a strong password" required minlength="8" autocomplete="new-password">
+                <button type="button" class="toggle-pw" onclick="togglePw('suPassword', this)">
+                    <i data-lucide="eye"></i>
+                </button>
+            </div>
+            <p class="form-hint">Min 8 chars · uppercase · lowercase · number</p>
+        </div>
+        <button type="submit" class="btn-submit" id="signupBtn">
+            <i data-lucide="user-plus"></i> Create Account
+        </button>
+    </form>
+
+    <p class="auth-footer">Secure multi-tenant authentication</p>
+</div>
+
+<script>
+    const API = window.location.origin;
+
+    // If token exists, validate it before redirecting — prevents redirect loop
+    (async function checkExistingSession() {
+        const tk = localStorage.getItem('admin_token');
+        if (!tk) return;
+        try {
+            const res = await fetch(API + '/admin/tenant', {
+                headers: { 'Authorization': 'Bearer ' + tk }
+            });
+            if (res.ok) {
+                // Token is valid — sync cookie and redirect
+                document.cookie = `admin_token=${tk}; path=/; SameSite=Lax; max-age=86400`;
+                window.location.href = '/console/';
+            } else {
+                // Token expired/invalid — clear everything, stay on login
+                localStorage.removeItem('admin_token');
+                localStorage.removeItem('tenant_id');
+                localStorage.removeItem('tenant_name');
+                document.cookie = 'admin_token=; path=/; max-age=0';
+            }
+        } catch {
+            // Network error — don't redirect, let user login fresh
+        }
+    })();
+
+    // Init icons
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    });
+
+    // ===== Tab switching =====
+    function switchTab(tab) {
+        document.querySelectorAll('.auth-tab').forEach(t =>
+            t.classList.toggle('active', t.dataset.tab === tab)
+        );
+        document.getElementById('signinForm').classList.toggle('active', tab === 'signin');
+        document.getElementById('signupForm').classList.toggle('active', tab === 'signup');
+        hideMessages();
+    }
+
+    // ===== Messages =====
+    function showError(msg) {
+        hideMessages();
+        document.getElementById('errorText').textContent = msg;
+        document.getElementById('errorMsg').classList.add('show');
+    }
+
+    function showSuccess(msg) {
+        hideMessages();
+        document.getElementById('successText').textContent = msg;
+        document.getElementById('successMsg').classList.add('show');
+    }
+
+    function hideMessages() {
+        document.getElementById('errorMsg').classList.remove('show');
+        document.getElementById('successMsg').classList.remove('show');
+    }
+
+    // ===== Password toggle =====
+    function togglePw(inputId, btn) {
+        const input = document.getElementById(inputId);
+        const icon = btn.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.setAttribute('data-lucide', 'eye-off');
+        } else {
+            input.type = 'password';
+            icon.setAttribute('data-lucide', 'eye');
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    // ===== Loading state =====
+    function setLoading(btnId, loading) {
+        const btn = document.getElementById(btnId);
+        if (loading) {
+            btn.disabled = true;
+            btn.dataset.orig = btn.innerHTML;
+            btn.innerHTML = '<div class="spinner"></div> Please wait\u2026';
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = btn.dataset.orig || btn.innerHTML;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+    }
+
+    // ===== Sign In =====
+    async function handleSignIn(e) {
+        e.preventDefault();
+        hideMessages();
+        const email = document.getElementById('siEmail').value.trim();
+        const password = document.getElementById('siPassword').value;
+
+        if (!email || !password) { showError('Please fill in all fields.'); return; }
+
+        setLoading('signinBtn', true);
+        try {
+            const res = await fetch(API + '/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                localStorage.setItem('admin_token', data.access_token);
+                localStorage.setItem('tenant_id', String(data.tenant_id));
+                localStorage.setItem('tenant_name', data.tenant_name || '');
+                document.cookie = `admin_token=${data.access_token}; path=/; SameSite=Lax; max-age=86400`;
+                showSuccess('Login successful! Redirecting\u2026');
+                setTimeout(() => { window.location.href = '/console/'; }, 500);
+            } else {
+                showError(data.detail || 'Invalid email or password.');
+            }
+        } catch {
+            showError('Network error. Please check your connection.');
+        } finally {
+            setLoading('signinBtn', false);
+        }
+    }
+
+    // ===== Sign Up =====
+    async function handleSignUp(e) {
+        e.preventDefault();
+        hideMessages();
+        const tenant_name = document.getElementById('suOrgName').value.trim();
+        const email = document.getElementById('suEmail').value.trim();
+        const password = document.getElementById('suPassword').value;
+
+        if (!tenant_name || !email || !password) { showError('Please fill in all fields.'); return; }
+        if (password.length < 8) { showError('Password must be at least 8 characters.'); return; }
+        if (!/[A-Z]/.test(password)) { showError('Password needs at least one uppercase letter.'); return; }
+        if (!/[a-z]/.test(password)) { showError('Password needs at least one lowercase letter.'); return; }
+        if (!/\d/.test(password))    { showError('Password needs at least one number.'); return; }
+
+        setLoading('signupBtn', true);
+        try {
+            const res = await fetch(API + '/admin/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, tenant_name })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                localStorage.setItem('admin_token', data.access_token);
+                localStorage.setItem('tenant_id', String(data.tenant_id));
+                localStorage.setItem('tenant_name', data.tenant_name || '');
+                document.cookie = `admin_token=${data.access_token}; path=/; SameSite=Lax; max-age=86400`;
+                showSuccess('Account created! Redirecting to console\u2026');
+                setTimeout(() => { window.location.href = '/console/'; }, 800);
+            } else {
+                showError(data.detail || 'Registration failed. Please try again.');
+            }
+        } catch {
+            showError('Network error. Please check your connection.');
+        } finally {
+            setLoading('signupBtn', false);
+        }
+    }
+</script>
+
+</body>
+</html>

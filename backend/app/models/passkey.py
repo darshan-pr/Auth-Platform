@@ -9,6 +9,7 @@ class PasskeyCredential(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     app_id = Column(String, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
     credential_id = Column(String, nullable=False, index=True)
     public_key = Column(String, nullable=False)
     sign_count = Column(Integer, default=0, nullable=False)

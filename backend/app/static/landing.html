@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Platform | Identity Infrastructure That Teams Can Operate</title>
+    <link rel="stylesheet" href="/static/landing.css">
+</head>
+<body>
+    <!-- ==================== Top Bar ==================== -->
+    <header class="topbar">
+        <div class="topbar-inner">
+            <a href="/" class="logo">
+                <span class="logo-dot"></span>
+                <span>Auth Platform</span>
+            </a>
+
+            <!-- Desktop nav -->
+            <nav class="menu">
+                <a href="/api/docs">Developer Docs</a>
+                <a href="/docs">OpenAPI</a>
+                <a href="/login" class="menu-login">Login</a>
+            </nav>
+
+            <!-- Mobile hamburger -->
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+                <svg class="icon-menu" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="6"  x2="21" y2="6"/>
+                    <line x1="3" y1="12" x2="21" y2="12"/>
+                    <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+                <svg class="icon-close" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6"  x2="6"  y2="18"/>
+                    <line x1="6"  y1="6"  x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Mobile nav drawer -->
+        <nav class="mobile-nav">
+            <a href="/api/docs">Developer Docs</a>
+            <a href="/docs">OpenAPI</a>
+            <a href="/login" class="menu-login">Login</a>
+        </nav>
+    </header>
+
+    <!-- ==================== Hero (dark bg) ==================== -->
+    <section class="hero-section">
+        <div class="hero-content">
+            <div class="hero-copy">
+                <p class="eyebrow">Self-hosted authentication</p>
+                <h1>Build auth once.<br><span>Keep control forever.</span></h1>
+                <p class="hero-text">
+                    Auth Platform gives your team a practical identity layer: hosted login, OAuth 2.0 with PKCE,
+                    RS256 JWT sessions, OTP verification, and app-level isolation managed from one console.
+                </p>
+                <div class="hero-actions">
+                    <a href="/login" class="btn btn-primary">Open Console</a>
+                    <a href="/api/docs" class="btn btn-secondary">Read Docs</a>
+                </div>
+                <div class="hero-meta">
+                    <span>OAuth 2.0 + PKCE</span>
+                    <span>RS256 tokens</span>
+                    <span>Multi-tenant apps</span>
+                </div>
+            </div>
+
+            <aside class="hero-panel">
+                <h2>What teams usually do first</h2>
+                <ol>
+                    <li>
+                        <strong>Create an application</strong>
+                        <p>Generate a client ID and define allowed redirect URIs.</p>
+                    </li>
+                    <li>
+                        <strong>Set auth policy</strong>
+                        <p>Configure OTP, passkeys, login notifications, and token expiry.</p>
+                    </li>
+                    <li>
+                        <strong>Integrate in frontend</strong>
+                        <p>Drop in the SDK and redirect users to the hosted login flow.</p>
+                    </li>
+                </ol>
+            </aside>
+        </div>
+    </section>
+
+    <!-- ==================== Main content ==================== -->
+    <main class="page">
+        <section class="trust">
+            <p>Designed for product teams, platform engineers, and security-conscious startups that need control without rebuilding auth from scratch.</p>
+        </section>
+
+        <section class="features">
+            <article class="feature">
+                <div class="feature-icon">&#128274;</div>
+                <h3>Hosted login that your app can trust</h3>
+                <p>Users sign in through a dedicated flow while your frontend receives standards-based authorization codes and secure tokens.</p>
+            </article>
+            <article class="feature">
+                <div class="feature-icon">&#127757;</div>
+                <h3>Per-app tenancy and policy boundaries</h3>
+                <p>Each application keeps separate users, redirect URIs, and session settings so teams can ship safely across environments.</p>
+            </article>
+            <article class="feature">
+                <div class="feature-icon">&#9881;</div>
+                <h3>Operational console for real workflows</h3>
+                <p>Create apps, onboard users, rotate credentials, and inspect health without leaving your own infrastructure.</p>
+            </article>
+        </section>
+
+        <section class="details">
+            <div class="details-block">
+                <h2>Built for clear handoff between teams</h2>
+                <p>Product teams get a smoother sign-in journey. Security teams keep policy control. Developers keep a simple integration surface.</p>
+            </div>
+            <div class="detail-grid">
+                <div>
+                    <h4>Authentication</h4>
+                    <p>Hosted login, OTP, passkey-ready model.</p>
+                </div>
+                <div>
+                    <h4>Token lifecycle</h4>
+                    <p>RS256 JWTs, refresh tokens, configurable TTL.</p>
+                </div>
+                <div>
+                    <h4>Integration</h4>
+                    <p>JavaScript SDK, callback handling, session helpers.</p>
+                </div>
+                <div>
+                    <h4>Control plane</h4>
+                    <p>Admin console for apps, users, and policies.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="cta">
+            <h2>Start from the console, then scale with confidence.</h2>
+            <p>Use your own infrastructure, keep your own data, and iterate without identity becoming a bottleneck.</p>
+            <a href="/login" class="btn btn-primary">Go to Console</a>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; <span id="year"></span> Auth Platform</p>
+        <div>
+            <a href="/api/docs">Docs</a>
+            <a href="/docs">OpenAPI</a>
+            <a href="/login">Console</a>
+        </div>
+    </footer>
+
+    <script>
+        document.getElementById('year').textContent = new Date().getFullYear();
+
+        // Mobile nav toggle
+        var navToggle = document.getElementById('navToggle');
+        if (navToggle) {
+            navToggle.addEventListener('click', function () {
+                document.body.classList.toggle('nav-open');
+            });
+        }
+    </script>
+</body>
+</html>

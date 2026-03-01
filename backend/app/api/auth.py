@@ -8,11 +8,13 @@ from app.schemas.auth import (
 )
 from app.services.otp_service import generate_otp, verify_otp, generate_password_reset_otp, verify_password_reset_otp
 from app.services.mail_service import send_otp_email, send_password_reset_email, send_password_reset_token_email, send_login_notification_email
-from app.services.jwt_service import create_access_token, create_refresh_token
+from app.services.jwt_service import create_access_token, create_refresh_token, mark_user_online, clear_user_blacklist
 from app.services.password_service import hash_password, verify_password, generate_reset_token, verify_reset_token
+from app.services.tenant_service import get_or_create_default_tenant
 from app.db import get_db
 from app.models.user import User
 from app.models.app import App
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/auth")
 
@@ -39,6 +41,7 @@ def generate_tokens_for_user(user: User, app: App):
     token_data = {"sub": user.email, "user_id": user.id}
     if app:
         token_data["app_id"] = app.app_id
+        token_data["tenant_id"] = app.tenant_id
     
     # Use app-specific expiry settings
     if app:
@@ -50,6 +53,12 @@ def generate_tokens_for_user(user: User, app: App):
     
     access_token = create_access_token(token_data, access_expires)
     refresh_token = create_refresh_token(token_data, refresh_expires)
+    
+    # Mark user as online in Redis
+    if app:
+        ttl = int(app.access_token_expiry_minutes * 60) + 60  # add 1 min buffer
+        mark_user_online(user.id, app.tenant_id, ttl_seconds=ttl)
+        clear_user_blacklist(user.id, app.tenant_id)
     
     return access_token, refresh_token
 
@@ -66,15 +75,15 @@ def signup(request: SignupRequest, db: Session = Depends(get_db)):
             detail="App credentials are required for signup"
         )
     
-    # Check if user already exists for this app
+    # Check if user already exists for this tenant
     existing_user = db.query(User).filter(
         User.email == request.email,
-        User.app_id == request.app_id
+        User.tenant_id == app.tenant_id
     ).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email already exists for this app"
+            detail="User with this email already exists for this tenant"
         )
     
     # Create user with hashed password
@@ -82,7 +91,8 @@ def signup(request: SignupRequest, db: Session = Depends(get_db)):
     user = User(
         email=request.email,
         password_hash=hashed_pwd,
-        app_id=request.app_id
+        app_id=request.app_id,
+        tenant_id=app.tenant_id
     )
     db.add(user)
     db.commit()
@@ -109,10 +119,10 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
             detail="App credentials are required for login"
         )
     
-    # Find user for this specific app
+    # Find user for this tenant
     user = db.query(User).filter(
         User.email == request.email,
-        User.app_id == request.app_id
+        User.tenant_id == app.tenant_id
     ).first()
     if not user:
         raise HTTPException(
@@ -136,9 +146,14 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     
     # Check if user is active
     if not user.is_active:
+        # Look up admin email for this tenant
+        from app.models.admin import Admin
+        admin = db.query(Admin).filter(Admin.tenant_id == app.tenant_id).first()
+        admin_email = admin.email if admin else "your administrator"
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is deactivated"
+            detail=f"Your account has been temporarily deactivated by the administrator. "
+                   f"Please contact {admin_email} for further assistance."
         )
     
     # Check if OTP is enabled for this app
@@ -195,10 +210,10 @@ def login_verify_otp(request: LoginOTPVerifyRequest, db: Session = Depends(get_d
             detail="Invalid or expired OTP"
         )
     
-    # Get user for this specific app
+    # Get user for this tenant
     user = db.query(User).filter(
         User.email == request.email,
-        User.app_id == request.app_id
+        User.tenant_id == app.tenant_id
     ).first()
     if not user:
         raise HTTPException(
@@ -242,10 +257,10 @@ def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db
             detail="App credentials are required"
         )
     
-    # Check if user exists for this app
+    # Check if user exists for this tenant
     user = db.query(User).filter(
         User.email == request.email,
-        User.app_id == request.app_id
+        User.tenant_id == app.tenant_id
     ).first()
     
     if not user:
@@ -300,10 +315,10 @@ def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db))
             detail="App credentials are required"
         )
     
-    # Get user for this specific app
+    # Get user for this tenant
     user = db.query(User).filter(
         User.email == request.email,
-        User.app_id == request.app_id
+        User.tenant_id == app.tenant_id
     ).first()
     
     if not user:
@@ -345,6 +360,65 @@ def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db))
         "email": user.email
     }
 
+# ============== Set Password (admin-invited users) ==============
+
+class SetPasswordRequest(BaseModel):
+    token: str
+    email: str
+    app_id: str
+    new_password: str
+
+@router.post("/set-password")
+def set_password(request: SetPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Set password for a user invited by admin.
+    Uses the reset token sent via email link.
+    """
+    # Validate app exists
+    app = db.query(App).filter(App.app_id == request.app_id).first()
+    if not app:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid application"
+        )
+
+    # Verify the reset token
+    if not verify_reset_token(request.email, request.app_id, request.token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired link. Please contact your administrator for a new invite."
+        )
+
+    # Find the user
+    user = db.query(User).filter(
+        User.email == request.email,
+        User.tenant_id == app.tenant_id
+    ).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Validate password strength
+    if len(request.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    if not any(c.isupper() for c in request.new_password):
+        raise HTTPException(status_code=400, detail="Password must contain an uppercase letter")
+    if not any(c.islower() for c in request.new_password):
+        raise HTTPException(status_code=400, detail="Password must contain a lowercase letter")
+    if not any(c.isdigit() for c in request.new_password):
+        raise HTTPException(status_code=400, detail="Password must contain a digit")
+
+    # Set the password
+    user.password_hash = hash_password(request.new_password)
+    db.commit()
+
+    return {
+        "message": "Password set successfully. You can now sign in.",
+        "email": user.email
+    }
+
 # ============== OTP-only Auth (legacy) ==============
 
 @router.post("/request-otp")
@@ -380,19 +454,26 @@ def verify(request: OTPVerifyRequest, db: Session = Depends(get_db)):
             detail="Invalid or expired OTP"
         )
     
-    # Check if user exists for this app, create if not
+    # Check if user exists for this tenant, create if not
     if app:
         user = db.query(User).filter(
             User.email == request.email,
-            User.app_id == request.app_id
+            User.tenant_id == app.tenant_id
         ).first()
     else:
         user = db.query(User).filter(User.email == request.email).first()
     
     if not user:
+        # For legacy flow without app, get or create default tenant
+        if app:
+            tenant_id = app.tenant_id
+        else:
+            default_tenant = get_or_create_default_tenant(db)
+            tenant_id = default_tenant.id
         user = User(
             email=request.email,
-            app_id=request.app_id if app else 'default'
+            app_id=request.app_id if app else 'default',
+            tenant_id=tenant_id
         )
         db.add(user)
         db.commit()

@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from app.db import get_db
 from app.models.app import App
 from app.models.user import User
+from app.models.admin import Admin
 from app.models.passkey import PasskeyCredential
 from app.services.oauth_service import (
     create_oauth_session,
@@ -37,6 +38,13 @@ from app.services.passkey_service import (
     verify_passkey_authentication,
 )
 from app.api.auth import generate_tokens_for_user
+from app.services.jwt_service import mark_user_online, is_user_blacklisted, clear_user_blacklist
+
+
+def _get_admin_contact_email(db: Session, tenant_id: int) -> str:
+    """Look up the admin email for a tenant so users know whom to contact."""
+    admin = db.query(Admin).filter(Admin.tenant_id == tenant_id).first()
+    return admin.email if admin else "your administrator"
 
 router = APIRouter(prefix="/oauth")
 
@@ -194,10 +202,10 @@ def authenticate(req: AuthenticateRequest, db: Session = Depends(get_db)):
 
 def _handle_signup(req: AuthenticateRequest, session: dict, app: App, db: Session):
     """Create a new user account"""
-    # Check if user exists for this specific app
+    # Check if user exists for this specific tenant
     existing = db.query(User).filter(
         User.email == req.email,
-        User.app_id == session["client_id"]
+        User.tenant_id == app.tenant_id
     ).first()
     if existing:
         raise HTTPException(
@@ -221,6 +229,7 @@ def _handle_signup(req: AuthenticateRequest, session: dict, app: App, db: Sessio
         email=req.email,
         password_hash=hashed,
         app_id=session["client_id"],
+        tenant_id=app.tenant_id,
     )
     db.add(user)
     db.commit()
@@ -236,7 +245,7 @@ def _handle_login(req: AuthenticateRequest, session: dict, app: App, db: Session
     """Verify email + password, then either issue code or request OTP"""
     user = db.query(User).filter(
         User.email == req.email,
-        User.app_id == session["client_id"]
+        User.tenant_id == app.tenant_id
     ).first()
     if not user or not user.password_hash:
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -245,7 +254,16 @@ def _handle_login(req: AuthenticateRequest, session: dict, app: App, db: Session
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     if not user.is_active:
-        raise HTTPException(status_code=403, detail="This account has been deactivated")
+        admin_email = _get_admin_contact_email(db, app.tenant_id)
+        raise HTTPException(
+            status_code=403,
+            detail=f"Your account has been temporarily deactivated by the administrator. "
+                   f"Please contact {admin_email} for further assistance."
+        )
+
+    # If user was force-logged-out, clear the blacklist now — they're proving identity again
+    if is_user_blacklisted(user.id, app.tenant_id):
+        clear_user_blacklist(user.id, app.tenant_id)
 
     # Check if OTP is required
     if app.otp_enabled:
@@ -276,7 +294,7 @@ def _handle_verify_otp(req: AuthenticateRequest, session: dict, app: App, db: Se
 
     user = db.query(User).filter(
         User.email == req.email,
-        User.app_id == session["client_id"]
+        User.tenant_id == app.tenant_id
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -288,7 +306,7 @@ def _handle_forgot_password(req: AuthenticateRequest, session: dict, app: App, d
     """Send password reset OTP to user's email"""
     user = db.query(User).filter(
         User.email == req.email,
-        User.app_id == session["client_id"]
+        User.tenant_id == app.tenant_id
     ).first()
     if not user or not user.password_hash:
         raise HTTPException(
@@ -322,7 +340,7 @@ def _handle_reset_password(req: AuthenticateRequest, session: dict, app: App, db
 
     user = db.query(User).filter(
         User.email == req.email,
-        User.app_id == session["client_id"]
+        User.tenant_id == app.tenant_id
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -348,7 +366,7 @@ def _handle_passkey_register_begin(req: AuthenticateRequest, session: dict, app:
 
     user = db.query(User).filter(
         User.email == req.email,
-        User.app_id == session["client_id"]
+        User.tenant_id == app.tenant_id
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found. Please sign up first.")
@@ -380,7 +398,7 @@ def _handle_passkey_register_complete(req: AuthenticateRequest, session: dict, a
 
     user = db.query(User).filter(
         User.email == req.email,
-        User.app_id == session["client_id"]
+        User.tenant_id == app.tenant_id
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -404,6 +422,7 @@ def _handle_passkey_register_complete(req: AuthenticateRequest, session: dict, a
     passkey = PasskeyCredential(
         user_id=user.id,
         app_id=session["client_id"],
+        tenant_id=app.tenant_id,
         credential_id=result["credential_id"],
         public_key=result["public_key"],
         sign_count=result["sign_count"],
@@ -487,7 +506,12 @@ def _handle_passkey_auth_complete(req: AuthenticateRequest, session: dict, app: 
         raise HTTPException(status_code=404, detail="User not found")
 
     if not user.is_active:
-        raise HTTPException(status_code=403, detail="This account has been deactivated")
+        admin_email = _get_admin_contact_email(db, app.tenant_id)
+        raise HTTPException(
+            status_code=403,
+            detail=f"Your account has been temporarily deactivated by the administrator. "
+                   f"Please contact {admin_email} for further assistance."
+        )
 
     return _complete_auth(session, user, req.session_id, app)
 
@@ -508,6 +532,12 @@ def _complete_auth(session: dict, user: User, session_id: str, app: App = None):
 
     # Clean up the OAuth session
     delete_oauth_session(session_id)
+
+    # Mark user online in Redis
+    if app:
+        ttl = int(app.access_token_expiry_minutes * 60) + 60
+        mark_user_online(user.id, app.tenant_id, ttl_seconds=ttl)
+        clear_user_blacklist(user.id, app.tenant_id)
 
     # Send login notification if enabled
     if app and app.login_notification_enabled:
@@ -569,16 +599,16 @@ def token_exchange(req: TokenExchangeRequest, db: Session = Depends(get_db)):
             detail="Invalid or expired authorization code, or PKCE verification failed."
         )
 
-    # Get user for this specific app
+    # Get app for token expiry settings and tenant context
+    app = db.query(App).filter(App.app_id == req.client_id).first()
+
+    # Get user for this tenant
     user = db.query(User).filter(
         User.email == code_data["user_email"],
-        User.app_id == req.client_id
+        User.tenant_id == app.tenant_id
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-
-    # Get app for token expiry settings
-    app = db.query(App).filter(App.app_id == req.client_id).first()
 
     # Generate tokens
     access_token, refresh_token = generate_tokens_for_user(user, app)

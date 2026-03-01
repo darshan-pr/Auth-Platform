@@ -207,3 +207,33 @@ def send_login_notification_email(
         logger.error(f"Failed to send login notification email to {to}: {str(e)}")
         # Don't raise — login notification is non-critical
         return False
+
+
+def send_set_password_email(to: str, reset_link: str, app_name: str = "Auth Platform") -> bool:
+    """Send a 'set your password' invitation email when an admin creates a user"""
+    
+    if DEV_MODE:
+        logger.info(f"[DEV MODE] Set Password link for {to}: {reset_link}")
+        print(f"\n{'='*50}")
+        print(f"[DEV MODE] Set Password link for {to}: {reset_link}")
+        print(f"{'='*50}\n")
+        return True
+    
+    try:
+        plain = (
+            f"Hello,\n\n"
+            f"An account has been created for you on {app_name}.\n\n"
+            f"Please set your password by visiting the following link:\n"
+            f"{reset_link}\n\n"
+            f"This link will expire in 10 minutes.\n\n"
+            f"If you didn't expect this email, you can safely ignore it.\n\n"
+            f"Best regards,\n{app_name} Team\nSecured by Auth Platform !"
+        )
+        html = _load_template("set_password.html", app_name=app_name, reset_link=reset_link)
+
+        _send_email(to, f"Set Your Password - {app_name}", plain, html)
+        logger.info(f"Set password email sent to {to}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send set password email to {to}: {str(e)}")
+        raise

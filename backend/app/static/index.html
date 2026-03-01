@@ -7,43 +7,186 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Auth Platform — Admin Console</title>
-    <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet" href="./style.css?v=20260301e">
+    <!-- ====== MOBILE OVERRIDES (inline = cache-proof) ====== -->
+    <style>
+        @keyframes _mobileModalUp {
+            from { transform: translateY(100%); }
+            to   { transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            /* ---------- TABLE → CARD LAYOUT ---------- */
+            .table-container {
+                overflow: visible !important;
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            .table-scroll-wrap {
+                overflow: visible !important;
+                background: none !important;
+            }
+            .data-table {
+                display: block !important;
+                width: 100% !important;
+                min-width: 0 !important;
+                border-collapse: separate !important;
+            }
+            .data-table thead { display: none !important; }
+            .data-table tbody { display: block !important; }
+            .data-table tbody tr {
+                display: block !important;
+                background: #fff;
+                border: 1px solid #e2e8f0;
+                border-radius: 12px;
+                padding: 14px 16px;
+                margin-bottom: 12px;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+                position: relative;
+            }
+            .data-table tbody tr:nth-child(even) { background: #fff !important; }
+            .data-table tbody tr:hover { background: #f8faff !important; }
+
+            .data-table td {
+                display: flex !important;
+                justify-content: space-between;
+                align-items: flex-start;
+                padding: 8px 0 !important;
+                border-bottom: 1px solid #f1f5f9 !important;
+                text-align: right;
+                font-size: 0.85rem;
+                gap: 12px;
+                word-break: break-word;
+            }
+            .data-table td:last-child { border-bottom: none !important; }
+
+            .data-table td::before {
+                content: attr(data-label);
+                font-weight: 700;
+                font-size: 0.7rem;
+                color: #475569;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                text-align: left;
+                flex-shrink: 0;
+                min-width: 85px;
+                padding-top: 3px;
+            }
+
+            /* colspan cells (loading / empty messages) */
+            .data-table td[colspan] {
+                justify-content: center !important;
+                text-align: center !important;
+                border: none !important;
+                padding: 32px 0 !important;
+            }
+            .data-table td[colspan]::before { display: none !important; }
+            .data-table td.loading { border-radius: 12px; background: #fff; border: 1px solid #e2e8f0; }
+            .data-table td.loading::before { display: none !important; }
+
+            .data-table code {
+                font-size: 0.72rem;
+                word-break: break-all;
+            }
+            .redirect-uris { max-width: none !important; }
+            .action-btns { justify-content: flex-end; }
+
+            /* ---------- MODALS → FULL-WIDTH BOTTOM SHEET ---------- */
+            .modal {
+                align-items: flex-end !important;
+                justify-content: center !important;
+                padding: 0 !important;
+            }
+            .modal-content,
+            .modal-content.modal-sm {
+                width: 100% !important;
+                max-width: 100vw !important;
+                max-height: 92dvh !important;
+                max-height: 92vh !important;
+                border-radius: 16px 16px 0 0 !important;
+                overflow: hidden !important;
+                animation: _mobileModalUp 0.28s ease !important;
+                display: flex !important;
+                flex-direction: column !important;
+                margin: 0 !important;
+            }
+            /* form sits between modal-content and body/footer — must also be flex */
+            .modal-content form {
+                display: flex !important;
+                flex-direction: column !important;
+                flex: 1 !important;
+                min-height: 0 !important;
+                overflow: hidden !important;
+            }
+            .modal-header {
+                padding: 18px 20px !important;
+                flex-shrink: 0 !important;
+                border-radius: 16px 16px 0 0 !important;
+            }
+            .modal-body {
+                padding: 20px !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                flex: 1 !important;
+                min-height: 0 !important;
+                -webkit-overflow-scrolling: touch;
+            }
+            .modal-footer {
+                flex-direction: column-reverse !important;
+                padding: 14px 20px calc(14px + env(safe-area-inset-bottom)) !important;
+                flex-shrink: 0 !important;
+                border-radius: 0 !important;
+                gap: 8px !important;
+            }
+            .modal-footer .btn {
+                width: 100% !important;
+                justify-content: center !important;
+            }
+            .form-group input,
+            .form-group textarea,
+            .form-group select { font-size: 16px !important; }
+            .form-section { padding: 14px !important; }
+            .form-row { grid-template-columns: 1fr !important; }
+            .form-group small { line-height: 1.45; overflow-wrap: anywhere; }
+            .checkbox-label { align-items: flex-start !important; }
+            .checkbox-label input[type="checkbox"] { margin-top: 2px; flex-shrink: 0; }
+
+            /* ---------- MISC ---------- */
+            .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+
+        @media (max-width: 400px) {
+            .stats-grid { grid-template-columns: 1fr !important; }
+        }
+    </style>
     <!-- Lucide Icons (lightweight SVG icon library) -->
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 <body>
 
-    <!-- ==================== Login Screen ==================== -->
-    <div id="loginScreen" class="login-screen">
-        <div class="login-card">
-            <div class="login-logo">
-                <div class="logo-icon"><i data-lucide="shield-check"></i></div>
-                <h1>Auth Platform</h1>
-                <p class="login-subtitle">Admin Console</p>
-            </div>
-            <form id="loginForm" class="login-form">
-                <div class="form-group">
-                    <label for="loginPassword">Password</label>
-                    <div class="password-wrap">
-                        <input type="password" id="loginPassword" placeholder="Enter admin password" required autofocus>
-                        <button type="button" class="toggle-password" onclick="togglePasswordVisibility()">
-                            <i data-lucide="eye" id="eyeIcon"></i>
-                        </button>
-                    </div>
-                    <p id="loginError" class="login-error hidden">Incorrect password. Please try again.</p>
-                </div>
-                <button type="submit" class="btn btn-primary btn-block">
-                    <i data-lucide="log-in"></i> Sign In
-                </button>
-            </form>
-            <p class="login-footer">Protected admin area</p>
-        </div>
-    </div>
+    <!-- ==================== Main App ==================== -->
+    <div id="appContainer" class="app-container">
 
-    <!-- ==================== Main App (hidden until login) ==================== -->
-    <div id="appContainer" class="app-container hidden">
+        <!-- ===== Mobile Header (phones only) ===== -->
+        <div class="mobile-header" id="mobileHeader">
+            <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle sidebar">
+                <i data-lucide="menu"></i>
+            </button>
+            <span class="mobile-brand">Auth Platform</span>
+            <button class="mobile-signout-btn" onclick="adminLogout()" aria-label="Sign out">
+                <i data-lucide="log-out"></i>
+            </button>
+        </div>
+
+        <!-- Dimmed overlay behind mobile sidebar -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebarEl">
+            <button class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Close sidebar">
+                <i data-lucide="x"></i>
+            </button>
             <div class="sidebar-header">
                 <div class="brand">
                     <i data-lucide="shield-check" class="brand-icon"></i>
@@ -110,6 +253,13 @@
                         <div class="stat-info">
                             <span class="stat-value" id="activeUsers">-</span>
                             <span class="stat-label">Active Users</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-online">
+                        <div class="stat-icon-wrap"><i data-lucide="wifi"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="onlineUsers">-</span>
+                            <span class="stat-label">Online Now</span>
                         </div>
                     </div>
                 </div>
@@ -222,7 +372,7 @@
                         <thead>
                             <tr>
                                 <th>Email</th>
-                                <th>App</th>
+                                <th>Online</th>
                                 <th>Status</th>
                                 <th>Created</th>
                                 <th>Actions</th>
@@ -380,6 +530,13 @@
                             <option value="false">Inactive</option>
                         </select>
                     </div>
+                    <div class="form-group hidden" id="forceLogoutGroup">
+                        <label>Session Control</label>
+                        <button type="button" class="btn btn-danger" id="forceLogoutBtn" onclick="forceLogoutUser()" style="width:100%;margin-top:4px">
+                            <i data-lucide="log-out"></i> Force Logout (Set Offline)
+                        </button>
+                        <small>Immediately invalidates the user's session and logs them out</small>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
@@ -414,6 +571,36 @@
     <!-- Toast Container -->
     <div id="toastContainer"></div>
 
-    <script src="./app.js"></script>
+    <script src="./app.js?v=20260301f"></script>
+    <!-- Inject data-label attributes so CSS card layout can show field names -->
+    <script>
+    (function mobileCardLabels() {
+        function applyLabels() {
+            document.querySelectorAll('.data-table').forEach(function(table) {
+                var headers = [];
+                table.querySelectorAll('thead th').forEach(function(th) {
+                    headers.push(th.textContent.trim());
+                });
+                if (!headers.length) return;
+                table.querySelectorAll('tbody tr').forEach(function(tr) {
+                    tr.querySelectorAll('td').forEach(function(td, i) {
+                        if (i < headers.length && !td.hasAttribute('colspan')) {
+                            td.setAttribute('data-label', headers[i]);
+                        }
+                    });
+                });
+            });
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', applyLabels);
+        } else {
+            applyLabels();
+        }
+        // Re-run whenever table rows are updated dynamically
+        new MutationObserver(function() {
+            requestAnimationFrame(applyLabels);
+        }).observe(document.body, { childList: true, subtree: true });
+    })();
+    </script>
 </body>
 </html>

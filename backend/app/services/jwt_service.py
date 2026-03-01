@@ -65,8 +65,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         "exp": expire,
         "iat": datetime.utcnow(),
         "iss": settings.JWT_ISSUER,
-        "type": "access"
     })
+    payload.setdefault("type", "access")
     return jwt.encode(payload, PRIVATE_KEY, algorithm=settings.JWT_ALGORITHM)
 
 def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -77,8 +77,8 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
         "exp": expire,
         "iat": datetime.utcnow(),
         "iss": settings.JWT_ISSUER,
-        "type": "refresh"
     })
+    payload.setdefault("type", "refresh")
     return jwt.encode(payload, PRIVATE_KEY, algorithm=settings.JWT_ALGORITHM)
 
 def verify_token(token: str) -> Optional[dict]:
@@ -90,6 +90,11 @@ def verify_token(token: str) -> Optional[dict]:
             algorithms=[settings.JWT_ALGORITHM],
             issuer=settings.JWT_ISSUER
         )
+        # If this is a user token, check if admin has force-logged-out this user
+        uid = payload.get("user_id")
+        tid = payload.get("tenant_id")
+        if uid and tid and is_user_blacklisted(uid, tid):
+            return None
         return payload
     except jwt.ExpiredSignatureError:
         return None
@@ -116,6 +121,7 @@ def refresh_token(db, refresh_token_str: str) -> dict:
     new_access_token = create_access_token({
         "sub": payload["sub"],
         "user_id": payload.get("user_id"),
+        "tenant_id": payload.get("tenant_id"),
         "app_id": app_id
     }, access_expires)
     
@@ -128,4 +134,59 @@ def revoke_token(db, token: str) -> dict:
     """Revoke a token (placeholder - implement with Redis blacklist)"""
     # TODO: Implement token blacklisting with Redis
     return {"message": "Token revoked"}
+
+
+# ============== Online Presence (Redis) ==============
+
+def mark_user_online(user_id: int, tenant_id: int, ttl_seconds: int = 1800):
+    """Set a Redis key to mark the user as online. TTL defaults to 30 min."""
+    try:
+        from app.redis import redis_client
+        key = f"user_online:{tenant_id}:{user_id}"
+        redis_client.setex(key, ttl_seconds, "1")
+    except Exception:
+        pass  # fail silently – presence is best-effort
+
+
+def is_user_online(user_id: int, tenant_id: int) -> bool:
+    """Check if the user has an active presence key in Redis."""
+    try:
+        from app.redis import redis_client
+        key = f"user_online:{tenant_id}:{user_id}"
+        return redis_client.exists(key) == 1
+    except Exception:
+        return False
+
+
+def force_user_offline(user_id: int, tenant_id: int):
+    """Remove the user's online presence key – effectively a force logout signal."""
+    try:
+        from app.redis import redis_client
+        key = f"user_online:{tenant_id}:{user_id}"
+        redis_client.delete(key)
+        # Also set a blacklist flag so token verify can reject
+        bl_key = f"user_blacklist:{tenant_id}:{user_id}"
+        redis_client.setex(bl_key, 86400, "1")  # blacklisted for 24h
+    except Exception:
+        pass
+
+
+def is_user_blacklisted(user_id: int, tenant_id: int) -> bool:
+    """Check if a user's sessions have been force-revoked."""
+    try:
+        from app.redis import redis_client
+        bl_key = f"user_blacklist:{tenant_id}:{user_id}"
+        return redis_client.exists(bl_key) == 1
+    except Exception:
+        return False
+
+
+def clear_user_blacklist(user_id: int, tenant_id: int):
+    """Clear the blacklist flag when a user logs in again."""
+    try:
+        from app.redis import redis_client
+        bl_key = f"user_blacklist:{tenant_id}:{user_id}"
+        redis_client.delete(bl_key)
+    except Exception:
+        pass
 

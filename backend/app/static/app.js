@@ -1,7 +1,28 @@
 const API_URL = window.location.origin;
 
-// Admin password (SHA-256 hash of "Darsh@26")
-const ADMIN_PASSWORD_HASH = '713942dda7199acdaed4b307423db76a90185e005c38a668d28743c38a84a94f';
+// ==================== Auth Interceptor ====================
+// Automatically attaches admin JWT to all /admin/ API requests
+// and redirects to login on 401 responses.
+(function () {
+    const _fetch = window.fetch;
+    window.fetch = function (url, opts) {
+        opts = opts || {};
+        const tk = localStorage.getItem('admin_token');
+        if (tk && typeof url === 'string' && url.includes('/admin')) {
+            opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + tk });
+        }
+        return _fetch.call(this, url, opts).then(function (res) {
+            if (res.status === 401 && typeof url === 'string' && url.includes('/admin')) {
+                localStorage.removeItem('admin_token');
+                localStorage.removeItem('tenant_id');
+                localStorage.removeItem('tenant_name');
+                document.cookie = 'admin_token=; path=/; max-age=0';
+                window.location.href = '/login';
+            }
+            return res;
+        });
+    };
+})();
 
 // State
 let currentPage = 'dashboard';
@@ -15,11 +36,34 @@ let selectedAppFilter = '';
 // ==================== Init ====================
 
 let _renderIconsTimer = null;
+let _responsiveModeTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    syncResponsiveMode();
+    window.addEventListener('resize', queueResponsiveModeSync);
+    window.addEventListener('orientationchange', queueResponsiveModeSync);
     renderIcons();
     checkSession();
 });
+
+function queueResponsiveModeSync() {
+    if (_responsiveModeTimer) clearTimeout(_responsiveModeTimer);
+    _responsiveModeTimer = setTimeout(() => {
+        _responsiveModeTimer = null;
+        syncResponsiveMode();
+    }, 120);
+}
+
+function isMobileAdaptiveMode() {
+    const narrowViewport = window.matchMedia('(max-width: 900px)').matches;
+    const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+    const noHover = window.matchMedia('(hover: none)').matches;
+    return narrowViewport || coarsePointer || noHover;
+}
+
+function syncResponsiveMode() {
+    document.body.classList.toggle('mobile-adaptive', isMobileAdaptiveMode());
+}
 
 function renderIcons() {
     if (typeof lucide === 'undefined') return;
@@ -33,72 +77,81 @@ function renderIcons() {
 
 // ==================== Auth Gate ====================
 
-async function hashPassword(password) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 function checkSession() {
-    const session = sessionStorage.getItem('admin_authenticated');
-    if (session === 'true') {
+    var tk = localStorage.getItem('admin_token');
+    if (tk) {
+        // Sync cookie so middleware stays happy
+        document.cookie = 'admin_token=' + tk + '; path=/; SameSite=Lax; max-age=86400';
         showApp();
     } else {
-        showLogin();
+        // Clear any stale cookie too
+        document.cookie = 'admin_token=; path=/; max-age=0';
+        window.location.href = '/login';
     }
 }
 
 function showLogin() {
-    document.getElementById('loginScreen').classList.remove('hidden');
-    document.getElementById('appContainer').classList.add('hidden');
-    renderIcons();
-
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const password = document.getElementById('loginPassword').value;
-        const hash = await hashPassword(password);
-
-        if (hash === ADMIN_PASSWORD_HASH) {
-            sessionStorage.setItem('admin_authenticated', 'true');
-            document.getElementById('loginError').classList.add('hidden');
-            showApp();
-        } else {
-            document.getElementById('loginError').classList.remove('hidden');
-            document.getElementById('loginPassword').value = '';
-            document.getElementById('loginPassword').focus();
-        }
-    });
+    window.location.href = '/login';
 }
 
 function showApp() {
-    document.getElementById('loginScreen').classList.add('hidden');
+    syncResponsiveMode();
     document.getElementById('appContainer').classList.remove('hidden');
     setupNavigation();
+    setupMobileSidebar();
     setupModals();
     setupForms();
     checkApiHealth();
     loadDashboard();
+
+    // Show tenant name in sidebar
+    var tenantName = localStorage.getItem('tenant_name');
+    if (tenantName) {
+        var el = document.querySelector('.brand .version');
+        if (el) el.textContent = tenantName;
+    }
+
     renderIcons();
 }
 
 function adminLogout() {
-    sessionStorage.removeItem('admin_authenticated');
-    location.reload();
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('tenant_id');
+    localStorage.removeItem('tenant_name');
+    document.cookie = 'admin_token=; path=/; max-age=0';
+    window.location.href = '/login';
 }
 
-function togglePasswordVisibility() {
-    const input = document.getElementById('loginPassword');
-    const icon = document.getElementById('eyeIcon');
-    if (input.type === 'password') {
-        input.type = 'text';
-        icon.setAttribute('data-lucide', 'eye-off');
-    } else {
-        input.type = 'password';
-        icon.setAttribute('data-lucide', 'eye');
+// ==================== Mobile Sidebar ====================
+
+function setupMobileSidebar() {
+    var hamburgerBtn  = document.getElementById('hamburgerBtn');
+    var sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
+    var overlay       = document.getElementById('sidebarOverlay');
+    var sidebar       = document.getElementById('sidebarEl');
+
+    function openSidebar() {
+        sidebar.classList.add('open');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
     }
-    renderIcons();
+
+    function closeSidebar() {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    if (hamburgerBtn)    hamburgerBtn.addEventListener('click', openSidebar);
+    if (sidebarCloseBtn) sidebarCloseBtn.addEventListener('click', closeSidebar);
+    if (overlay)         overlay.addEventListener('click', closeSidebar);
+
+    // Auto-close sidebar when a nav item is tapped on mobile
+    document.querySelectorAll('.sidebar .nav-item').forEach(function(item) {
+        item.addEventListener('click', function() {
+            if (isMobileAdaptiveMode()) closeSidebar();
+        });
+    });
 }
 
 // ==================== Navigation ====================
@@ -140,6 +193,7 @@ async function loadDashboard() {
             animateValue('totalApps', stats.total_apps || 0);
             animateValue('totalUsers', stats.total_users || 0);
             animateValue('activeUsers', stats.active_users || 0);
+            animateValue('onlineUsers', stats.online_users || 0);
         }
     } catch (error) {
         console.error('Error loading stats:', error);
@@ -380,14 +434,19 @@ async function loadUsers() {
         tbody.innerHTML = users.map(user => {
             const appName = user.app_id ? (appMap[user.app_id] || user.app_id) : 'None';
             const safeEmail = escapeAttr(user.email);
+            const onlineClass = user.is_online ? 'active' : 'inactive';
+            const onlineLabel = user.is_online ? 'Online' : 'Offline';
             return `
             <tr>
                 <td class="app-name-cell">${escapeHtml(user.email)}</td>
-                <td>${user.app_id ? `<code>${user.app_id}</code><br><small style="color:#94a3b8">${escapeHtml(appName)}</small>` : '<span style="color:#94a3b8">None</span>'}</td>
+                <td><span class="status-badge ${onlineClass}">${onlineLabel}</span></td>
                 <td><span class="status-badge ${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
                 <td>${formatDate(user.created_at)}</td>
                 <td>
                     <div class="action-btns">
+                        ${user.is_online ? `<button class="btn-icon danger" data-action="force-logout" data-user-id="${user.id}" data-user-email="${safeEmail}" title="Force Logout">
+                            <i data-lucide="log-out"></i>
+                        </button>` : ''}
                         <button class="btn-icon" data-action="edit-user" data-user-id="${user.id}" title="Edit">
                             <i data-lucide="pencil"></i>
                         </button>
@@ -407,6 +466,7 @@ async function loadUsers() {
                 const userId = parseInt(btn.dataset.userId);
                 if (action === 'edit-user') editUser(userId);
                 else if (action === 'delete-user') confirmDeleteUser(userId, btn.dataset.userEmail);
+                else if (action === 'force-logout') forceLogoutUserById(userId, btn.dataset.userEmail);
             });
         });
         renderIcons();
@@ -424,6 +484,8 @@ function showCreateUserModal() {
     document.getElementById('userEmail').disabled = false;
     document.getElementById('userAppId').disabled = false;
     document.getElementById('userStatusGroup').classList.add('hidden');
+    var flGroup = document.getElementById('forceLogoutGroup');
+    if (flGroup) flGroup.classList.add('hidden');
     loadAppsForSelect();
     openModal('userModal');
 }
@@ -453,6 +515,11 @@ function editUser(userId) {
     document.getElementById('userAppId').disabled = true;
     document.getElementById('userStatusGroup').classList.remove('hidden');
     document.getElementById('userStatus').value = user.is_active ? 'true' : 'false';
+    // Show force-logout button only if user is online
+    const flGroup = document.getElementById('forceLogoutGroup');
+    if (flGroup) {
+        flGroup.classList.toggle('hidden', !user.is_online);
+    }
     loadAppsForSelect().then(() => {
         document.getElementById('userAppId').value = user.app_id || '';
     });
@@ -517,6 +584,30 @@ function confirmDeleteUser(userId, email) {
     openModal('deleteModal');
 }
 
+// Force-logout from table action button
+async function forceLogoutUserById(userId, email) {
+    try {
+        const response = await fetch(`${API_URL}/admin/users/${userId}/force-logout`, { method: 'POST' });
+        if (response.ok) {
+            showToast(`${email} has been forced offline`, 'success');
+            loadUsers();
+            loadDashboard();
+        } else {
+            const data = await response.json();
+            showToast(data.detail || 'Failed to force logout', 'error');
+        }
+    } catch { showToast('Failed to force logout', 'error'); }
+}
+
+// Force-logout from edit modal
+async function forceLogoutUser() {
+    if (!editingUserId) return;
+    const user = users.find(u => u.id === editingUserId);
+    const email = user ? user.email : '';
+    await forceLogoutUserById(editingUserId, email);
+    closeModal('userModal');
+}
+
 // ==================== Modals ====================
 
 function setupModals() {
@@ -538,12 +629,23 @@ function setupModals() {
 }
 
 function openModal(modalId) {
-    document.getElementById(modalId).classList.add('show');
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    modal.classList.add('show');
+    syncModalScrollLock();
     renderIcons();
 }
 
 function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('show');
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    modal.classList.remove('show');
+    syncModalScrollLock();
+}
+
+function syncModalScrollLock() {
+    const hasOpenModal = document.querySelector('.modal.show');
+    document.body.classList.toggle('modal-open', !!hasOpenModal);
 }
 
 function setupForms() {
@@ -565,7 +667,7 @@ async function checkApiHealth() {
     const text = document.getElementById('statusText');
 
     try {
-        const response = await fetch(`${API_URL}/`);
+        const response = await fetch(`${API_URL}/health`);
         const data = await response.json();
 
         if (data.status === 'healthy') {

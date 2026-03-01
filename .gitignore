@@ -4,6 +4,7 @@ instance
 *.pyc
 *.pyo
 .env
+.railway.env
 /backend/keys
 /frontend/admin-console/credentials.json
 .admin.pid

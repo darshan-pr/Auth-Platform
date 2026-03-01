@@ -10,10 +10,26 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 <body>
+    <!-- Mobile top bar (phones only) -->
+    <div class="docs-mobile-header" id="docsMobileHeader">
+        <button class="docs-hamburger" id="docsHamburger" aria-label="Open navigation">
+            <i class="fas fa-bars"></i>
+        </button>
+        <span class="docs-mobile-title">API Docs</span>
+        <a href="/console" class="docs-mobile-console">Console</a>
+    </div>
+    <!-- Sidebar backdrop -->
+    <div class="docs-overlay" id="docsOverlay"></div>
+
     <div class="docs-container">
         <!-- Sidebar Navigation -->
-        <aside class="sidebar">
-            <button onclick="location.href='/console'" class="btn-secondary">Console</button>
+        <aside class="sidebar" id="docsSidebar">
+            <div class="docs-sidebar-top">
+                <button class="docs-sidebar-close" id="docsSidebarClose" aria-label="Close navigation">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <button onclick="location.href='/console'" class="btn-secondary docs-sidebar-console">Console</button>
             <div class="sidebar-header">
                 <p>Auth Platform</p>
                 <span class="version">v1.0.0</span>
@@ -592,6 +608,38 @@ app.get('/api/protected', authenticateToken, (req, res) => {
             });
         }, observerOptions);
         document.querySelectorAll('.doc-section').forEach(section => observer.observe(section));
+    </script>
+
+    <!-- Mobile sidebar toggle -->
+    <script>
+        (function () {
+            var hamburger   = document.getElementById('docsHamburger');
+            var closeBtn    = document.getElementById('docsSidebarClose');
+            var overlay     = document.getElementById('docsOverlay');
+            var sidebar     = document.getElementById('docsSidebar');
+
+            function openSidebar() {
+                sidebar.classList.add('open');
+                overlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeSidebar() {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+
+            if (hamburger)  hamburger.addEventListener('click', openSidebar);
+            if (closeBtn)   closeBtn.addEventListener('click', closeSidebar);
+            if (overlay)    overlay.addEventListener('click', closeSidebar);
+
+            // Close when a nav link is clicked on mobile
+            sidebar.querySelectorAll('.nav-item').forEach(function(item) {
+                item.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) closeSidebar();
+                });
+            });
+        })();
     </script>
 </body>
 </html>
