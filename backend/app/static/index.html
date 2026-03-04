@@ -372,10 +372,28 @@
                         </button>
                     </div>
                 </header>
+
+                <!-- Bulk Actions Bar (visible when users selected) -->
+                <div id="bulkActionsBar" class="bulk-actions-bar hidden">
+                    <span id="bulkSelectedCount">0 selected</span>
+                    <div class="bulk-btns">
+                        <button class="btn btn-sm btn-warning" onclick="bulkAction('set-inactive')">
+                            <i data-lucide="user-x"></i> Set Inactive
+                        </button>
+                        <button class="btn btn-sm btn-danger-outline" onclick="bulkAction('force-logout')">
+                            <i data-lucide="log-out"></i> Force Logout
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="bulkAction('delete')">
+                            <i data-lucide="trash-2"></i> Delete
+                        </button>
+                    </div>
+                </div>
+
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
                             <tr>
+                                <th class="th-check"><input type="checkbox" id="selectAllUsers" onchange="toggleSelectAll(this)"></th>
                                 <th>Email</th>
                                 <th>Online</th>
                                 <th>Status</th>
@@ -384,7 +402,7 @@
                             </tr>
                         </thead>
                         <tbody id="usersTableBody">
-                            <tr><td colspan="5" class="loading">Loading...</td></tr>
+                            <tr><td colspan="6" class="loading">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -607,10 +625,32 @@
         </div>
     </div>
 
+    <!-- Bulk Action Confirm Modal -->
+    <div id="bulkConfirmModal" class="modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header modal-header-danger">
+                <h3 id="bulkConfirmTitle">Confirm Bulk Action</h3>
+                <button class="modal-close">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body delete-confirm">
+                <div class="delete-icon"><i data-lucide="alert-triangle"></i></div>
+                <p id="bulkConfirmMessage">Are you sure?</p>
+                <p class="delete-target" id="bulkConfirmCount"></p>
+                <p class="delete-warning" id="bulkConfirmWarning">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('bulkConfirmModal')">Cancel</button>
+                <button class="btn btn-danger" id="bulkConfirmBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Container -->
     <div id="toastContainer"></div>
 
-    <script src="./app.js?v=20260301f"></script>
+    <script src="./app.js?v=20260304a"></script>
     <!-- Inject data-label attributes so CSS card layout can show field names -->
     <script>
     (function mobileCardLabels() {

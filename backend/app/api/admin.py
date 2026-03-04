@@ -572,6 +572,80 @@ def create_user(
         "message": "User created successfully" + (" and invite email sent" if invite_sent else " (invite email failed)")
     }
 
+
+class BulkActionRequest(BaseModel):
+    action: str  # "delete" | "force-logout" | "set-inactive"
+    user_ids: list[int]
+
+
+@router.post("/users/bulk-action")
+def bulk_user_action(
+    request: BulkActionRequest,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Perform a bulk action on multiple users (scoped to admin's tenant)"""
+    if request.action not in ("delete", "force-logout", "set-inactive"):
+        raise HTTPException(status_code=400, detail="Invalid action. Must be: delete, force-logout, or set-inactive")
+
+    if not request.user_ids:
+        raise HTTPException(status_code=400, detail="No user IDs provided")
+
+    # Fetch all matching users scoped to the admin's tenant
+    target_users = db.query(User).filter(
+        User.id.in_(request.user_ids),
+        User.tenant_id == admin.tenant_id
+    ).all()
+
+    if not target_users:
+        raise HTTPException(status_code=404, detail="No matching users found in your tenant")
+
+    results = {"processed": 0, "skipped": 0, "emails_sent": 0}
+
+    if request.action == "delete":
+        for user in target_users:
+            db.query(PasskeyCredential).filter(
+                PasskeyCredential.user_id == user.id,
+                PasskeyCredential.tenant_id == admin.tenant_id
+            ).delete()
+            db.delete(user)
+            results["processed"] += 1
+        db.commit()
+
+    elif request.action == "force-logout":
+        for user in target_users:
+            force_user_offline(user.id, admin.tenant_id)
+            results["processed"] += 1
+            # Send notification email if enabled
+            try:
+                app_name = "Auth Platform"
+                send_email = False
+                if user.app_id:
+                    app_obj = db.query(App).filter(App.app_id == user.app_id).first()
+                    if app_obj:
+                        if app_obj.name:
+                            app_name = app_obj.name
+                        send_email = app_obj.force_logout_notification_enabled
+                if send_email:
+                    if send_force_logout_email(user.email, app_name):
+                        results["emails_sent"] += 1
+            except Exception:
+                pass
+
+    elif request.action == "set-inactive":
+        for user in target_users:
+            user.is_active = False
+            results["processed"] += 1
+        db.commit()
+
+    return {
+        "message": f"Bulk {request.action} completed",
+        "action": request.action,
+        **results,
+        "total_requested": len(request.user_ids)
+    }
+
+
 @router.get("/users/{user_id}", response_model=dict)
 def get_user(
     user_id: int,

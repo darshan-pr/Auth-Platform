@@ -476,8 +476,32 @@ body.modal-open { overflow: hidden; }
 
 .btn-danger { background: var(--danger); color: #fff; box-shadow: 0 3px 10px rgba(239,68,68,0.28); }
 .btn-danger:hover { background: #dc2626; transform: translateY(-1px); box-shadow: 0 5px 16px rgba(239,68,68,0.36); }
-
+.btn-danger-outline { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.btn-danger-outline:hover { background: var(--danger); color: #fff; }
+.btn-warning { background: #f59e0b; color: #fff; box-shadow: 0 3px 10px rgba(245,158,11,0.28); }
+.btn-warning:hover { background: #d97706; transform: translateY(-1px); }
 .btn-sm { padding: 6px 12px; font-size: 0.82rem; }
+
+/* Bulk Actions Bar */
+.bulk-actions-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    margin-bottom: 12px;
+    background: var(--surface);
+    border: 1px solid var(--primary);
+    border-radius: var(--radius);
+    box-shadow: 0 2px 8px rgba(99,102,241,0.12);
+    animation: slideDown 0.2s ease;
+}
+.bulk-actions-bar.hidden { display: none; }
+.bulk-actions-bar span { font-weight: 600; color: var(--primary); font-size: 0.9rem; }
+.bulk-btns { display: flex; gap: 8px; }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+.th-check { width: 40px; text-align: center; }
+.td-check { text-align: center; }
+.td-check input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
 
 /* ====== Modals ====== */
 .modal {

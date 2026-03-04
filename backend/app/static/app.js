@@ -32,6 +32,8 @@ let editingAppId = null;
 let editingUserId = null;
 let deleteCallback = null;
 let selectedAppFilter = '';
+let selectedUserIds = new Set();
+let _autoRefreshTimer = null;
 
 // ==================== Init ====================
 
@@ -103,6 +105,7 @@ function showApp() {
     setupForms();
     checkApiHealth();
     loadDashboard();
+    startAutoRefresh();
 
     // Show tenant name in sidebar
     var tenantName = localStorage.getItem('tenant_name');
@@ -176,11 +179,33 @@ function navigateTo(page) {
         p.classList.toggle('active', p.id === `${page}Page`);
     });
 
-    switch (page) {
+    // Clear bulk selection when leaving users page
+    if (page !== 'users') clearBulkSelection();
+
+    refreshCurrentPage();
+    startAutoRefresh();
+}
+
+function refreshCurrentPage() {
+    switch (currentPage) {
         case 'dashboard': loadDashboard(); break;
         case 'apps':      loadApps();      break;
         case 'users':     loadAppFilterOptions().then(() => loadUsers()); break;
     }
+}
+
+function startAutoRefresh() {
+    stopAutoRefresh();
+    _autoRefreshTimer = setInterval(() => {
+        // Only auto-refresh if no modals are open
+        if (!document.querySelector('.modal.show')) {
+            refreshCurrentPage();
+        }
+    }, 15000);
+}
+
+function stopAutoRefresh() {
+    if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null; }
 }
 
 // ==================== Dashboard ====================
@@ -304,10 +329,10 @@ function editApp(appId) {
     document.getElementById('appFormSubmit').textContent = 'Save Changes';
     document.getElementById('appName').value = app.name || '';
     document.getElementById('appDescription').value = app.description || '';
-    document.getElementById('appOtpEnabled').checked = app.otp_enabled !== false;
-    document.getElementById('appPasskeyEnabled').checked = app.passkey_enabled === true;
-    document.getElementById('appLoginNotification').checked = app.login_notification_enabled === true;
-    document.getElementById('appForceLogoutNotification').checked = app.force_logout_notification_enabled === true;
+    document.getElementById('appOtpEnabled').checked = !!app.otp_enabled;
+    document.getElementById('appPasskeyEnabled').checked = !!app.passkey_enabled;
+    document.getElementById('appLoginNotification').checked = !!app.login_notification_enabled;
+    document.getElementById('appForceLogoutNotification').checked = !!app.force_logout_notification_enabled;
     document.getElementById('appAccessTokenExpiry').value = app.access_token_expiry_minutes || 30;
     document.getElementById('appRefreshTokenExpiry').value = app.refresh_token_expiry_days || 7;
     document.getElementById('appRedirectUris').value = app.redirect_uris || '';
@@ -413,7 +438,7 @@ function confirmDeleteApp(appId, appName) {
 
 async function loadUsers() {
     const tbody = document.getElementById('usersTableBody');
-    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading users...</td></tr>';
+tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading users...</td></tr>';
 
     try {
         let url = `${API_URL}/admin/users`;
@@ -426,7 +451,7 @@ async function loadUsers() {
         users = Array.isArray(data) ? data : (data.users || []);
 
         if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="loading">No users found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="loading">No users found.</td></tr>';
             return;
         }
 
@@ -439,8 +464,10 @@ async function loadUsers() {
             const safeEmail = escapeAttr(user.email);
             const onlineClass = user.is_online ? 'active' : 'inactive';
             const onlineLabel = user.is_online ? 'Online' : 'Offline';
+            const isChecked = selectedUserIds.has(user.id) ? 'checked' : '';
             return `
             <tr>
+                <td class="td-check"><input type="checkbox" class="user-select-cb" data-user-id="${user.id}" ${isChecked} onchange="onUserCheckChange()"></td>
                 <td class="app-name-cell">${escapeHtml(user.email)}</td>
                 <td><span class="status-badge ${onlineClass}">${onlineLabel}</span></td>
                 <td><span class="status-badge ${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
@@ -472,10 +499,17 @@ async function loadUsers() {
                 else if (action === 'force-logout') forceLogoutUserById(userId, btn.dataset.userEmail);
             });
         });
+
+        // Sync select-all checkbox state
+        const allCbs = document.querySelectorAll('.user-select-cb');
+        const selectAllCb = document.getElementById('selectAllUsers');
+        if (selectAllCb) selectAllCb.checked = allCbs.length > 0 && selectedUserIds.size === allCbs.length;
+        updateBulkBar();
+
         renderIcons();
     } catch (error) {
         console.error('Error loading users:', error);
-        tbody.innerHTML = '<tr><td colspan="6" class="loading">Failed to load users</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="loading">Failed to load users</td></tr>';
     }
 }
 
@@ -634,6 +668,119 @@ async function forceLogoutUser() {
     const email = user ? user.email : '';
     closeModal('userModal');
     confirmForceLogout(editingUserId, email);
+}
+
+// ==================== Bulk User Operations ====================
+
+function toggleSelectAll(masterCb) {
+    document.querySelectorAll('.user-select-cb').forEach(cb => {
+        cb.checked = masterCb.checked;
+        const uid = parseInt(cb.dataset.userId);
+        if (masterCb.checked) selectedUserIds.add(uid);
+        else selectedUserIds.delete(uid);
+    });
+    updateBulkBar();
+}
+
+function onUserCheckChange() {
+    selectedUserIds.clear();
+    document.querySelectorAll('.user-select-cb:checked').forEach(cb => {
+        selectedUserIds.add(parseInt(cb.dataset.userId));
+    });
+    // Sync "select all" checkbox
+    const allCbs = document.querySelectorAll('.user-select-cb');
+    const selectAllCb = document.getElementById('selectAllUsers');
+    if (selectAllCb) selectAllCb.checked = allCbs.length > 0 && selectedUserIds.size === allCbs.length;
+    updateBulkBar();
+}
+
+function updateBulkBar() {
+    const bar = document.getElementById('bulkActionsBar');
+    if (!bar) return;
+    if (selectedUserIds.size > 0) {
+        bar.classList.remove('hidden');
+        document.getElementById('bulkSelectedCount').textContent = `${selectedUserIds.size} selected`;
+    } else {
+        bar.classList.add('hidden');
+    }
+    renderIcons();
+}
+
+function clearBulkSelection() {
+    selectedUserIds.clear();
+    const selectAllCb = document.getElementById('selectAllUsers');
+    if (selectAllCb) selectAllCb.checked = false;
+    document.querySelectorAll('.user-select-cb').forEach(cb => cb.checked = false);
+    updateBulkBar();
+}
+
+function bulkAction(action) {
+    if (selectedUserIds.size === 0) return;
+
+    const count = selectedUserIds.size;
+    const titleEl = document.getElementById('bulkConfirmTitle');
+    const msgEl = document.getElementById('bulkConfirmMessage');
+    const countEl = document.getElementById('bulkConfirmCount');
+    const warnEl = document.getElementById('bulkConfirmWarning');
+    const btn = document.getElementById('bulkConfirmBtn');
+
+    if (action === 'delete') {
+        titleEl.textContent = 'Bulk Delete Users';
+        msgEl.textContent = 'Are you sure you want to permanently delete:';
+        countEl.textContent = `${count} user${count > 1 ? 's' : ''}`;
+        warnEl.textContent = 'This action cannot be undone.';
+        btn.textContent = 'Delete All';
+        btn.className = 'btn btn-danger';
+    } else if (action === 'force-logout') {
+        titleEl.textContent = 'Bulk Force Logout';
+        msgEl.textContent = 'Force logout the following users immediately:';
+        countEl.textContent = `${count} user${count > 1 ? 's' : ''}`;
+        warnEl.textContent = 'All active sessions will be revoked.';
+        btn.textContent = 'Force Logout All';
+        btn.className = 'btn btn-danger';
+    } else if (action === 'set-inactive') {
+        titleEl.textContent = 'Set Users Inactive';
+        msgEl.textContent = 'Set the following users to inactive:';
+        countEl.textContent = `${count} user${count > 1 ? 's' : ''}`;
+        warnEl.textContent = 'Users will no longer be able to log in until reactivated.';
+        btn.textContent = 'Set Inactive';
+        btn.className = 'btn btn-warning';
+    }
+
+    btn.onclick = () => executeBulkAction(action);
+    openModal('bulkConfirmModal');
+}
+
+async function executeBulkAction(action) {
+    const btn = document.getElementById('bulkConfirmBtn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Processing...';
+
+    try {
+        const response = await fetch(`${API_URL}/admin/users/bulk-action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, user_ids: Array.from(selectedUserIds) })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            closeModal('bulkConfirmModal');
+            const extra = data.emails_sent > 0 ? ` (${data.emails_sent} emails sent)` : '';
+            showToast(`${data.processed} user${data.processed > 1 ? 's' : ''} — ${action} completed${extra}`, 'success');
+            clearBulkSelection();
+            loadUsers();
+            loadDashboard();
+        } else {
+            showToast(data.detail || 'Bulk action failed', 'error');
+        }
+    } catch {
+        showToast('Bulk action failed', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
 }
 
 // ==================== Modals ====================
