@@ -5,7 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 // Type definitions
 interface User {
   email: string;
-  user_id: string;
+  user_id: number;
   app_id: string;
   issuer: string;
   expires_at: Date;

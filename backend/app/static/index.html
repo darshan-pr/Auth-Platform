@@ -376,11 +376,11 @@
                 <!-- Bulk Actions Bar (visible when users selected) -->
                 <div id="bulkActionsBar" class="bulk-actions-bar hidden">
                     <span id="bulkSelectedCount">0 selected</span>
-                    <div class="bulk-btns">
-                        <button class="btn btn-sm btn-warning" onclick="bulkAction('set-inactive')">
+                    <div class="bulk-btns" style="margin-bottom: 10px; margin-top: 10px;">
+                        <button class="btn btn-sm btn-warning" style="background-color: rgba(3, 222, 185, 0.647);" onclick="bulkAction('set-inactive')">
                             <i data-lucide="user-x"></i> Set Inactive
                         </button>
-                        <button class="btn btn-sm btn-danger-outline" onclick="bulkAction('force-logout')">
+                        <button class="btn btn-sm btn-danger-outline" style="background-color: rgba(255, 170, 1, 0.718);" onclick="bulkAction('force-logout')">
                             <i data-lucide="log-out"></i> Force Logout
                         </button>
                         <button class="btn btn-sm btn-danger" onclick="bulkAction('delete')">

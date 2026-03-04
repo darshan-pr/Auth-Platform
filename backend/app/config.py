@@ -42,7 +42,12 @@ class Settings:
     # CORS Configuration
     ALLOWED_ORIGINS: list = os.getenv("ALLOWED_ORIGINS", "*").split(",") if os.getenv("ALLOWED_ORIGINS") else ["*"]
 
-    # Public server URL (used in docs, SDK examples, etc.)
+    # Public server URL (used in API responses, token issuer, etc.)
     AUTH_SERVER_URL: str = os.getenv("AUTH_SERVER_URL", "http://localhost:8000")
+
+    # URL shown in the docs page & SDK examples.
+    # Set DOCS_AUTH_SERVER_URL in your .env to override (e.g. your Railway/production URL).
+    # Falls back to AUTH_SERVER_URL if not set.
+    DOCS_AUTH_SERVER_URL: str = os.getenv("DOCS_AUTH_SERVER_URL", "")
 
 settings = Settings()

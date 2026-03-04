@@ -34,7 +34,7 @@
             <button onclick="location.href='/dashboard'" class="btn-secondary docs-sidebar-console">Dashboard</button>
             <div class="sidebar-header">
                 <p>Auth Platform</p>
-                <span class="version">v1.0.0</span>
+                <span class="version">v2.0.0</span>
             </div>
             <nav class="sidebar-nav">
                 <div class="nav-section">
@@ -46,6 +46,7 @@
                 <div class="nav-section">
                     <h3>Authentication</h3>
                     <a href="#integration" class="nav-item">Integration Guide</a>
+                    <a href="#env-setup" class="nav-item">Environment Setup</a>
                     <a href="#sdk-reference" class="nav-item">SDK Reference</a>
                 </div>
                 <div class="nav-section">
@@ -86,6 +87,11 @@
                             <div class="feature-icon"><i class="fas fa-key"></i></div>
                             <h3>RS256 JWT</h3>
                             <p>Asymmetric key signing with automatic token refresh</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon"><i class="fas fa-bolt"></i></div>
+                            <h3>Real-Time Revocation</h3>
+                            <p>SSE-powered instant session invalidation when admin force-logouts a user</p>
                         </div>
                         <div class="feature-card">
                             <div class="feature-icon"><i class="fas fa-buildings"></i></div>
@@ -151,10 +157,10 @@
                             <p>Drop-in authentication for any frontend framework</p>
                             <ul class="feature-list">
                                 <li>OAuth 2.0 Authorization Code Flow with PKCE</li>
-                                <li>Automatic token refresh</li>
-                                <li>Session management</li>
-                                <li>Zero dependencies</li>
-                                <li>TypeScript-ready</li>
+                                <li>Automatic token refresh &amp; SSE real-time revocation</li>
+                                <li>True encapsulation — internal state is inaccessible</li>
+                                <li>Auth change events with logout reason</li>
+                                <li>Zero dependencies &amp; framework-agnostic</li>
                             </ul>
                         </div>
                         <div class="download-actions">
@@ -167,10 +173,10 @@
                     <div class="info-box">
                         <strong><i class="fas fa-box"></i> What's included:</strong>
                         <ul>
-                            <li><code>auth-sdk.js</code> - Complete AuthClient implementation</li>
-                            <li>PKCE crypto utilities (code verifier, challenge generation)</li>
-                            <li>Token management and auto-refresh logic</li>
-                            <li>Session storage helpers</li>
+                            <li><code>auth-sdk.js</code> — Complete AuthClient class with true <code>#</code> private fields</li>
+                            <li>PKCE crypto utilities (code verifier, SHA-256 challenge)</li>
+                            <li>Auto token refresh timer + SSE session stream for real-time revocation</li>
+                            <li>Works as <code>&lt;script&gt;</code> tag (UMD) or ES module <code>import</code></li>
                         </ul>
                     </div>
                 </section>
@@ -179,25 +185,37 @@
                     <h2>Integration Guide</h2>
                    
                     <h3>1. Basic Setup</h3>
-                    <pre><code class="language-javascript">// config.js
-const AUTH_CONFIG = {
-  AUTH_SERVER: '__AUTH_SERVER__',
-  CLIENT_ID: 'app_xxxxxxxxxxxx',
-  REDIRECT_URI: window.location.origin + window.location.pathname
-};
-// Initialize
-const auth = new AuthClient(AUTH_CONFIG);</code></pre>
+                    <p>Configure the SDK using environment variables — <strong>never hardcode secrets or URLs in source code</strong>.</p>
+                    <pre><code class="language-javascript">// Read from your environment / .env file
+const auth = new AuthClient({
+  AUTH_SERVER:  '__AUTH_SERVER__',          // or process.env.NEXT_PUBLIC_AUTH_SERVER
+  CLIENT_ID:   'app_xxxxxxxxxxxx',          // from Admin Console
+  REDIRECT_URI: window.location.origin,     // must match Admin Console
+});</code></pre>
                     <h3>2. Handle Authentication</h3>
-                    <pre><code class="language-javascript">// On page load - check for OAuth callback
+                    <pre><code class="language-javascript">// On page load — check for OAuth callback
 await auth.handleCallback();
+
 if (auth.isAuthenticated()) {
   const user = auth.getUser();
   showDashboard(user);
-  auth.startAutoRefresh(); // Enable auto token refresh
+  auth.startAutoRefresh();  // token refresh + SSE revocation stream
 } else {
   showLoginButton();
 }</code></pre>
-                    <h3>3. Making Authenticated Requests</h3>
+                    <h3>3. Listen for Auth Changes</h3>
+                    <p>Get notified in real-time when the session state changes — including admin force-logouts.</p>
+                    <pre><code class="language-javascript">auth.onAuthChange((isLoggedIn, reason) => {
+  if (!isLoggedIn) {
+    if (reason === 'revoked_by_admin') {
+      showBanner('Your session was ended by an administrator');
+    } else if (reason === 'session_expired') {
+      showBanner('Session expired — please log in again');
+    }
+    redirectToLogin();
+  }
+});</code></pre>
+                    <h3>4. Making Authenticated Requests</h3>
                     <pre><code class="language-javascript">async function fetchUserData() {
   const token = auth.getAccessToken();
  
@@ -210,69 +228,163 @@ if (auth.isAuthenticated()) {
  
   return response.json();
 }</code></pre>
-                    <h3>4. Logout</h3>
+                    <h3>5. Logout</h3>
                     <pre><code class="language-javascript">document.getElementById('logoutBtn').onclick = () => {
   auth.logout();
   window.location.href = '/';
 };</code></pre>
                 </section>
+
+                <!-- Environment Setup -->
+                <section id="env-setup" class="doc-section">
+                    <h2>Environment Setup</h2>
+                    <p>The SDK reads its configuration from a config object — use your framework's environment variables to supply the values. <strong>Never commit real credentials to source control.</strong></p>
+
+                    <h3>Next.js</h3>
+                    <pre><code class="language-bash"># .env.local
+NEXT_PUBLIC_AUTH_SERVER=__AUTH_SERVER__
+NEXT_PUBLIC_CLIENT_ID=app_xxxxxxxxxxxx
+NEXT_PUBLIC_REDIRECT_URI=http://localhost:3000/callback</code></pre>
+                    <pre><code class="language-javascript">// lib/config.js
+export const AUTH_CONFIG = {
+  AUTH_SERVER:  process.env.NEXT_PUBLIC_AUTH_SERVER,
+  CLIENT_ID:   process.env.NEXT_PUBLIC_CLIENT_ID,
+  REDIRECT_URI: process.env.NEXT_PUBLIC_REDIRECT_URI,
+};</code></pre>
+
+                    <h3>Vite (Vue / React / Svelte)</h3>
+                    <pre><code class="language-bash"># .env
+VITE_AUTH_SERVER=__AUTH_SERVER__
+VITE_CLIENT_ID=app_xxxxxxxxxxxx
+VITE_REDIRECT_URI=http://localhost:5173/callback</code></pre>
+                    <pre><code class="language-javascript">const auth = new AuthClient({
+  AUTH_SERVER:  import.meta.env.VITE_AUTH_SERVER,
+  CLIENT_ID:   import.meta.env.VITE_CLIENT_ID,
+  REDIRECT_URI: import.meta.env.VITE_REDIRECT_URI,
+});</code></pre>
+
+                    <h3>Create React App</h3>
+                    <pre><code class="language-bash"># .env
+REACT_APP_AUTH_SERVER=__AUTH_SERVER__
+REACT_APP_CLIENT_ID=app_xxxxxxxxxxxx
+REACT_APP_REDIRECT_URI=http://localhost:3000/callback</code></pre>
+                    <pre><code class="language-javascript">const auth = new AuthClient({
+  AUTH_SERVER:  process.env.REACT_APP_AUTH_SERVER,
+  CLIENT_ID:   process.env.REACT_APP_CLIENT_ID,
+  REDIRECT_URI: process.env.REACT_APP_REDIRECT_URI,
+});</code></pre>
+
+                    <h3>Plain HTML / Vanilla JS</h3>
+                    <p>Since plain HTML has no build step, pass values directly or use <code>&lt;meta&gt;</code> tags:</p>
+                    <pre><code class="language-html">&lt;script src="auth-sdk.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  const auth = new AuthClient({
+    AUTH_SERVER:  '__AUTH_SERVER__',
+    CLIENT_ID:   'app_xxxxxxxxxxxx',
+    REDIRECT_URI: window.location.origin,
+  });
+&lt;/script&gt;</code></pre>
+                </section>
                 <!-- SDK Reference -->
                 <section id="sdk-reference" class="doc-section">
                     <h2>SDK Reference</h2>
+                    <p class="info-box"><i class="fas fa-lock"></i> The SDK uses <strong>true private fields</strong> (<code>#</code>) — internal state like tokens and streams are completely inaccessible from outside the class.</p>
+
                     <div class="method-card">
-                        <h3>AuthClient(config)</h3>
-                        <p>Initialize the authentication client.</p>
+                        <h3>new AuthClient(config)</h3>
+                        <p>Create an auth client. Throws if <code>AUTH_SERVER</code> is missing.</p>
                         <pre><code class="language-javascript">const auth = new AuthClient({
-  AUTH_SERVER: '__AUTH_SERVER__',
-  CLIENT_ID: 'your-client-id',
-  REDIRECT_URI: window.location.origin
+  AUTH_SERVER:  process.env.NEXT_PUBLIC_AUTH_SERVER,
+  CLIENT_ID:   process.env.NEXT_PUBLIC_CLIENT_ID,
+  REDIRECT_URI: process.env.NEXT_PUBLIC_REDIRECT_URI,
 });</code></pre>
+                        <table class="param-table">
+                            <tr><td><code>AUTH_SERVER</code></td><td>string</td><td><strong>Required.</strong> Auth platform URL (from env).</td></tr>
+                            <tr><td><code>CLIENT_ID</code></td><td>string</td><td>OAuth Client ID from Admin Console.</td></tr>
+                            <tr><td><code>REDIRECT_URI</code></td><td>string</td><td>Callback URL — must match Admin Console.</td></tr>
+                        </table>
                     </div>
+
                     <div class="method-card">
                         <h3>auth.login()</h3>
-                        <p>Start OAuth flow and redirect to hosted login page.</p>
+                        <p>Redirect to the hosted login page (OAuth 2.0 + PKCE). Like "Sign in with Google" — your app never sees the password.</p>
                         <pre><code class="language-javascript">auth.login();</code></pre>
                     </div>
+
                     <div class="method-card">
-                        <h3>auth.logout()</h3>
-                        <p>Clear session and trigger auth change callback.</p>
-                        <pre><code class="language-javascript">auth.logout();</code></pre>
+                        <h3>auth.logout(reason?)</h3>
+                        <p>Clear session, stop refresh timers &amp; SSE stream, and fire the <code>onAuthChange</code> callback.</p>
+                        <pre><code class="language-javascript">auth.logout();  // voluntary logout (reason = null)</code></pre>
                     </div>
+
                     <div class="method-card">
                         <h3>auth.isAuthenticated() → boolean</h3>
-                        <p>Check if user has a valid non-expired access token.</p>
+                        <p>Check if user has a valid, non-expired access token.</p>
                         <pre><code class="language-javascript">if (auth.isAuthenticated()) {
   console.log('User is logged in');
 }</code></pre>
                     </div>
+
                     <div class="method-card">
                         <h3>auth.getUser() → object | null</h3>
-                        <p>Get current user information from JWT.</p>
+                        <p>Get current user info decoded from the JWT. Returns a <strong>frozen</strong> object (cannot be mutated).</p>
                         <pre><code class="language-javascript">const user = auth.getUser();
-// { email, user_id, app_id, expires_at, issued_at }</code></pre>
+// { email, user_id, app_id, issuer, expires_at, issued_at }</code></pre>
                     </div>
+
                     <div class="method-card">
                         <h3>auth.getAccessToken() → string | null</h3>
-                        <p>Get raw JWT access token for API requests.</p>
-                        <pre><code class="language-javascript">const token = auth.getAccessToken();
-fetch('/api/data', {
-  headers: { 'Authorization': `Bearer ${token}` }
+                        <p>Get the raw JWT for <code>Authorization</code> headers.</p>
+                        <pre><code class="language-javascript">fetch('/api/data', {
+  headers: { 'Authorization': `Bearer ${auth.getAccessToken()}` }
 });</code></pre>
                     </div>
+
                     <div class="method-card">
                         <h3>auth.handleCallback() → Promise&lt;boolean&gt;</h3>
-                        <p>Process OAuth callback after redirect. Call on page load.</p>
-                        <pre><code class="language-javascript">await auth.handleCallback();</code></pre>
+                        <p>Process the OAuth redirect. Call once on page load (or on your callback route). Returns <code>true</code> if tokens were received.</p>
+                        <pre><code class="language-javascript">const handled = await auth.handleCallback();</code></pre>
                     </div>
+
+                    <div class="method-card">
+                        <h3>auth.onAuthChange(callback)</h3>
+                        <p>Register a listener for authentication state changes. Fires on login, logout, and <strong>real-time admin revocation</strong>.</p>
+                        <pre><code class="language-javascript">auth.onAuthChange((isLoggedIn, reason) => {
+  // reason: 'revoked_by_admin' | 'session_expired' | null
+  if (!isLoggedIn &amp;&amp; reason === 'revoked_by_admin') {
+    alert('Admin ended your session');
+  }
+});</code></pre>
+                    </div>
+
                     <div class="method-card">
                         <h3>auth.startAutoRefresh()</h3>
-                        <p>Enable automatic token refresh before expiration.</p>
-                        <pre><code class="language-javascript">auth.startAutoRefresh();</code></pre>
+                        <p>Enable two automatic features:</p>
+                        <ul>
+                            <li><strong>Token refresh</strong> — refreshes access token before it expires (checks every 15 s)</li>
+                            <li><strong>SSE revocation stream</strong> — opens a server-sent event connection that fires instantly when an admin force-logouts the user</li>
+                        </ul>
+                        <pre><code class="language-javascript">if (auth.isAuthenticated()) {
+  auth.startAutoRefresh();
+}</code></pre>
                     </div>
+
                     <div class="method-card">
                         <h3>auth.refreshAccessToken() → Promise&lt;boolean&gt;</h3>
-                        <p>Manually refresh the access token.</p>
-                        <pre><code class="language-javascript">const success = await auth.refreshAccessToken();</code></pre>
+                        <p>Manually refresh the access token. Normally handled automatically by <code>startAutoRefresh()</code>.</p>
+                        <pre><code class="language-javascript">const ok = await auth.refreshAccessToken();</code></pre>
+                    </div>
+
+                    <div class="method-card">
+                        <h3>auth.verifyToken() → Promise&lt;object | null&gt;</h3>
+                        <p>Verify the current access token server-side and get the decoded payload.</p>
+                        <pre><code class="language-javascript">const payload = await auth.verifyToken();</code></pre>
+                    </div>
+
+                    <div class="method-card">
+                        <h3>auth.getTimeUntilExpiry() → number</h3>
+                        <p>Seconds remaining until the access token expires (0 if expired or missing).</p>
+                        <pre><code class="language-javascript">console.log(`Token expires in ${auth.getTimeUntilExpiry()}s`);</code></pre>
                     </div>
                 </section>
                 <!-- API Endpoints -->
@@ -447,14 +559,36 @@ fetch('/api/data', {
                 <!-- Examples -->
                 <section id="examples" class="doc-section">
                     <h2>Code Examples</h2>
-                    <h3>React Integration</h3>
-                    <pre><code class="language-javascript">import { useEffect, useState } from 'react';
+
+                    <h3>React / Next.js</h3>
+                    <pre><code class="language-javascript">// .env.local
+// NEXT_PUBLIC_AUTH_SERVER=__AUTH_SERVER__
+// NEXT_PUBLIC_CLIENT_ID=app_xxxxxxxxxxxx
+// NEXT_PUBLIC_REDIRECT_URI=http://localhost:3000/callback
+
+import AuthClient from './auth-sdk';
+import { AUTH_CONFIG } from './config';
+import { useEffect, useState } from 'react';
+
 function App() {
   const [user, setUser] = useState(null);
-  const auth = new AuthClient(AUTH_CONFIG);
+  const [logoutReason, setLogoutReason] = useState(null);
+  const [auth] = useState(() => new AuthClient(AUTH_CONFIG));
+
   useEffect(() => {
     async function init() {
       await auth.handleCallback();
+
+      auth.onAuthChange((loggedIn, reason) => {
+        if (loggedIn) {
+          setUser(auth.getUser());
+          setLogoutReason(null);
+        } else {
+          setUser(null);
+          setLogoutReason(reason);
+        }
+      });
+
       if (auth.isAuthenticated()) {
         setUser(auth.getUser());
         auth.startAutoRefresh();
@@ -462,25 +596,46 @@ function App() {
     }
     init();
   }, []);
+
+  if (logoutReason === 'revoked_by_admin') {
+    return &lt;div className="banner"&gt;Admin ended your session&lt;/div&gt;;
+  }
   if (!user) {
-    return &lt;button onClick={() => auth.login()}&gt;Login&lt;/button&gt;;
+    return &lt;button onClick={() =&gt; auth.login()}&gt;Login&lt;/button&gt;;
   }
   return (
     &lt;div&gt;
       &lt;h1&gt;Welcome, {user.email}&lt;/h1&gt;
-      &lt;button onClick={() => auth.logout()}&gt;Logout&lt;/button&gt;
+      &lt;button onClick={() =&gt; auth.logout()}&gt;Logout&lt;/button&gt;
     &lt;/div&gt;
   );
 }</code></pre>
-                    <h3>Vue.js Integration</h3>
-                    <pre><code class="language-javascript">export default {
+
+                    <h3>Vue.js (Vite)</h3>
+                    <pre><code class="language-javascript">// .env
+// VITE_AUTH_SERVER=__AUTH_SERVER__
+// VITE_CLIENT_ID=app_xxxxxxxxxxxx
+// VITE_REDIRECT_URI=http://localhost:5173/callback
+
+import AuthClient from './auth-sdk';
+
+export default {
   data() {
     return {
-      auth: new AuthClient(AUTH_CONFIG),
-      user: null
+      auth: new AuthClient({
+        AUTH_SERVER:  import.meta.env.VITE_AUTH_SERVER,
+        CLIENT_ID:   import.meta.env.VITE_CLIENT_ID,
+        REDIRECT_URI: import.meta.env.VITE_REDIRECT_URI,
+      }),
+      user: null,
+      logoutReason: null
     };
   },
   async mounted() {
+    this.auth.onAuthChange((loggedIn, reason) => {
+      this.user = loggedIn ? this.auth.getUser() : null;
+      this.logoutReason = reason;
+    });
     await this.auth.handleCallback();
     if (this.auth.isAuthenticated()) {
       this.user = this.auth.getUser();
@@ -488,13 +643,8 @@ function App() {
     }
   },
   methods: {
-    login() {
-      this.auth.login();
-    },
-    logout() {
-      this.auth.logout();
-      this.user = null;
-    }
+    login()  { this.auth.login(); },
+    logout() { this.auth.logout(); }
   }
 };</code></pre>
                     <h3>Protected API Route (Express)</h3>
@@ -536,7 +686,7 @@ app.get('/api/protected', authenticateToken, (req, res) => {
                         <a href="/docs">OpenAPI Spec</a>
                         <a href="https://github.com">GitHub</a>
                     </div>
-                    <p>Auth Platform v1.0.0 • Built with FastAPI</p>
+                    <p>Auth Platform v2.0.0 • Built with FastAPI</p>
                 </footer>
             </div>
             <!-- Table of Contents -->

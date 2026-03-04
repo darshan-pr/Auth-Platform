@@ -1,82 +1,126 @@
 /**
  * ============================================================
- *  Auth Platform — JavaScript SDK
+ *  Auth Platform — JavaScript SDK  (v2.0.0)
  * ============================================================
- * 
- *  Drop-in authentication module for any frontend app.
+ *
+ *  Drop-in authentication for any web app.
  *  Uses OAuth 2.0 Authorization Code Flow with PKCE.
- * 
- *  Usage:
- *    <script src="config.js"></script>
- *    <script src="auth.js"></script>
- *    <script>
- *      const auth = new AuthClient(AUTH_CONFIG);
- *      
- *      // Check if user is logged in
- *      if (auth.isAuthenticated()) {
- *          const user = auth.getUser();
- *          console.log('Hello', user.email);
- *      }
- *      
- *      // Login
- *      auth.login();
- *      
- *      // Logout
- *      auth.logout();
- *    </script>
- * 
- *  That's it. No secrets. No backend needed on your app.
+ *  Zero dependencies. Works with any framework.
+ *
+ *  Quick start:
+ *  ─────────────────────────────────────────────────
+ *  1. Set environment variables (or use a .env file):
+ *
+ *       AUTH_SERVER_URL=https://auth.yourplatform.com
+ *       AUTH_CLIENT_ID=your-client-id
+ *       AUTH_REDIRECT_URI=https://yourapp.com/callback
+ *
+ *  2. Initialise the SDK:
+ *
+ *       const auth = new AuthClient({
+ *         // Read from your environment / config — never hardcode in production
+ *         AUTH_SERVER:   process.env.AUTH_SERVER_URL,   // or import.meta.env.VITE_AUTH_SERVER
+ *         CLIENT_ID:     process.env.AUTH_CLIENT_ID,    // from Admin Console
+ *         REDIRECT_URI:  process.env.AUTH_REDIRECT_URI, // must match Admin Console
+ *       });
+ *
+ *  3. Handle the callback & check session:
+ *
+ *       await auth.handleCallback();
+ *       if (auth.isAuthenticated()) {
+ *         console.log('Hello', auth.getUser().email);
+ *         auth.startAutoRefresh();  // auto token refresh + real-time revocation
+ *       } else {
+ *         auth.login();
+ *       }
+ *
+ *  That's it. No secrets needed on the frontend.
+ *
+ *  Environment variable naming by framework:
+ *  ──────────────────────────────────────────
+ *    Next.js  →  NEXT_PUBLIC_AUTH_SERVER, NEXT_PUBLIC_CLIENT_ID, NEXT_PUBLIC_REDIRECT_URI
+ *    Vite     →  VITE_AUTH_SERVER,        VITE_CLIENT_ID,        VITE_REDIRECT_URI
+ *    CRA      →  REACT_APP_AUTH_SERVER,   REACT_APP_CLIENT_ID,   REACT_APP_REDIRECT_URI
+ *    Plain JS →  pass values directly from your build config or <meta> tags
+ *
  * ============================================================
  */
 
 class AuthClient {
-    constructor(config) {
-        this.authServer = config.AUTH_SERVER;
-        this.clientId = config.CLIENT_ID;
-        this.redirectUri = config.REDIRECT_URI;
 
-        this._tokens = null;
-        this._user = null;
-        this._onAuthChange = null;
-        this._sessionInterval = null;
-        this._eventSource = null;
-
-        // Load tokens from session storage
-        this._loadSession();
-    }
-
-    // ==================== Public API ====================
+    /* ──────────────────────────────────────────────
+     *  TRUE PRIVATE STATE
+     *  Using # private fields — inaccessible outside this class.
+     *  Developers cannot read or mutate tokens, streams, etc.
+     * ────────────────────────────────────────────── */
+    #authServer;
+    #clientId;
+    #redirectUri;
+    #tokens = null;
+    #onAuthChangeCb = null;
+    #sessionInterval = null;
+    #eventSource = null;
 
     /**
-     * Start OAuth login flow — redirects to the auth platform's login page.
-     * Like clicking "Sign in with Google".
+     * Create an AuthClient instance.
+     *
+     * @param {Object} config
+     * @param {string} config.AUTH_SERVER   - Auth platform URL (from env)
+     * @param {string} config.CLIENT_ID    - OAuth Client ID (from Admin Console)
+     * @param {string} config.REDIRECT_URI - Callback URL (must match Admin Console)
      */
-    login() {
-        if (!this.clientId) {
+    constructor(config = {}) {
+        if (!config.AUTH_SERVER) {
             throw new Error(
-                'CLIENT_ID is not configured. Set it in config.js.\n' +
-                'Get one from the Admin Console.'
+                '[AuthClient] AUTH_SERVER is required.\n' +
+                'Set it via environment variable (e.g. NEXT_PUBLIC_AUTH_SERVER).'
             );
         }
-        this._startOAuthFlow();
+        this.#authServer  = config.AUTH_SERVER.replace(/\/+$/, '');
+        this.#clientId    = config.CLIENT_ID || '';
+        this.#redirectUri = config.REDIRECT_URI || '';
+
+        // Restore any existing session from storage
+        this.#loadSession();
+    }
+
+
+    /* =====================================================
+     *  PUBLIC API — These are the ONLY methods developers
+     *  should use. Everything else is truly private.
+     * ===================================================== */
+
+    /**
+     * Redirect to the hosted login page (OAuth 2.0 + PKCE).
+     * Like "Sign in with Google" — your app never sees the password.
+     */
+    login() {
+        if (!this.#clientId) {
+            throw new Error(
+                '[AuthClient] CLIENT_ID is not configured.\n' +
+                'Get one from the Admin Console and set it via environment variable.'
+            );
+        }
+        this.#startOAuthFlow();
     }
 
     /**
-     * Clear session and optionally redirect to login
-     * @param {string} [reason] - Optional reason for logout (e.g. 'revoked')
+     * Clear session and notify listeners.
+     * @param {string} [reason] - Optional reason: 'revoked_by_admin' | 'session_expired' | null
      */
     logout(reason) {
-        this._clearSession();
-        if (this._onAuthChange) this._onAuthChange(false, reason || null);
+        this.#clearSession();
+        if (this.#onAuthChangeCb) this.#onAuthChangeCb(false, reason || null);
     }
 
     /**
-     * Returns true if user has a valid (non-expired) access token
+     * Check if the user has a valid (non-expired) access token.
+     * @returns {boolean}
      */
     isAuthenticated() {
-        if (!this._tokens?.access_token) return false;
+        if (!this.#tokens?.access_token) return false;
         try {
-            const payload = this._decodeJWT(this._tokens.access_token);
+            const payload = AuthClient.#decodeJWT(this.#tokens.access_token);
             return payload.exp * 1000 > Date.now();
         } catch {
             return false;
@@ -84,390 +128,343 @@ class AuthClient {
     }
 
     /**
-     * Get the current user info decoded from the JWT
-     * Returns { email, user_id, app_id, exp, iss } or null
+     * Get current user info decoded from the JWT.
+     * Returns a frozen object — cannot be accidentally mutated.
+     * @returns {{ email: string, user_id: number, app_id: string, issuer: string, expires_at: Date, issued_at: Date } | null}
      */
     getUser() {
-        if (!this._tokens?.access_token) return null;
+        if (!this.#tokens?.access_token) return null;
         try {
-            const payload = this._decodeJWT(this._tokens.access_token);
-            return {
-                email: payload.sub,
-                user_id: payload.user_id,
-                app_id: payload.app_id,
-                issuer: payload.iss,
-                expires_at: new Date(payload.exp * 1000),
-                issued_at: new Date(payload.iat * 1000),
-            };
+            const p = AuthClient.#decodeJWT(this.#tokens.access_token);
+            return Object.freeze({
+                email:      p.sub,
+                user_id:    p.user_id,
+                app_id:     p.app_id,
+                issuer:     p.iss,
+                expires_at: new Date(p.exp * 1000),
+                issued_at:  new Date(p.iat * 1000),
+            });
         } catch {
             return null;
         }
     }
 
     /**
-     * Get the raw access token (for Authorization headers)
+     * Get the raw access token string for Authorization headers.
+     * Usage: fetch(url, { headers: { Authorization: `Bearer ${auth.getAccessToken()}` } })
+     * @returns {string | null}
      */
     getAccessToken() {
-        return this._tokens?.access_token || null;
+        return this.#tokens?.access_token || null;
     }
 
     /**
-     * Refresh the access token using the refresh token
+     * Manually refresh the access token using the stored refresh token.
+     * Normally you don't need this — startAutoRefresh() handles it automatically.
+     * @returns {Promise<boolean>} true if refresh succeeded
      */
     async refreshAccessToken() {
-        if (!this._tokens?.refresh_token) return false;
-
+        if (!this.#tokens?.refresh_token) return false;
         try {
-            const res = await fetch(`${this.authServer}/token/refresh`, {
+            const res = await fetch(this.#authServer + '/token/refresh', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refresh_token: this._tokens.refresh_token }),
+                body: JSON.stringify({ refresh_token: this.#tokens.refresh_token }),
             });
-
             if (res.ok) {
                 const data = await res.json();
-                this._tokens.access_token = data.access_token;
-                this._saveSession();
+                this.#tokens.access_token = data.access_token;
+                this.#saveSession();
                 return true;
             }
         } catch (err) {
-            console.error('[AuthClient] Token refresh failed:', err);
+            console.error('[AuthClient] Token refresh failed:', err.message);
         }
         return false;
     }
 
     /**
-     * Verify the current access token with the server
+     * Verify the current access token with the auth server.
+     * @returns {Promise<Object | null>} decoded payload or null
      */
     async verifyToken() {
-        if (!this._tokens?.access_token) return null;
-
+        if (!this.#tokens?.access_token) return null;
         try {
-            const res = await fetch(`${this.authServer}/token/verify`, {
+            const res = await fetch(this.#authServer + '/token/verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: this._tokens.access_token }),
+                body: JSON.stringify({ token: this.#tokens.access_token }),
             });
             return await res.json();
         } catch (err) {
-            console.error('[AuthClient] Token verify failed:', err);
+            console.error('[AuthClient] Token verify failed:', err.message);
             return null;
         }
     }
 
     /**
-     * Lightweight server-side session check (manual/fallback).
-     * For automatic real-time detection, use startAutoRefresh() which uses SSE.
-     */
-    async checkSession() {
-        if (!this._tokens?.access_token) return false;
-
-        try {
-            const res = await fetch(`${this.authServer}/token/session-check`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ access_token: this._tokens.access_token }),
-            });
-
-            if (res.ok) return true;
-
-            if (res.status === 401) {
-                const data = await res.json().catch(() => ({}));
-                const isAdminRevoke = (data.detail || '').toLowerCase().includes('revoked');
-                if (isAdminRevoke) {
-                    this.logout('revoked_by_admin');
-                    return false;
-                }
-                const refreshed = await this.refreshAccessToken();
-                if (!refreshed) {
-                    this.logout('session_expired');
-                    return false;
-                }
-                return true;
-            }
-            return true;
-        } catch {
-            return true; // Network error — don't log out
-        }
-    }
-
-    /**
-     * Register a callback for auth state changes
-     * callback(isAuthenticated: boolean, reason?: string)
-     * reason is provided on logout: 'revoked_by_admin' | 'session_expired' | null
+     * Register a callback that fires on login/logout events.
+     *
+     * @param {(isAuthenticated: boolean, reason?: string) => void} callback
+     *
+     * The reason parameter on logout:
+     *   'revoked_by_admin' — admin force-logged out the user
+     *   'session_expired'  — tokens expired and refresh failed
+     *   null               — user logged out voluntarily
+     *
+     * Example:
+     *   auth.onAuthChange((loggedIn, reason) => {
+     *     if (!loggedIn && reason === 'revoked_by_admin') {
+     *       showBanner('Your session was ended by an administrator');
+     *     }
+     *   });
      */
     onAuthChange(callback) {
-        this._onAuthChange = callback;
+        this.#onAuthChangeCb = callback;
     }
 
     /**
-     * Handle the OAuth callback if we're returning from the auth platform.
-     * Returns true if a callback was handled, false otherwise.
-     * Call this on page load.
+     * Handle the OAuth redirect callback.
+     * Call this once on page load (or on your callback route).
+     * Returns true if a callback was successfully processed.
+     * @returns {Promise<boolean>}
      */
     async handleCallback() {
         const params = new URLSearchParams(window.location.search);
-        const code = params.get('code');
+        const code  = params.get('code');
         const state = params.get('state');
-
         if (!code || !state) return false;
 
-        // Verify state (CSRF protection)
+        // CSRF protection
         const savedState = sessionStorage.getItem('_auth_state');
         if (state !== savedState) {
             console.error('[AuthClient] State mismatch — possible CSRF attack');
-            this._cleanupOAuthParams();
+            this.#cleanupOAuthParams();
             return false;
         }
 
-        // Get PKCE code_verifier
         const codeVerifier = sessionStorage.getItem('_auth_code_verifier');
         if (!codeVerifier) {
             console.error('[AuthClient] Missing PKCE code_verifier');
-            this._cleanupOAuthParams();
+            this.#cleanupOAuthParams();
             return false;
         }
 
-        // Clean URL
+        // Remove OAuth params from the URL bar
         window.history.replaceState({}, document.title, window.location.pathname);
-        this._cleanupOAuthParams();
+        this.#cleanupOAuthParams();
 
-        // Exchange code for tokens
+        // Exchange authorization code for tokens
         try {
-            const res = await fetch(`${this.authServer}/oauth/token`, {
+            const res = await fetch(this.#authServer + '/oauth/token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    grant_type: 'authorization_code',
-                    code: code,
-                    client_id: this.clientId,
-                    redirect_uri: this.redirectUri,
+                    grant_type:    'authorization_code',
+                    code,
+                    client_id:     this.#clientId,
+                    redirect_uri:  this.#redirectUri,
                     code_verifier: codeVerifier,
                 }),
             });
 
             const data = await res.json();
-
-            if (res.ok) {
-                this._tokens = {
-                    access_token: data.access_token,
-                    refresh_token: data.refresh_token,
-                };
-                this._saveSession();
-                this._startSessionMonitor();
-                this._startSessionStream();
-                if (this._onAuthChange) this._onAuthChange(true);
-                return true;
-            } else {
+            if (!res.ok) {
                 console.error('[AuthClient] Token exchange failed:', data.detail);
                 return false;
             }
+
+            this.#tokens = {
+                access_token:  data.access_token,
+                refresh_token: data.refresh_token,
+            };
+            this.#saveSession();
+            this.#startSessionMonitor();
+            this.#startSessionStream();
+            if (this.#onAuthChangeCb) this.#onAuthChangeCb(true);
+            return true;
         } catch (err) {
-            console.error('[AuthClient] Token exchange error:', err);
+            console.error('[AuthClient] Token exchange error:', err.message);
             return false;
         }
     }
 
     /**
-     * Start automatic session monitoring — auto-refreshes before expiry
-     * AND opens an SSE stream to detect admin-revoked sessions in real time.
+     * Enable automatic session management:
+     *   1. Refreshes the access token before it expires (timer-based)
+     *   2. Opens an SSE stream for real-time admin revocation detection
      *
-     * Uses Server-Sent Events (EventSource) instead of polling:
-     *   Polling:  6 HTTP requests/min per user
-     *   SSE:      1 persistent connection per user, 0 extra requests
+     * Call this AFTER confirming isAuthenticated() === true.
      */
     startAutoRefresh() {
-        this._startSessionMonitor();
-        this._startSessionStream();
+        this.#startSessionMonitor();
+        this.#startSessionStream();
     }
 
     /**
-     * Get seconds until the access token expires
+     * Seconds until the access token expires (0 if expired or missing).
+     * @returns {number}
      */
     getTimeUntilExpiry() {
-        if (!this._tokens?.access_token) return 0;
+        if (!this.#tokens?.access_token) return 0;
         try {
-            const payload = this._decodeJWT(this._tokens.access_token);
-            return Math.max(0, Math.floor((payload.exp * 1000 - Date.now()) / 1000));
+            const p = AuthClient.#decodeJWT(this.#tokens.access_token);
+            return Math.max(0, Math.floor((p.exp * 1000 - Date.now()) / 1000));
         } catch {
             return 0;
         }
     }
 
-    // ==================== Internal: OAuth Flow ====================
 
-    async _startOAuthFlow() {
-        const codeVerifier = this._generateCodeVerifier();
-        const codeChallenge = await this._generateCodeChallenge(codeVerifier);
-        const state = this._generateState();
+    /* =====================================================
+     *  PRIVATE — OAuth Flow
+     * ===================================================== */
 
-        // Store PKCE params for the callback
+    async #startOAuthFlow() {
+        const codeVerifier  = AuthClient.#generateRandom(32);
+        const codeChallenge = await AuthClient.#sha256Base64Url(codeVerifier);
+        const state         = AuthClient.#generateRandom(16);
+
         sessionStorage.setItem('_auth_code_verifier', codeVerifier);
         sessionStorage.setItem('_auth_state', state);
 
-        const params = new URLSearchParams({
-            client_id: this.clientId,
-            redirect_uri: this.redirectUri,
-            response_type: 'code',
-            state: state,
-            code_challenge: codeChallenge,
+        const qs = new URLSearchParams({
+            client_id:             this.#clientId,
+            redirect_uri:          this.#redirectUri,
+            response_type:         'code',
+            state,
+            code_challenge:        codeChallenge,
             code_challenge_method: 'S256',
         });
 
-        window.location.href = `${this.authServer}/oauth/authorize?${params}`;
+        window.location.href = this.#authServer + '/oauth/authorize?' + qs;
     }
 
-    // ==================== Internal: Session Management ====================
 
-    _loadSession() {
+    /* =====================================================
+     *  PRIVATE — Session Storage
+     * ===================================================== */
+
+    #loadSession() {
         try {
-            const saved = sessionStorage.getItem('_auth_tokens');
-            if (saved) this._tokens = JSON.parse(saved);
-        } catch { /* ignore */ }
+            const raw = sessionStorage.getItem('_auth_tokens');
+            if (raw) this.#tokens = JSON.parse(raw);
+        } catch { /* corrupted — ignore */ }
     }
 
-    _saveSession() {
-        sessionStorage.setItem('_auth_tokens', JSON.stringify(this._tokens));
+    #saveSession() {
+        sessionStorage.setItem('_auth_tokens', JSON.stringify(this.#tokens));
     }
 
-    _clearSession() {
-        this._tokens = null;
-        this._user = null;
+    #clearSession() {
+        this.#tokens = null;
         sessionStorage.removeItem('_auth_tokens');
-        this._stopSessionMonitor();
-        this._stopSessionStream();
+        this.#stopSessionMonitor();
+        this.#stopSessionStream();
     }
 
-    _cleanupOAuthParams() {
+    #cleanupOAuthParams() {
         sessionStorage.removeItem('_auth_code_verifier');
         sessionStorage.removeItem('_auth_state');
     }
 
-    _startSessionMonitor() {
-        this._stopSessionMonitor();
-        this._sessionInterval = setInterval(async () => {
-            const ttl = this.getTimeUntilExpiry();
 
+    /* =====================================================
+     *  PRIVATE — Token Auto-Refresh Timer
+     * ===================================================== */
+
+    #startSessionMonitor() {
+        this.#stopSessionMonitor();
+        this.#sessionInterval = setInterval(async () => {
+            const ttl = this.getTimeUntilExpiry();
             if (ttl <= 0) {
-                // Expired — try refresh
-                const refreshed = await this.refreshAccessToken();
-                if (!refreshed) {
-                    console.log('[AuthClient] Session expired, refresh failed');
-                    this.logout();
-                }
+                const ok = await this.refreshAccessToken();
+                if (!ok) this.logout('session_expired');
             } else if (ttl < 120) {
-                // Less than 2 minutes — proactively refresh
-                console.log(`[AuthClient] Token expiring in ${ttl}s, refreshing...`);
                 await this.refreshAccessToken();
             }
-        }, 15000);
+        }, 15_000);
     }
 
-    _stopSessionMonitor() {
-        if (this._sessionInterval) {
-            clearInterval(this._sessionInterval);
-            this._sessionInterval = null;
+    #stopSessionMonitor() {
+        if (this.#sessionInterval) {
+            clearInterval(this.#sessionInterval);
+            this.#sessionInterval = null;
         }
     }
 
-    /**
-     * SSE stream — opens a persistent connection to the server.
-     * The server pushes a 'revoked' event the moment admin force-logouts.
-     * No polling, no wasted requests, instant detection.
-     */
-    _startSessionStream() {
-        this._stopSessionStream();
 
-        if (!this._tokens?.access_token) return;
-        if (typeof EventSource === 'undefined') {
-            // Fallback for environments without EventSource (e.g. old Node)
-            console.warn('[AuthClient] EventSource not available, falling back to manual checkSession()');
-            return;
-        }
+    /* =====================================================
+     *  PRIVATE — SSE Real-Time Revocation Stream
+     *  The server pushes a "revoked" event the instant an
+     *  admin force-logouts the user. Zero polling overhead.
+     * ===================================================== */
 
-        const url = `${this.authServer}/token/session-stream?token=${encodeURIComponent(this._tokens.access_token)}`;
-        this._eventSource = new EventSource(url);
+    #startSessionStream() {
+        this.#stopSessionStream();
+        if (!this.#tokens?.access_token) return;
+        if (typeof EventSource === 'undefined') return;
 
-        // Server pushed a 'revoked' event — admin force-logged us out
-        this._eventSource.addEventListener('revoked', () => {
-            console.warn('[AuthClient] Session revoked by administrator (SSE)');
-            this._stopSessionStream();
+        const url = this.#authServer + '/token/session-stream?token=' + encodeURIComponent(this.#tokens.access_token);
+        this.#eventSource = new EventSource(url);
+
+        this.#eventSource.addEventListener('revoked', () => {
+            this.#stopSessionStream();
             this.logout('revoked_by_admin');
         });
 
-        this._eventSource.addEventListener('connected', () => {
-            console.log('[AuthClient] Session stream connected');
-        });
-
-        // EventSource fires 'error' when:
-        //   - Server returns non-2xx (e.g. 401 expired token) → readyState = CLOSED
-        //   - Network drop → readyState = CONNECTING (auto-reconnects)
-        this._eventSource.onerror = async () => {
-            if (this._eventSource?.readyState === EventSource.CLOSED) {
-                // Server rejected us (token expired)
-                this._stopSessionStream();
-
-                // Try to refresh token and reconnect
-                const refreshed = await this.refreshAccessToken();
-                if (refreshed) {
-                    // Reconnect with new token after brief delay
-                    setTimeout(() => this._startSessionStream(), 2000);
-                } else {
-                    this.logout('session_expired');
-                }
+        this.#eventSource.onerror = async () => {
+            if (this.#eventSource?.readyState === EventSource.CLOSED) {
+                this.#stopSessionStream();
+                const ok = await this.refreshAccessToken();
+                if (ok) setTimeout(() => this.#startSessionStream(), 2000);
+                else    this.logout('session_expired');
             }
-            // If readyState is CONNECTING, EventSource is auto-reconnecting — let it
+            // CONNECTING state = auto-reconnect, let it be
         };
     }
 
-    _stopSessionStream() {
-        if (this._eventSource) {
-            this._eventSource.close();
-            this._eventSource = null;
+    #stopSessionStream() {
+        if (this.#eventSource) {
+            this.#eventSource.close();
+            this.#eventSource = null;
         }
     }
 
-    // ==================== Internal: PKCE Crypto ====================
 
-    _generateCodeVerifier() {
-        const array = new Uint8Array(32);
-        crypto.getRandomValues(array);
-        return this._base64UrlEncode(array);
+    /* =====================================================
+     *  PRIVATE STATIC — Crypto & JWT Utilities
+     * ===================================================== */
+
+    static #generateRandom(bytes) {
+        const arr = new Uint8Array(bytes);
+        crypto.getRandomValues(arr);
+        return AuthClient.#base64Url(arr);
     }
 
-    async _generateCodeChallenge(verifier) {
-        const data = new TextEncoder().encode(verifier);
-        const digest = await crypto.subtle.digest('SHA-256', data);
-        return this._base64UrlEncode(new Uint8Array(digest));
+    static async #sha256Base64Url(plain) {
+        const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(plain));
+        return AuthClient.#base64Url(new Uint8Array(digest));
     }
 
-    _generateState() {
-        const array = new Uint8Array(16);
-        crypto.getRandomValues(array);
-        return this._base64UrlEncode(array);
+    static #base64Url(buf) {
+        let s = '';
+        for (let i = 0; i < buf.length; i++) s += String.fromCharCode(buf[i]);
+        return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     }
 
-    _base64UrlEncode(buffer) {
-        let str = '';
-        const bytes = new Uint8Array(buffer);
-        for (let i = 0; i < bytes.byteLength; i++) {
-            str += String.fromCharCode(bytes[i]);
-        }
-        return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    }
-
-    // ==================== Internal: JWT ====================
-
-    _decodeJWT(token) {
-        const base64Url = token.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    static #decodeJWT(token) {
+        const seg = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
         const json = decodeURIComponent(
-            atob(base64).split('').map(c =>
-                '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-            ).join('')
+            atob(seg).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
         );
         return JSON.parse(json);
     }
 }
 
+
+/* =====================================================
+ *  Export for ES modules (Next.js / Vite / etc.)
+
+ * ===================================================== */
 export default AuthClient;

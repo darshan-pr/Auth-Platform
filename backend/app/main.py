@@ -202,9 +202,12 @@ if static_dir.exists():
 
     @app.get("/api/config", include_in_schema=False)
     async def public_config():
-        """Return public client-side config (e.g. auth server URL) sourced from env."""
+        """Return public client-side config (auth server URL) sourced from env.
+        DOCS_AUTH_SERVER_URL overrides AUTH_SERVER_URL for use in docs & SDK examples.
+        """
         from fastapi.responses import JSONResponse
-        return JSONResponse({"AUTH_SERVER_URL": settings.AUTH_SERVER_URL})
+        docs_url = settings.DOCS_AUTH_SERVER_URL or settings.AUTH_SERVER_URL
+        return JSONResponse({"AUTH_SERVER_URL": docs_url})
     
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
     app.mount("/dashboard", StaticFiles(directory=str(static_dir), html=True), name="admin-dashboard")

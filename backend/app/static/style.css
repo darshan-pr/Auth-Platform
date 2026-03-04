@@ -497,7 +497,7 @@ body.modal-open { overflow: hidden; }
 }
 .bulk-actions-bar.hidden { display: none; }
 .bulk-actions-bar span { font-weight: 600; color: var(--primary); font-size: 0.9rem; }
-.bulk-btns { display: flex; gap: 8px; }
+.bulk-btns { display: flex; gap: 8px; margin-bottom: 10pxˇ; }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 .th-check { width: 40px; text-align: center; }
 .td-check { text-align: center; }
