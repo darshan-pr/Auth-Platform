@@ -318,8 +318,9 @@ def list_apps(
         "tenant_id": app.tenant_id,
         "is_active": True,  # All apps are active by default
         "otp_enabled": app.otp_enabled,
+        "passkey_enabled": app.passkey_enabled,
         "login_notification_enabled": app.login_notification_enabled,
-            "force_logout_notification_enabled": app.force_logout_notification_enabled,
+        "force_logout_notification_enabled": app.force_logout_notification_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days,
         "redirect_uris": app.redirect_uris,
