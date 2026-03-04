@@ -43,10 +43,13 @@ def run_migrations():
         for mig_file in migration_files:
             logger.info(f"Running migration: {mig_file.name}")
             sql = mig_file.read_text()
+            # Strip SQL comment lines before splitting on semicolons
+            cleaned_lines = [line for line in sql.splitlines() if not line.strip().startswith("--")]
+            cleaned_sql = "\n".join(cleaned_lines)
             # Execute each statement separately (split on semicolons)
-            for statement in sql.split(";"):
+            for statement in cleaned_sql.split(";"):
                 statement = statement.strip()
-                if statement and not statement.startswith("--"):
+                if statement:
                     try:
                         conn.execute(text(statement))
                     except Exception as e:
