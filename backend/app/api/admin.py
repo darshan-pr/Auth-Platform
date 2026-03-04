@@ -18,7 +18,7 @@ from app.services.jwt_service import create_access_token, verify_token
 from app.services.jwt_service import is_user_online, force_user_offline
 from app.services.password_service import hash_password, verify_password, generate_reset_token
 from app.services.tenant_service import create_tenant
-from app.services.mail_service import send_set_password_email
+from app.services.mail_service import send_set_password_email, send_force_logout_email
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,7 @@ class AppCreateRequest(BaseModel):
     description: Optional[str] = None
     otp_enabled: bool = True
     login_notification_enabled: bool = False
+    force_logout_notification_enabled: bool = False
     passkey_enabled: bool = False
     access_token_expiry_minutes: int = 30
     refresh_token_expiry_days: int = 7
@@ -54,6 +55,7 @@ class AppUpdateRequest(BaseModel):
     description: Optional[str] = None
     otp_enabled: Optional[bool] = None
     login_notification_enabled: Optional[bool] = None
+    force_logout_notification_enabled: Optional[bool] = None
     passkey_enabled: Optional[bool] = None
     access_token_expiry_minutes: Optional[int] = None
     refresh_token_expiry_days: Optional[int] = None
@@ -247,6 +249,7 @@ def create_app(
             description=request.description,
             otp_enabled=request.otp_enabled,
             login_notification_enabled=request.login_notification_enabled,
+            force_logout_notification_enabled=request.force_logout_notification_enabled,
             passkey_enabled=request.passkey_enabled,
             access_token_expiry_minutes=request.access_token_expiry_minutes,
             refresh_token_expiry_days=request.refresh_token_expiry_days,
@@ -264,6 +267,7 @@ def create_app(
             "tenant_id": app.tenant_id,
             "otp_enabled": app.otp_enabled,
             "login_notification_enabled": app.login_notification_enabled,
+            "force_logout_notification_enabled": app.force_logout_notification_enabled,
             "passkey_enabled": app.passkey_enabled,
             "access_token_expiry_minutes": app.access_token_expiry_minutes,
             "refresh_token_expiry_days": app.refresh_token_expiry_days,
@@ -315,7 +319,7 @@ def list_apps(
         "is_active": True,  # All apps are active by default
         "otp_enabled": app.otp_enabled,
         "login_notification_enabled": app.login_notification_enabled,
-        "passkey_enabled": app.passkey_enabled,
+            "force_logout_notification_enabled": app.force_logout_notification_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days,
         "redirect_uris": app.redirect_uris,
@@ -344,6 +348,7 @@ def get_app(
         "tenant_id": app.tenant_id,
         "otp_enabled": app.otp_enabled,
         "login_notification_enabled": app.login_notification_enabled,
+        "force_logout_notification_enabled": app.force_logout_notification_enabled,
         "passkey_enabled": app.passkey_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days,
@@ -375,6 +380,8 @@ def update_app(
         app.otp_enabled = request.otp_enabled
     if request.login_notification_enabled is not None:
         app.login_notification_enabled = request.login_notification_enabled
+    if request.force_logout_notification_enabled is not None:
+        app.force_logout_notification_enabled = request.force_logout_notification_enabled
     if request.passkey_enabled is not None:
         app.passkey_enabled = request.passkey_enabled
     if request.access_token_expiry_minutes is not None:
@@ -395,6 +402,7 @@ def update_app(
         "tenant_id": app.tenant_id,
         "otp_enabled": app.otp_enabled,
         "login_notification_enabled": app.login_notification_enabled,
+        "force_logout_notification_enabled": app.force_logout_notification_enabled,
         "passkey_enabled": app.passkey_enabled,
         "access_token_expiry_minutes": app.access_token_expiry_minutes,
         "refresh_token_expiry_days": app.refresh_token_expiry_days,
@@ -659,7 +667,7 @@ def force_logout_user(
     admin: Admin = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
-    """Force a user offline – invalidates their session immediately"""
+    """Force a user offline – invalidates their session immediately and sends a notification email"""
     user = db.query(User).filter(
         User.id == user_id,
         User.tenant_id == admin.tenant_id
@@ -668,11 +676,28 @@ def force_logout_user(
         raise HTTPException(status_code=404, detail="User not found")
     
     force_user_offline(user.id, admin.tenant_id)
+
+    # Send notification email if enabled for this app (non-blocking, best-effort)
+    email_sent = False
+    try:
+        app_name = "Auth Platform"
+        send_email = False
+        if user.app_id:
+            app_obj = db.query(App).filter(App.app_id == user.app_id).first()
+            if app_obj:
+                if app_obj.name:
+                    app_name = app_obj.name
+                send_email = app_obj.force_logout_notification_enabled
+        if send_email:
+            email_sent = send_force_logout_email(user.email, app_name)
+    except Exception as e:
+        logger.warning(f"Failed to send force-logout email to {user.email}: {e}")
     
     return {
         "message": f"User {user.email} has been forced offline",
         "user_id": user.id,
-        "is_online": False
+        "is_online": False,
+        "email_sent": email_sent
     }
 
 

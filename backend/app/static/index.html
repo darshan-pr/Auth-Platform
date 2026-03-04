@@ -443,6 +443,13 @@
                             </label>
                             <small>Send an email alert with session details on every successful login</small>
                         </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="appForceLogoutNotification">
+                                <span>Enable Force Logout Notification Email</span>
+                            </label>
+                            <small>Send an email to the user when an admin force-logs them out</small>
+                        </div>
                     </div>
 
                     <div class="form-section">
@@ -569,6 +576,33 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
                 <button class="btn btn-danger" id="deleteConfirmBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Force Logout Confirm Modal -->
+    <div id="forceLogoutModal" class="modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header modal-header-danger">
+                <h3>Force Logout</h3>
+                <button class="modal-close">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body delete-confirm">
+                <div class="delete-icon" style="color:#e74c3c;"><i data-lucide="log-out"></i></div>
+                <p>Are you sure you want to force logout:</p>
+                <p class="delete-target" id="forceLogoutTargetName"></p>
+                <p class="delete-warning">
+                    This will immediately revoke all active sessions for this user.<br>
+                    A notification email will be sent to the user.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('forceLogoutModal')">Cancel</button>
+                <button class="btn btn-danger" id="forceLogoutConfirmBtn">
+                    <i data-lucide="log-out"></i> Force Logout
+                </button>
             </div>
         </div>
     </div>

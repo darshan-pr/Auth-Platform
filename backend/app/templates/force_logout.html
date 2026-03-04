@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Session Revoked</title>
+</head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:40px 0;">
+<tr><td align="center">
+<table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;box-shadow:0 2px 16px rgba(0,0,0,0.08);overflow:hidden;">
+
+    <!-- Header -->
+    <tr>
+        <td style="background:linear-gradient(135deg,#e74c3c 0%,#c0392b 100%);padding:32px 36px;text-align:center;">
+            <div style="width:48px;height:48px;margin:0 auto 12px;background:rgba(255,255,255,0.2);border-radius:12px;line-height:48px;font-size:22px;color:#fff;font-weight:700;">&#x26A0;</div>
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">Session Revoked</h1>
+            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">{{ app_name }}</p>
+        </td>
+    </tr>
+
+    <!-- Body -->
+    <tr>
+        <td style="padding:36px;">
+            <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.6;">Hello,</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#333;line-height:1.6;">
+                Your active session on <strong>{{ app_name }}</strong> has been revoked by an administrator.
+                You have been logged out of all devices.
+            </p>
+
+            <!-- Details Card -->
+            <div style="background:#f8f9fa;border-radius:12px;padding:24px;margin:0 0 24px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="padding:8px 0;font-size:13px;color:#888;width:140px;">Account</td>
+                        <td style="padding:8px 0;font-size:14px;color:#333;font-weight:500;">{{ email }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="border-bottom:1px solid #eee;"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px 0;font-size:13px;color:#888;">Revoked At</td>
+                        <td style="padding:8px 0;font-size:14px;color:#333;font-weight:500;">{{ revoked_at }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="border-bottom:1px solid #eee;"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px 0;font-size:13px;color:#888;">Action</td>
+                        <td style="padding:8px 0;font-size:14px;color:#333;font-weight:500;">Force Logout by Admin</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div style="background:#fef2f2;border-left:4px solid #e74c3c;border-radius:0 8px 8px 0;padding:14px 16px;margin:0 0 24px;">
+                <p style="margin:0;font-size:13px;color:#991b1b;line-height:1.5;">
+                    <strong>What does this mean?</strong> All your active tokens have been invalidated.
+                    You will need to sign in again to continue using {{ app_name }}.
+                </p>
+            </div>
+
+            <div style="background:#eff6ff;border-left:4px solid #3b82f6;border-radius:0 8px 8px 0;padding:14px 16px;margin:0 0 24px;">
+                <p style="margin:0;font-size:13px;color:#1e40af;line-height:1.5;">
+                    If you believe this was done in error, please contact your administrator.
+                </p>
+            </div>
+
+            <p style="margin:0;font-size:13px;color:#888;line-height:1.5;">
+                This is an automated security notification from {{ app_name }}.
+            </p>
+        </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+        <td style="background:#f8f9fa;padding:20px 36px;text-align:center;border-top:1px solid #eee;">
+            <p style="margin:0;font-size:12px;color:#aaa;">
+                Secured by <strong style="color:#667eea;">Auth Platform</strong>
+            </p>
+        </td>
+    </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

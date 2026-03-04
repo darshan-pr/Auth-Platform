@@ -19,6 +19,7 @@ class App(Base):
     refresh_token_expiry_days = Column(Integer, default=7, nullable=False)
     # Email Notification Settings
     login_notification_enabled = Column(Boolean, default=False, nullable=False)
+    force_logout_notification_enabled = Column(Boolean, default=False, nullable=False)
     # Passkey (WebAuthn) Settings
     passkey_enabled = Column(Boolean, default=False, nullable=False)
     # OAuth Settings

@@ -237,3 +237,44 @@ def send_set_password_email(to: str, reset_link: str, app_name: str = "Auth Plat
     except Exception as e:
         logger.error(f"Failed to send set password email to {to}: {str(e)}")
         raise
+
+
+def send_force_logout_email(to: str, app_name: str = "Auth Platform") -> bool:
+    """Send a notification email when an admin force-logouts a user"""
+
+    if DEV_MODE:
+        logger.info(f"[DEV MODE] Force logout notification for {to} on {app_name}")
+        print(f"\n{'='*50}")
+        print(f"[DEV MODE] Force logout notification for {to} on {app_name}")
+        print(f"{'='*50}\n")
+        return True
+
+    try:
+        now = datetime.utcnow()
+        revoked_at = now.strftime("%B %d, %Y at %I:%M %p UTC")
+
+        plain = (
+            f"Hello,\n\n"
+            f"Your active session on {app_name} has been revoked by an administrator.\n\n"
+            f"Account: {to}\n"
+            f"Revoked At: {revoked_at}\n"
+            f"Action: Force Logout by Admin\n\n"
+            f"All your active tokens have been invalidated. "
+            f"You will need to sign in again to continue using {app_name}.\n\n"
+            f"If you believe this was done in error, please contact your administrator.\n\n"
+            f"Best regards,\n{app_name} Team\nSecured by Auth Platform !"
+        )
+        html = _load_template(
+            "force_logout.html",
+            app_name=app_name,
+            email=to,
+            revoked_at=revoked_at,
+        )
+
+        _send_email(to, f"Session Revoked - {app_name}", plain, html)
+        logger.info(f"Force logout notification email sent to {to}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send force logout email to {to}: {str(e)}")
+        # Don't raise — this is non-critical, the force-logout itself already succeeded
+        return False

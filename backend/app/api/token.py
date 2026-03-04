@@ -129,30 +129,37 @@ async def session_stream(token: str):
         # Server-side loop: check Redis blacklist key every 3 seconds.
         # Redis EXISTS is O(1), takes < 1ms. This is NOT expensive.
         heartbeat_counter = 0
-        while True:
-            await asyncio.sleep(3)
-            try:
-                blacklisted = await asyncio.to_thread(
-                    is_user_blacklisted, user_id, tenant_id
-                )
-                if blacklisted:
-                    yield "event: revoked\ndata: {\"reason\": \"revoked_by_admin\"}\n\n"
-                    return
-            except Exception:
-                pass  # Redis hiccup — keep connection alive, retry next cycle
+        try:
+            while True:
+                await asyncio.sleep(3)
+                try:
+                    blacklisted = await asyncio.to_thread(
+                        is_user_blacklisted, user_id, tenant_id
+                    )
+                    if blacklisted:
+                        yield "event: revoked\ndata: {\"reason\": \"revoked_by_admin\"}\n\n"
+                        return
+                except Exception:
+                    pass  # Redis hiccup — keep connection alive, retry next cycle
 
-            # Send a heartbeat comment every ~30s to keep proxies/LBs happy
-            heartbeat_counter += 1
-            if heartbeat_counter >= 10:
-                yield ": heartbeat\n\n"
-                heartbeat_counter = 0
+                # Send a heartbeat comment every ~15s to keep proxies/LBs happy
+                # (Railway, Render, Nginx all have proxy read timeouts; 15s is safe)
+                heartbeat_counter += 1
+                if heartbeat_counter >= 5:
+                    yield ": heartbeat\n\n"
+                    heartbeat_counter = 0
+        except asyncio.CancelledError:
+            # Client disconnected — clean up gracefully
+            return
 
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx/proxy buffering
+            "X-Accel-Buffering": "no",       # Disable Nginx proxy buffering
+            "X-Content-Type-Options": "nosniff",
+            "Transfer-Encoding": "chunked",   # Force chunked encoding for proxies
         },
     )

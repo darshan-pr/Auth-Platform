@@ -288,6 +288,7 @@ function showCreateAppModal() {
     document.getElementById('appOtpEnabled').checked = true;
     document.getElementById('appPasskeyEnabled').checked = false;
     document.getElementById('appLoginNotification').checked = false;
+    document.getElementById('appForceLogoutNotification').checked = false;
     document.getElementById('appAccessTokenExpiry').value = 30;
     document.getElementById('appRefreshTokenExpiry').value = 7;
     document.getElementById('appRedirectUris').value = '';
@@ -306,6 +307,7 @@ function editApp(appId) {
     document.getElementById('appOtpEnabled').checked = app.otp_enabled !== false;
     document.getElementById('appPasskeyEnabled').checked = app.passkey_enabled === true;
     document.getElementById('appLoginNotification').checked = app.login_notification_enabled === true;
+    document.getElementById('appForceLogoutNotification').checked = app.force_logout_notification_enabled === true;
     document.getElementById('appAccessTokenExpiry').value = app.access_token_expiry_minutes || 30;
     document.getElementById('appRefreshTokenExpiry').value = app.refresh_token_expiry_days || 7;
     document.getElementById('appRedirectUris').value = app.redirect_uris || '';
@@ -318,6 +320,7 @@ async function saveApp() {
     const otp_enabled = document.getElementById('appOtpEnabled').checked;
     const passkey_enabled = document.getElementById('appPasskeyEnabled').checked;
     const login_notification_enabled = document.getElementById('appLoginNotification').checked;
+    const force_logout_notification_enabled = document.getElementById('appForceLogoutNotification').checked;
     const access_token_expiry_minutes = parseInt(document.getElementById('appAccessTokenExpiry').value) || 30;
     const refresh_token_expiry_days = parseInt(document.getElementById('appRefreshTokenExpiry').value) || 7;
     const redirect_uris = document.getElementById('appRedirectUris').value.trim();
@@ -325,7 +328,7 @@ async function saveApp() {
     if (!name) { showToast('Please enter an app name', 'error'); return; }
 
     try {
-        const body = { name, description, otp_enabled, passkey_enabled, login_notification_enabled, access_token_expiry_minutes, refresh_token_expiry_days };
+        const body = { name, description, otp_enabled, passkey_enabled, login_notification_enabled, force_logout_notification_enabled, access_token_expiry_minutes, refresh_token_expiry_days };
         if (redirect_uris) body.redirect_uris = redirect_uris;
 
         let response;
@@ -584,28 +587,53 @@ function confirmDeleteUser(userId, email) {
     openModal('deleteModal');
 }
 
-// Force-logout from table action button
+// Force-logout from table action button — shows confirmation dialog first
 async function forceLogoutUserById(userId, email) {
-    try {
-        const response = await fetch(`${API_URL}/admin/users/${userId}/force-logout`, { method: 'POST' });
-        if (response.ok) {
-            showToast(`${email} has been forced offline`, 'success');
-            loadUsers();
-            loadDashboard();
-        } else {
-            const data = await response.json();
-            showToast(data.detail || 'Failed to force logout', 'error');
-        }
-    } catch { showToast('Failed to force logout', 'error'); }
+    confirmForceLogout(userId, email);
 }
 
-// Force-logout from edit modal
+// Show force-logout confirmation dialog
+function confirmForceLogout(userId, email) {
+    document.getElementById('forceLogoutTargetName').textContent = email;
+    document.getElementById('forceLogoutConfirmBtn').onclick = async () => {
+        // Disable button to prevent double-click
+        const btn = document.getElementById('forceLogoutConfirmBtn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader"></i> Logging out...';
+        renderIcons();
+
+        try {
+            const response = await fetch(`${API_URL}/admin/users/${userId}/force-logout`, { method: 'POST' });
+            if (response.ok) {
+                const data = await response.json();
+                closeModal('forceLogoutModal');
+                const emailNote = data.email_sent ? ' (notification email sent)' : '';
+                showToast(`${email} has been forced offline${emailNote}`, 'success');
+                loadUsers();
+                loadDashboard();
+            } else {
+                const data = await response.json();
+                showToast(data.detail || 'Failed to force logout', 'error');
+            }
+        } catch {
+            showToast('Failed to force logout', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            renderIcons();
+        }
+    };
+    openModal('forceLogoutModal');
+}
+
+// Force-logout from edit modal — shows confirmation dialog first
 async function forceLogoutUser() {
     if (!editingUserId) return;
     const user = users.find(u => u.id === editingUserId);
     const email = user ? user.email : '';
-    await forceLogoutUserById(editingUserId, email);
     closeModal('userModal');
+    confirmForceLogout(editingUserId, email);
 }
 
 // ==================== Modals ====================
