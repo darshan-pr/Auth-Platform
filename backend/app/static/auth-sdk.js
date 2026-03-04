@@ -39,6 +39,7 @@ class AuthClient {
         this._user = null;
         this._onAuthChange = null;
         this._sessionInterval = null;
+        this._eventSource = null;
 
         // Load tokens from session storage
         this._loadSession();
@@ -62,10 +63,11 @@ class AuthClient {
 
     /**
      * Clear session and optionally redirect to login
+     * @param {string} [reason] - Optional reason for logout (e.g. 'revoked_by_admin')
      */
-    logout() {
+    logout(reason) {
         this._clearSession();
-        if (this._onAuthChange) this._onAuthChange(false);
+        if (this._onAuthChange) this._onAuthChange(false, reason || null);
     }
 
     /**
@@ -154,8 +156,45 @@ class AuthClient {
     }
 
     /**
+     * Lightweight server-side session check.
+     * Returns true if the session is still active, false if revoked/expired.
+     * When false, the user is automatically logged out.
+     */
+    async checkSession() {
+        if (!this._tokens?.access_token) return false;
+
+        try {
+            const res = await fetch(`${this.authServer}/token/session-check`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ access_token: this._tokens.access_token }),
+            });
+
+            if (res.ok) return true;
+
+            if (res.status === 401) {
+                const data = await res.json().catch(() => ({}));
+                const isAdminRevoke = (data.detail || '').toLowerCase().includes('revoked');
+                if (isAdminRevoke) {
+                    this.logout('revoked_by_admin');
+                    return false;
+                }
+                const refreshed = await this.refreshAccessToken();
+                if (!refreshed) {
+                    this.logout('session_expired');
+                    return false;
+                }
+                return true;
+            }
+            return true;
+        } catch {
+            return true;
+        }
+    }
+
+    /**
      * Register a callback for auth state changes
-     * callback(isAuthenticated: boolean)
+     * callback(isAuthenticated: boolean, reason?: string)
      */
     onAuthChange(callback) {
         this._onAuthChange = callback;
@@ -216,6 +255,7 @@ class AuthClient {
                 };
                 this._saveSession();
                 this._startSessionMonitor();
+                this._startSessionStream();
                 if (this._onAuthChange) this._onAuthChange(true);
                 return true;
             } else {
@@ -230,9 +270,11 @@ class AuthClient {
 
     /**
      * Start automatic session monitoring — auto-refreshes before expiry
+     * AND opens an SSE stream to detect admin-revoked sessions in real time.
      */
     startAutoRefresh() {
         this._startSessionMonitor();
+        this._startSessionStream();
     }
 
     /**
@@ -289,6 +331,7 @@ class AuthClient {
         this._user = null;
         sessionStorage.removeItem('_auth_tokens');
         this._stopSessionMonitor();
+        this._stopSessionStream();
     }
 
     _cleanupOAuthParams() {
@@ -320,6 +363,53 @@ class AuthClient {
         if (this._sessionInterval) {
             clearInterval(this._sessionInterval);
             this._sessionInterval = null;
+        }
+    }
+
+    /**
+     * SSE stream — opens a persistent connection to the server.
+     * The server pushes a 'revoked' event the moment admin force-logouts.
+     * No polling, no wasted requests, instant detection.
+     */
+    _startSessionStream() {
+        this._stopSessionStream();
+
+        if (!this._tokens?.access_token) return;
+        if (typeof EventSource === 'undefined') {
+            console.warn('[AuthClient] EventSource not available, falling back to manual checkSession()');
+            return;
+        }
+
+        const url = `${this.authServer}/token/session-stream?token=${encodeURIComponent(this._tokens.access_token)}`;
+        this._eventSource = new EventSource(url);
+
+        this._eventSource.addEventListener('revoked', () => {
+            console.warn('[AuthClient] Session revoked by administrator (SSE)');
+            this._stopSessionStream();
+            this.logout('revoked_by_admin');
+        });
+
+        this._eventSource.addEventListener('connected', () => {
+            console.log('[AuthClient] Session stream connected');
+        });
+
+        this._eventSource.onerror = async () => {
+            if (this._eventSource?.readyState === EventSource.CLOSED) {
+                this._stopSessionStream();
+                const refreshed = await this.refreshAccessToken();
+                if (refreshed) {
+                    setTimeout(() => this._startSessionStream(), 2000);
+                } else {
+                    this.logout('session_expired');
+                }
+            }
+        };
+    }
+
+    _stopSessionStream() {
+        if (this._eventSource) {
+            this._eventSource.close();
+            this._eventSource = null;
         }
     }
 

@@ -19,6 +19,7 @@ interface AuthContextType {
   logout: () => void;
   loading: boolean;
   authClient: any;
+  logoutReason: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [logoutReason, setLogoutReason] = useState<string | null>(null);
 
   // Initialize auth client
   useEffect(() => {
@@ -49,15 +51,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (authenticated) {
           setUser(client.getUser());
+          // Start polling the server for session validity
+          // This is what catches admin-revoked sessions
+          client.startAutoRefresh();
         }
 
-        // Register auth change callback
-        client.onAuthChange((authenticated: boolean) => {
+        // Register auth change callback — receives (isAuth, reason?)
+        client.onAuthChange((authenticated: boolean, reason?: string) => {
           setIsAuthenticated(authenticated);
           if (authenticated) {
             setUser(client.getUser());
+            setLogoutReason(null);
           } else {
             setUser(null);
+            if (reason) {
+              setLogoutReason(reason);
+            }
           }
         });
 
@@ -82,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authClient.logout();
       setUser(null);
       setIsAuthenticated(false);
+      setLogoutReason(null);
     }
   }, [authClient]);
 
@@ -94,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         loading,
         authClient,
+        logoutReason,
       }}
     >
       {children}

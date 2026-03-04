@@ -2,11 +2,13 @@
 
 import { useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function LoginPage() {
   const { isAuthenticated, login, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const revokedByAdmin = searchParams.get('reason') === 'revoked';
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
@@ -33,6 +35,21 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="max-w-md w-full space-y-8 p-10 bg-white rounded-xl shadow-2xl">
+        {/* Admin revocation notice */}
+        {revokedByAdmin && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+            <div className="flex items-center justify-center space-x-2 mb-1">
+              <svg className="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
+              <p className="text-sm font-semibold text-red-800">Session Revoked</p>
+            </div>
+            <p className="text-xs text-red-600">
+              Your session was ended by an administrator. Please sign in again.
+            </p>
+          </div>
+        )}
+
         <div className="text-center">
           <div className="mx-auto h-16 w-16 bg-indigo-600 rounded-full flex items-center justify-center">
             <svg

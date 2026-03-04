@@ -5,15 +5,20 @@ import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
-  const { isAuthenticated, user, logout, loading, authClient } = useAuth();
+  const { isAuthenticated, user, logout, loading, authClient, logoutReason } = useAuth();
   const router = useRouter();
   const [timeUntilExpiry, setTimeUntilExpiry] = useState<number | null>(null);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push('/');
+      // Redirect to login — pass reason as query param so the login page can show a message
+      if (logoutReason === 'revoked_by_admin') {
+        router.push('/?reason=revoked');
+      } else {
+        router.push('/');
+      }
     }
-  }, [isAuthenticated, loading, router]);
+  }, [isAuthenticated, loading, router, logoutReason]);
 
   useEffect(() => {
     if (authClient) {

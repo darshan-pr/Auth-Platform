@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+
+ARG NEXT_PUBLIC_AUTH_SERVER=http://localhost:8000
+ARG NEXT_PUBLIC_CLIENT_ID=client-id-placeholder
+ARG NEXT_PUBLIC_REDIRECT_URI=http://localhost:3000/callback
+
+ENV NEXT_PUBLIC_AUTH_SERVER=${NEXT_PUBLIC_AUTH_SERVER}
+ENV NEXT_PUBLIC_CLIENT_ID=${NEXT_PUBLIC_CLIENT_ID}
+ENV NEXT_PUBLIC_REDIRECT_URI=${NEXT_PUBLIC_REDIRECT_URI}
+
+COPY next-app/package*.json ./
+RUN npm ci
+
+COPY next-app ./
+RUN npm run build
+
+EXPOSE 3000
+
+CMD ["npm", "run", "start", "--", "-H", "0.0.0.0", "-p", "3000"]

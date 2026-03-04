@@ -107,6 +107,12 @@ def refresh_token(db, refresh_token_str: str) -> dict:
     if not payload or payload.get("type") != "refresh":
         raise ValueError("Invalid refresh token")
     
+    # Check if user has been force-logged-out by admin
+    uid = payload.get("user_id")
+    tid = payload.get("tenant_id")
+    if uid and tid and is_user_blacklisted(uid, tid):
+        raise ValueError("Session has been revoked by administrator")
+    
     # Get app-specific settings if app_id is in the token
     access_expires = None
     app_id = payload.get("app_id")
@@ -131,9 +137,15 @@ def refresh_token(db, refresh_token_str: str) -> dict:
     }
 
 def revoke_token(db, token: str) -> dict:
-    """Revoke a token (placeholder - implement with Redis blacklist)"""
-    # TODO: Implement token blacklisting with Redis
-    return {"message": "Token revoked"}
+    """Revoke a token — blacklists the user so all their tokens are rejected."""
+    payload = verify_token(token)
+    if not payload:
+        return {"message": "Token already invalid"}
+    uid = payload.get("user_id")
+    tid = payload.get("tenant_id")
+    if uid and tid:
+        force_user_offline(uid, tid)
+    return {"message": "Token revoked — user has been force-logged-out"}
 
 
 # ============== Online Presence (Redis) ==============
@@ -167,6 +179,8 @@ def force_user_offline(user_id: int, tenant_id: int):
         # Also set a blacklist flag so token verify can reject
         bl_key = f"user_blacklist:{tenant_id}:{user_id}"
         redis_client.setex(bl_key, 86400, "1")  # blacklisted for 24h
+        # Publish to Redis pub/sub for real-time SSE notification
+        redis_client.publish(f"force_logout:{tenant_id}:{user_id}", "revoked")
     except Exception:
         pass
 
