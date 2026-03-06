@@ -236,6 +236,11 @@
                         <h2>Dashboard</h2>
                         <p class="page-desc">Overview of your auth platform</p>
                     </div>
+                    <div class="page-actions">
+                        <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage()" title="Refresh">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
+                    </div>
                 </header>
 
                 <div class="stats-grid">
@@ -318,13 +323,20 @@
                         <p class="page-desc">Manage registered OAuth applications</p>
                     </div>
                     <div class="page-actions">
-                        <div class="search-wrap">
-                            <i data-lucide="search" class="search-icon"></i>
-                            <input type="text" id="appSearch" placeholder="Search apps..." class="search-input" oninput="filterApps()">
+                        <div class="search-row">
+                            <div class="search-wrap">
+                                <i data-lucide="search" class="search-icon"></i>
+                                <input type="text" id="appSearch" placeholder="Search apps..." class="search-input" oninput="filterApps()">
+                            </div>
+                            <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage()" title="Refresh">
+                                <i data-lucide="refresh-cw"></i>
+                            </button>
                         </div>
-                        <button class="btn btn-primary" onclick="showCreateAppModal()">
-                            <i data-lucide="plus"></i> New App
-                        </button>
+                        <div class="filter-row">
+                            <button class="btn btn-primary" style="flex:1" onclick="showCreateAppModal()">
+                                <i data-lucide="plus"></i> New App
+                            </button>
+                        </div>
                     </div>
                 </header>
                 <div class="table-container">
@@ -357,19 +369,26 @@
                         <p class="page-desc">Manage authenticated users</p>
                     </div>
                     <div class="page-actions">
-                        <div class="filter-wrap">
-                            <i data-lucide="filter" class="filter-icon"></i>
-                            <select id="userAppFilter" class="filter-select" onchange="onAppFilterChange()">
-                                <option value="">All Applications</option>
-                            </select>
+                        <div class="search-row">
+                            <div class="search-wrap">
+                                <i data-lucide="search" class="search-icon"></i>
+                                <input type="text" id="userSearch" placeholder="Search users..." class="search-input" oninput="filterUsers()">
+                            </div>
+                            <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage()" title="Refresh">
+                                <i data-lucide="refresh-cw"></i>
+                            </button>
                         </div>
-                        <div class="search-wrap">
-                            <i data-lucide="search" class="search-icon"></i>
-                            <input type="text" id="userSearch" placeholder="Search users..." class="search-input" oninput="filterUsers()">
+                        <div class="filter-row">
+                            <div class="filter-wrap" style="flex:1">
+                                <i data-lucide="filter" class="filter-icon"></i>
+                                <select id="userAppFilter" class="filter-select" onchange="onAppFilterChange()">
+                                    <option value="">All Applications</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" onclick="showCreateUserModal()">
+                                <i data-lucide="user-plus"></i> Add User
+                            </button>
                         </div>
-                        <button class="btn btn-primary" onclick="showCreateUserModal()">
-                            <i data-lucide="user-plus"></i> Add User
-                        </button>
                     </div>
                 </header>
 
@@ -377,14 +396,14 @@
                 <div id="bulkActionsBar" class="bulk-actions-bar hidden">
                     <span id="bulkSelectedCount">0 selected</span>
                     <div class="bulk-btns">
-                        <button class="btn btn-sm btn-warning" onclick="bulkAction('set-inactive')">
-                            <i data-lucide="user-x"></i> Set Inactive
+                        <button class="btn btn-sm btn-warning" onclick="bulkAction('set-inactive')" title="Set Inactive">
+                            <i data-lucide="user-x"></i> <span class="bulk-btn-label">Set Inactive</span>
                         </button>
-                        <button class="btn btn-sm btn-danger-outline"  onclick="bulkAction('force-logout')">
-                            <i data-lucide="log-out"></i> Force Logout
+                        <button class="btn btn-sm btn-danger-outline" onclick="bulkAction('force-logout')" title="Force Logout">
+                            <i data-lucide="log-out"></i> <span class="bulk-btn-label">Force Logout</span>
                         </button>
-                        <button class="btn btn-sm btn-danger" onclick="bulkAction('delete')">
-                            <i data-lucide="trash-2"></i> Delete
+                        <button class="btn btn-sm btn-danger" onclick="bulkAction('delete')" title="Delete">
+                            <i data-lucide="trash-2"></i> <span class="bulk-btn-label">Delete</span>
                         </button>
                     </div>
                 </div>

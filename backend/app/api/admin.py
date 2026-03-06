@@ -533,13 +533,14 @@ def create_user(
     if not app:
         raise HTTPException(status_code=400, detail="App not found in your tenant")
     
-    # Check if user already exists in this tenant
+    # Check if user already exists in this app (same email can exist in different apps)
     existing = db.query(User).filter(
         User.email == request.email,
-        User.tenant_id == admin.tenant_id
+        User.tenant_id == admin.tenant_id,
+        User.app_id == request.app_id
     ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="User with this email already exists in this tenant")
+        raise HTTPException(status_code=400, detail="User with this email already exists in this app")
     
     user = User(
         email=request.email,

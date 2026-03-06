@@ -6,7 +6,7 @@ from app.db import Base
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
-        UniqueConstraint('email', 'tenant_id', name='uq_user_email_tenant'),
+        UniqueConstraint('email', 'tenant_id', 'app_id', name='uq_user_email_tenant_app'),
     )
 
     id = Column(Integer, primary_key=True, index=True)

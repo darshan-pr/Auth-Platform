@@ -75,15 +75,16 @@ def signup(request: SignupRequest, db: Session = Depends(get_db)):
             detail="App credentials are required for signup"
         )
     
-    # Check if user already exists for this tenant
+    # Check if user already exists for this app within tenant
     existing_user = db.query(User).filter(
         User.email == request.email,
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == request.app_id
     ).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email already exists for this tenant"
+            detail="User with this email already exists for this app"
         )
     
     # Create user with hashed password
@@ -119,10 +120,11 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
             detail="App credentials are required for login"
         )
     
-    # Find user for this tenant
+    # Find user for this app within tenant
     user = db.query(User).filter(
         User.email == request.email,
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == request.app_id
     ).first()
     if not user:
         raise HTTPException(
@@ -210,10 +212,11 @@ def login_verify_otp(request: LoginOTPVerifyRequest, db: Session = Depends(get_d
             detail="Invalid or expired OTP"
         )
     
-    # Get user for this tenant
+    # Get user for this app within tenant
     user = db.query(User).filter(
         User.email == request.email,
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == request.app_id
     ).first()
     if not user:
         raise HTTPException(
@@ -257,10 +260,11 @@ def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db
             detail="App credentials are required"
         )
     
-    # Check if user exists for this tenant
+    # Check if user exists for this app within tenant
     user = db.query(User).filter(
         User.email == request.email,
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == request.app_id
     ).first()
     
     if not user:
@@ -315,10 +319,11 @@ def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db))
             detail="App credentials are required"
         )
     
-    # Get user for this tenant
+    # Get user for this app within tenant
     user = db.query(User).filter(
         User.email == request.email,
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == request.app_id
     ).first()
     
     if not user:
@@ -389,10 +394,11 @@ def set_password(request: SetPasswordRequest, db: Session = Depends(get_db)):
             detail="Invalid or expired link. Please contact your administrator for a new invite."
         )
 
-    # Find the user
+    # Find the user within this app
     user = db.query(User).filter(
         User.email == request.email,
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == request.app_id
     ).first()
     if not user:
         raise HTTPException(
@@ -454,11 +460,12 @@ def verify(request: OTPVerifyRequest, db: Session = Depends(get_db)):
             detail="Invalid or expired OTP"
         )
     
-    # Check if user exists for this tenant, create if not
+    # Check if user exists for this app within tenant, create if not
     if app:
         user = db.query(User).filter(
             User.email == request.email,
-            User.tenant_id == app.tenant_id
+            User.tenant_id == app.tenant_id,
+            User.app_id == request.app_id
         ).first()
     else:
         user = db.query(User).filter(User.email == request.email).first()

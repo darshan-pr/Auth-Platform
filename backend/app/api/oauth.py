@@ -202,10 +202,11 @@ def authenticate(req: AuthenticateRequest, db: Session = Depends(get_db)):
 
 def _handle_signup(req: AuthenticateRequest, session: dict, app: App, db: Session):
     """Create a new user account"""
-    # Check if user exists for this specific tenant
+    # Check if user exists for this specific app within tenant
     existing = db.query(User).filter(
         User.email == req.email,
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == session["client_id"]
     ).first()
     if existing:
         raise HTTPException(
@@ -245,7 +246,8 @@ def _handle_login(req: AuthenticateRequest, session: dict, app: App, db: Session
     """Verify email + password, then either issue code or request OTP"""
     user = db.query(User).filter(
         User.email == req.email,
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == session["client_id"]
     ).first()
     if not user or not user.password_hash:
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -294,7 +296,8 @@ def _handle_verify_otp(req: AuthenticateRequest, session: dict, app: App, db: Se
 
     user = db.query(User).filter(
         User.email == req.email,
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == session["client_id"]
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -306,7 +309,8 @@ def _handle_forgot_password(req: AuthenticateRequest, session: dict, app: App, d
     """Send password reset OTP to user's email"""
     user = db.query(User).filter(
         User.email == req.email,
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == session["client_id"]
     ).first()
     if not user or not user.password_hash:
         raise HTTPException(
@@ -340,7 +344,8 @@ def _handle_reset_password(req: AuthenticateRequest, session: dict, app: App, db
 
     user = db.query(User).filter(
         User.email == req.email,
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == session["client_id"]
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -366,7 +371,8 @@ def _handle_passkey_register_begin(req: AuthenticateRequest, session: dict, app:
 
     user = db.query(User).filter(
         User.email == req.email,
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == session["client_id"]
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found. Please sign up first.")
@@ -398,7 +404,8 @@ def _handle_passkey_register_complete(req: AuthenticateRequest, session: dict, a
 
     user = db.query(User).filter(
         User.email == req.email,
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == session["client_id"]
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -602,10 +609,11 @@ def token_exchange(req: TokenExchangeRequest, db: Session = Depends(get_db)):
     # Get app for token expiry settings and tenant context
     app = db.query(App).filter(App.app_id == req.client_id).first()
 
-    # Get user for this tenant
+    # Get user for this tenant and app
     user = db.query(User).filter(
         User.email == code_data["user_email"],
-        User.tenant_id == app.tenant_id
+        User.tenant_id == app.tenant_id,
+        User.app_id == req.client_id
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

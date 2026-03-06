@@ -194,6 +194,9 @@ body.modal-open { overflow: hidden; }
 .page-desc { font-size: 0.875rem; color: var(--text-secondary); margin-top: 4px; }
 
 .page-actions { display: flex; gap: 12px; align-items: center; }
+/* On desktop, search-row/filter-row are just transparent flex pass-throughs */
+.page-actions .search-row,
+.page-actions .filter-row { display: contents; }
 
 .filter-wrap { position: relative; display: inline-block; }
 
@@ -470,6 +473,14 @@ body.modal-open { overflow: hidden; }
 
 .btn-secondary { background: #f1f5f9; color: var(--text); border: 1px solid var(--border); }
 .btn-secondary:hover { background: #e8edf5; }
+.btn-secondary svg { color: var(--text-secondary); }
+.btn-secondary:hover svg { color: var(--primary); }
+
+/* Icon-only refresh button */
+.btn-icon-text { padding: 9px 12px; min-width: 40px; }
+.btn-icon-text svg { width: 16px; height: 16px; transition: transform 0.3s ease; }
+.btn-icon-text:hover svg { transform: rotate(180deg); }
+.btn-icon-text:active svg { transform: rotate(360deg); }
 
 .btn-outline { background: var(--surface); color: var(--text); border: 1.5px solid var(--border); }
 .btn-outline:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
@@ -494,10 +505,13 @@ body.modal-open { overflow: hidden; }
     border-radius: var(--radius);
     box-shadow: 0 2px 8px rgba(99,102,241,0.12);
     animation: slideDown 0.2s ease;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 .bulk-actions-bar.hidden { display: none; }
-.bulk-actions-bar span { font-weight: 600; color: var(--primary); font-size: 0.9rem; }
-.bulk-btns { display: flex; gap: 8px; }
+.bulk-actions-bar span { font-weight: 600; color: var(--primary); font-size: 0.9rem; white-space: nowrap; }
+.bulk-btns { display: flex; gap: 8px; flex-wrap: nowrap; }
+.bulk-btns .btn { white-space: nowrap; }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 .th-check { width: 40px; text-align: center; }
 .td-check { text-align: center; }
@@ -909,12 +923,31 @@ body.mobile-adaptive .checkbox-label input[type="checkbox"] { margin-top: 2px; f
     }
     .page-header h2 { font-size: 1.3rem; }
 
-    .page-actions { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; }
-    .page-actions .search-wrap,
-    .page-actions .filter-wrap { flex: 1 1 100%; }
-    .page-actions .search-input,
+    .page-actions { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; align-items: center; }
+
+    /* Search + Refresh: side by side, search takes remaining space */
+    .page-actions .search-wrap { flex: 1 1 0; min-width: 0; }
+    .page-actions .search-input { width: 100%; }
+
+    /* Filter + New-User/New-App: side by side */
+    .page-actions .filter-wrap { flex: 1 1 0; min-width: 0; }
     .page-actions .filter-select { width: 100%; }
-    .page-actions .btn { flex: 1 1 100%; }
+
+    /* Primary action button: inline with filter */
+    .page-actions .btn-primary { flex: 0 0 auto; }
+
+    /* Refresh icon: compact, never stretches */
+    .page-actions .btn-icon-text { flex: 0 0 40px; padding: 9px 0; justify-content: center; }
+
+    /* Full-width row helpers for wrapping */
+    .page-actions .search-row { display: flex; gap: 8px; width: 100%; align-items: center; }
+    .page-actions .filter-row { display: flex; gap: 8px; width: 100%; align-items: center; }
+
+    /* Bulk actions bar: icon-only buttons on mobile, count on left */
+    .bulk-actions-bar { padding: 8px 12px; gap: 8px; }
+    .bulk-btn-label { display: none; }
+    .bulk-btns .btn { padding: 7px 10px; min-width: 36px; justify-content: center; }
+    .bulk-btns { gap: 6px; margin-left: auto; }
 
     /* Scrollable table — wrapper div handles scroll on mobile */
     .table-scroll-wrap {
@@ -980,4 +1013,198 @@ body.mobile-adaptive .checkbox-label input[type="checkbox"] { margin-top: 2px; f
     .stat-value     { font-size: 1.3rem; }
     .page-header h2 { font-size: 1.15rem; }
     .stats-grid     { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   SPA-like Page Transitions & Skeleton Loading
+   ============================================================ */
+
+/* Page transition animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-8px); }
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.page {
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.page.active {
+    animation: fadeIn 0.2s ease forwards;
+}
+
+.page.transitioning-out {
+    animation: fadeOut 0.12s ease forwards;
+}
+
+/* Content fade transitions */
+.fade-content {
+    transition: opacity 0.15s ease;
+}
+
+.fade-content.loading {
+    opacity: 0.5;
+}
+
+/* Skeleton loading styles */
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.skeleton {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite ease-in-out;
+    border-radius: 4px;
+}
+
+.skeleton-row {
+    display: flex;
+    gap: 16px;
+    padding: 14px 18px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.skeleton-cell {
+    height: 16px;
+    border-radius: 4px;
+}
+
+.skeleton-cell.sm { width: 60px; }
+.skeleton-cell.md { width: 120px; }
+.skeleton-cell.lg { width: 180px; }
+.skeleton-cell.xl { width: 240px; }
+
+.skeleton-stat {
+    height: 48px;
+    width: 60px;
+    border-radius: 8px;
+}
+
+.skeleton-badge {
+    height: 22px;
+    width: 70px;
+    border-radius: 12px;
+}
+
+/* Table skeleton rows */
+.data-table .skeleton-row td {
+    padding: 14px 18px;
+}
+
+/* Stat card skeleton */
+.stat-card.skeleton-card .stat-value {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite ease-in-out;
+    width: 60px;
+    height: 38px;
+    border-radius: 6px;
+    color: transparent;
+}
+
+/* Smooth number transitions */
+.stat-value {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stat-value.updating {
+    transform: scale(1.05);
+}
+
+/* Table row transitions */
+.data-table tbody tr {
+    transition: background 0.12s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+.data-table tbody tr.new-row {
+    animation: slideIn 0.3s ease forwards;
+}
+
+.data-table tbody tr.removing {
+    opacity: 0;
+    transform: translateX(-20px);
+}
+
+/* Button loading states */
+.btn.loading {
+    position: relative;
+    color: transparent;
+    pointer-events: none;
+}
+
+.btn.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin: -8px 0 0 -8px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Instant navigation feedback */
+.nav-item {
+    transition: all 0.15s ease;
+}
+
+.nav-item:active {
+    transform: scale(0.97);
+}
+
+/* Smooth content updates */
+.table-container {
+    transition: opacity 0.15s ease;
+}
+
+.table-container.refreshing {
+    opacity: 0.7;
+}
+
+/* Toast animations */
+@keyframes toastSlideIn {
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastSlideOut {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(100%); }
+}
+
+.toast {
+    animation: toastSlideIn 0.25s ease forwards;
+}
+
+.toast.removing {
+    animation: toastSlideOut 0.2s ease forwards;
+}
+
+/* Quick pulse for updates */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.pulse-update {
+    animation: pulse 0.4s ease;
 }

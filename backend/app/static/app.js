@@ -169,21 +169,71 @@ function setupNavigation() {
 }
 
 function navigateTo(page) {
-    currentPage = page;
-
+    if (currentPage === page) return; // Already on this page
+    
+    const currentPageEl = document.getElementById(`${currentPage}Page`);
+    const newPageEl = document.getElementById(`${page}Page`);
+    
+    // Update nav immediately for instant feedback
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.toggle('active', item.dataset.page === page);
     });
+    
+    // Smooth page transition
+    if (currentPageEl && newPageEl) {
+        currentPageEl.classList.add('transitioning-out');
+        
+        // Show skeleton loading immediately on new page
+        showPageSkeleton(page);
+        
+        setTimeout(() => {
+            currentPageEl.classList.remove('active', 'transitioning-out');
+            newPageEl.classList.add('active');
+            currentPage = page;
+            
+            // Clear bulk selection when leaving users page
+            if (page !== 'users') clearBulkSelection();
+            
+            refreshCurrentPage();
+            startAutoRefresh();
+        }, 100); // Quick transition
+    } else {
+        currentPage = page;
+        document.querySelectorAll('.page').forEach(p => {
+            p.classList.toggle('active', p.id === `${page}Page`);
+        });
+        
+        // Clear bulk selection when leaving users page
+        if (page !== 'users') clearBulkSelection();
+        
+        refreshCurrentPage();
+        startAutoRefresh();
+    }
+}
 
-    document.querySelectorAll('.page').forEach(p => {
-        p.classList.toggle('active', p.id === `${page}Page`);
-    });
+// Show skeleton loading for pages
+function showPageSkeleton(page) {
+    if (page === 'apps') {
+        const tbody = document.getElementById('appsTableBody');
+        if (tbody) tbody.innerHTML = generateTableSkeleton(5, 9);
+    } else if (page === 'users') {
+        const tbody = document.getElementById('usersTableBody');
+        if (tbody) tbody.innerHTML = generateTableSkeleton(5, 6);
+    }
+}
 
-    // Clear bulk selection when leaving users page
-    if (page !== 'users') clearBulkSelection();
-
-    refreshCurrentPage();
-    startAutoRefresh();
+// Generate skeleton loading rows for tables
+function generateTableSkeleton(rows, cols) {
+    let html = '';
+    for (let i = 0; i < rows; i++) {
+        html += '<tr class="skeleton-row">';
+        for (let j = 0; j < cols; j++) {
+            const width = ['sm', 'md', 'lg', 'xl'][Math.floor(Math.random() * 4)];
+            html += `<td><div class="skeleton skeleton-cell ${width}"></div></td>`;
+        }
+        html += '</tr>';
+    }
+    return html;
 }
 
 function refreshCurrentPage() {
@@ -195,13 +245,8 @@ function refreshCurrentPage() {
 }
 
 function startAutoRefresh() {
+    // Auto-refresh disabled - use manual refresh button instead
     stopAutoRefresh();
-    _autoRefreshTimer = setInterval(() => {
-        // Only auto-refresh if no modals are open
-        if (!document.querySelector('.modal.show')) {
-            refreshCurrentPage();
-        }
-    }, 15000);
 }
 
 function stopAutoRefresh() {
@@ -227,17 +272,29 @@ async function loadDashboard() {
 
 function animateValue(elementId, target) {
     const el = document.getElementById(elementId);
+    if (!el) return;
+    
     const current = parseInt(el.textContent) || 0;
     if (current === target) { el.textContent = target; return; }
+    
+    // Add visual update pulse
+    el.classList.add('updating');
 
-    const duration = 400;
+    const duration = 350; // Faster for snappier feel
     const start = performance.now();
 
     function tick(now) {
         const progress = Math.min((now - start) / duration, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
+        // Smoother easing function
+        const eased = progress < 0.5
+            ? 4 * progress * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 3) / 2;
         el.textContent = Math.round(current + (target - current) * eased);
-        if (progress < 1) requestAnimationFrame(tick);
+        if (progress < 1) {
+            requestAnimationFrame(tick);
+        } else {
+            el.classList.remove('updating');
+        }
     }
 
     requestAnimationFrame(tick);
@@ -247,11 +304,17 @@ function animateValue(elementId, target) {
 
 async function loadApps() {
     const tbody = document.getElementById('appsTableBody');
-    tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading applications...</td></tr>';
+    const container = tbody.closest('.table-container');
+    
+    // Show skeleton loading (instant visual feedback)
+    tbody.innerHTML = generateTableSkeleton(5, 9);
+    if (container) container.classList.add('refreshing');
 
     try {
         const response = await fetch(`${API_URL}/admin/apps`);
         apps = await response.json();
+        
+        if (container) container.classList.remove('refreshing');
 
         if (apps.length === 0) {
             tbody.innerHTML = '<tr><td colspan="9" class="loading">No applications yet. Create your first app.</td></tr>';
@@ -262,12 +325,12 @@ async function loadApps() {
             const safeAppId = escapeAttr(app.app_id);
             const safeName = escapeAttr(app.name || 'Unnamed');
             return `
-            <tr>
-                <td class="app-name-cell">${escapeHtml(app.name || 'Unnamed')}</td>
-                <td><code>${app.app_id}</code></td>
-                <td><span class="status-badge ${app.otp_enabled ? 'active' : 'inactive'}">${app.otp_enabled ? 'Enabled' : 'Disabled'}</span></td>
-                <td><span class="status-badge ${app.passkey_enabled ? 'active' : 'inactive'}">${app.passkey_enabled ? 'Enabled' : 'Disabled'}</span></td>
-                <td><span class="status-badge ${app.login_notification_enabled ? 'active' : 'inactive'}">${app.login_notification_enabled ? 'On' : 'Off'}</span></td>
+            <tr class="new-row">
+                <td data-label="Name" class="app-name-cell">${escapeHtml(app.name || 'Unnamed')}</td>
+                <td data-label="App ID"><code>${app.app_id}</code></td>
+                <td data-label="OTP"><span class="status-badge ${app.otp_enabled ? 'active' : 'inactive'}">${app.otp_enabled ? 'Enabled' : 'Disabled'}</span></td>
+                <td data-label="Passkey"><span class="status-badge ${app.passkey_enabled ? 'active' : 'inactive'}">${app.passkey_enabled ? 'Enabled' : 'Disabled'}</span></td>
+                <td data-label="Notification"><span class="status-badge ${app.login_notification_enabled ? 'active' : 'inactive'}">${app.login_notification_enabled ? 'On' : 'Off'}</span></td>
                 <td>${app.access_token_expiry_minutes}m / ${app.refresh_token_expiry_days}d</td>
                 <td class="redirect-uris">${app.redirect_uris ? escapeHtml(app.redirect_uris) : '<span style="color:#94a3b8">Not set</span>'}</td>
                 <td>${formatDate(app.created_at)}</td>
@@ -438,7 +501,11 @@ function confirmDeleteApp(appId, appName) {
 
 async function loadUsers() {
     const tbody = document.getElementById('usersTableBody');
-tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading users...</td></tr>';
+    const container = tbody.closest('.table-container');
+    
+    // Show skeleton loading (instant visual feedback)
+    tbody.innerHTML = generateTableSkeleton(5, 6);
+    if (container) container.classList.add('refreshing');
 
     try {
         let url = `${API_URL}/admin/users`;
@@ -449,6 +516,8 @@ tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading users...</td></tr
         const response = await fetch(url);
         const data = await response.json();
         users = Array.isArray(data) ? data : (data.users || []);
+        
+        if (container) container.classList.remove('refreshing');
 
         if (users.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" class="loading">No users found.</td></tr>';
@@ -466,12 +535,12 @@ tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading users...</td></tr
             const onlineLabel = user.is_online ? 'Online' : 'Offline';
             const isChecked = selectedUserIds.has(user.id) ? 'checked' : '';
             return `
-            <tr>
-                <td class="td-check"><input type="checkbox" class="user-select-cb" data-user-id="${user.id}" ${isChecked} onchange="onUserCheckChange()"></td>
-                <td class="app-name-cell">${escapeHtml(user.email)}</td>
-                <td><span class="status-badge ${onlineClass}">${onlineLabel}</span></td>
-                <td><span class="status-badge ${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
-                <td>${formatDate(user.created_at)}</td>
+            <tr class="new-row">
+                <td data-label="Select" class="td-check"><input type="checkbox" class="user-select-cb" data-user-id="${user.id}" ${isChecked} onchange="onUserCheckChange()"></td>
+                <td data-label="Email" class="app-name-cell">${escapeHtml(user.email)}</td>
+                <td data-label="Status"><span class="status-badge ${onlineClass}">${onlineLabel}</span></td>
+                <td data-label="Active"><span class="status-badge ${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
+                <td data-label="Created">${formatDate(user.created_at)}</td>
                 <td>
                     <div class="action-btns">
                         ${user.is_online ? `<button class="btn-icon danger" data-action="force-logout" data-user-id="${user.id}" data-user-email="${safeEmail}" title="Force Logout">
@@ -881,11 +950,10 @@ function showToast(message, type = 'info') {
     container.appendChild(toast);
     renderIcons();
 
+    // Use CSS animations for smoother transitions
     setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(100%)';
-        toast.style.transition = 'all 0.3s ease';
-        setTimeout(() => toast.remove(), 300);
+        toast.classList.add('removing');
+        setTimeout(() => toast.remove(), 200);
     }, 3000);
 }
 
