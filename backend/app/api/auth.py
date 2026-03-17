@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.schemas.auth import (
@@ -11,12 +11,21 @@ from app.services.mail_service import send_otp_email, send_password_reset_email,
 from app.services.jwt_service import create_access_token, create_refresh_token, mark_user_online, clear_user_blacklist
 from app.services.password_service import hash_password, verify_password, generate_reset_token, verify_reset_token
 from app.services.tenant_service import get_or_create_default_tenant
+from app.services.rate_limiter import create_rate_limit_dependency
+from app.services.geo_service import record_login_event
+from app.config import settings
 from app.db import get_db
 from app.models.user import User
 from app.models.app import App
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/auth")
+
+# Rate limit dependencies
+_rl_login = create_rate_limit_dependency("login", max_requests=settings.RATE_LIMIT_LOGIN)
+_rl_signup = create_rate_limit_dependency("signup", max_requests=settings.RATE_LIMIT_SIGNUP)
+_rl_otp = create_rate_limit_dependency("otp", max_requests=settings.RATE_LIMIT_OTP)
+_rl_forgot = create_rate_limit_dependency("forgot_password", max_requests=settings.RATE_LIMIT_OTP)
 
 def validate_app_credentials(db: Session, app_id: str, app_secret: str) -> App:
     """Validate app credentials and return the app if valid"""
@@ -36,9 +45,11 @@ def validate_app_credentials(db: Session, app_id: str, app_secret: str) -> App:
         )
     return app
 
-def generate_tokens_for_user(user: User, app: App):
+def generate_tokens_for_user(user: User, app: App, cnf: dict = None):
     """Generate access and refresh tokens for a user with app-specific expiry settings"""
     token_data = {"sub": user.email, "user_id": user.id}
+    if cnf:
+        token_data["cnf"] = cnf
     if app:
         token_data["app_id"] = app.app_id
         token_data["tenant_id"] = app.tenant_id
@@ -64,8 +75,8 @@ def generate_tokens_for_user(user: User, app: App):
 
 # ============== Password-based Auth ==============
 
-@router.post("/signup")
-def signup(request: SignupRequest, db: Session = Depends(get_db)):
+@router.post("/signup", dependencies=[Depends(_rl_signup)])
+def signup(request: SignupRequest, http_request: Request = None, db: Session = Depends(get_db)):
     """Sign up a new user with email and password"""
     # Validate app credentials
     app = validate_app_credentials(db, request.app_id, request.app_secret)
@@ -99,14 +110,18 @@ def signup(request: SignupRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     
+    # Record signup event
+    if http_request:
+        record_login_event(db, user.id, request.app_id, app.tenant_id, http_request, "signup")
+    
     return {
         "message": "User registered successfully",
         "email": user.email,
         "user_id": user.id
     }
 
-@router.post("/login", response_model=LoginResponse)
-def login(request: LoginRequest, db: Session = Depends(get_db)):
+@router.post("/login", response_model=LoginResponse, dependencies=[Depends(_rl_login)])
+def login(request: LoginRequest, http_request: Request = None, db: Session = Depends(get_db)):
     """
     Login with email and password.
     - If OTP is enabled for the app: verifies password and sends OTP
@@ -185,6 +200,9 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
                 access_token_expiry_minutes=app.access_token_expiry_minutes,
                 refresh_token_expiry_days=app.refresh_token_expiry_days,
             )
+        # Record login event
+        if http_request:
+            record_login_event(db, user.id, request.app_id, app.tenant_id, http_request, "login")
         return LoginResponse(
             message="Login successful",
             email=request.email,
@@ -194,7 +212,7 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
             token_type="bearer"
         )
 
-@router.post("/login/verify-otp", response_model=AuthResponse)
+@router.post("/login/verify-otp", response_model=AuthResponse, dependencies=[Depends(_rl_otp)])
 def login_verify_otp(request: LoginOTPVerifyRequest, db: Session = Depends(get_db)):
     """Verify OTP after password-based login"""
     # Validate app credentials
@@ -245,7 +263,7 @@ def login_verify_otp(request: LoginOTPVerifyRequest, db: Session = Depends(get_d
 
 # ============== Forgot Password ==============
 
-@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+@router.post("/forgot-password", response_model=ForgotPasswordResponse, dependencies=[Depends(_rl_forgot)])
 def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """
     Request password reset for a user.
@@ -427,7 +445,7 @@ def set_password(request: SetPasswordRequest, db: Session = Depends(get_db)):
 
 # ============== OTP-only Auth (legacy) ==============
 
-@router.post("/request-otp")
+@router.post("/request-otp", dependencies=[Depends(_rl_otp)])
 def request_otp(request: OTPRequest, db: Session = Depends(get_db)):
     """Request an OTP to be sent to the provided email"""
     # Validate app credentials if provided
@@ -446,7 +464,7 @@ def request_otp(request: OTPRequest, db: Session = Depends(get_db)):
             detail=f"Failed to send OTP: {str(e)}"
         )
 
-@router.post("/verify-otp", response_model=AuthResponse)
+@router.post("/verify-otp", response_model=AuthResponse, dependencies=[Depends(_rl_otp)])
 def verify(request: OTPVerifyRequest, db: Session = Depends(get_db)):
     """Verify OTP and return access and refresh tokens"""
     # Validate app credentials if provided

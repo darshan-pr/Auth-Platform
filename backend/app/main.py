@@ -22,6 +22,7 @@ from app.models.admin import Admin
 from app.models.refresh_token import RefreshToken
 from app.models.passkey import PasskeyCredential
 from app.models.tenant import Tenant
+from app.models.login_event import LoginEvent
 
 # Create all tables
 Base.metadata.create_all(bind=engine)
@@ -109,6 +110,10 @@ app.add_middleware(
 
 # Dashboard auth middleware — server-side gate for /dashboard routes
 app.add_middleware(ConsoleAuthMiddleware)
+
+# CSRF middleware — double-submit cookie pattern for state-changing requests
+from app.services.csrf import CSRFMiddleware
+app.add_middleware(CSRFMiddleware)
 
 # Include routers
 app.include_router(health.router, tags=["Health"])

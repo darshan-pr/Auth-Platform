@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -7,6 +7,7 @@ from app.services import jwt_service
 import asyncio
 
 from app.services.jwt_service import verify_token as _verify_token, mark_user_online, is_user_blacklisted
+from app.services.dpop_service import validate_dpop_proof
 
 router = APIRouter()
 
@@ -38,7 +39,7 @@ def revoke_token(request: TokenRevokeRequest, db: Session = Depends(get_db)):
     return jwt_service.revoke_token(db, request.token)
 
 @router.post("/verify")
-def verify_token(request: TokenRevokeRequest):
+def verify_token(request: TokenRevokeRequest, http_request: Request = None):
     """Verify if a token is valid"""
     payload = jwt_service.verify_token(request.token)
     if payload is None:
@@ -54,6 +55,20 @@ def verify_token(request: TokenRevokeRequest):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Session has been revoked by administrator"
         )
+    # Enforce DPoP if token was issued with sender-constraint
+    cnf = payload.get("cnf")
+    if cnf and cnf.get("jkt"):
+        if not http_request:
+            raise HTTPException(status_code=401, detail="DPoP proof required for sender-constrained token")
+        dpop_header = http_request.headers.get("DPoP")
+        if not dpop_header:
+            raise HTTPException(status_code=401, detail="DPoP proof required for sender-constrained token")
+        http_uri = str(http_request.url).split("?")[0]
+        dpop_result = validate_dpop_proof(dpop_header, "POST", http_uri, access_token=request.token)
+        if not dpop_result:
+            raise HTTPException(status_code=401, detail="Invalid DPoP proof")
+        if dpop_result["jkt"] != cnf["jkt"]:
+            raise HTTPException(status_code=401, detail="DPoP proof thumbprint does not match token binding")
     return {"valid": True, "payload": payload}
 
 class SessionCheckRequest(BaseModel):

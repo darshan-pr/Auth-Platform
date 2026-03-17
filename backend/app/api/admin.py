@@ -19,11 +19,17 @@ from app.services.jwt_service import is_user_online, force_user_offline
 from app.services.password_service import hash_password, verify_password, generate_reset_token
 from app.services.tenant_service import create_tenant
 from app.services.mail_service import send_set_password_email, send_force_logout_email
+from app.services.rate_limiter import create_rate_limit_dependency
+from app.config import settings as app_settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin")
 security = HTTPBearer()
+
+# Rate limit dependencies
+_rl_admin_login = create_rate_limit_dependency("admin_login", max_requests=app_settings.RATE_LIMIT_LOGIN)
+_rl_admin_register = create_rate_limit_dependency("admin_register", max_requests=app_settings.RATE_LIMIT_SIGNUP)
 
 # ============== Pydantic Schemas ==============
 
@@ -115,7 +121,7 @@ def get_current_admin(
     return admin
 
 
-@router.post("/register", response_model=dict)
+@router.post("/register", response_model=dict, dependencies=[Depends(_rl_admin_register)])
 def admin_register(request: AdminRegisterRequest, db: Session = Depends(get_db)):
     """Register a new admin and create their tenant"""
     # Check if admin already exists
@@ -159,7 +165,7 @@ def admin_register(request: AdminRegisterRequest, db: Session = Depends(get_db))
     }
 
 
-@router.post("/login", response_model=dict)
+@router.post("/login", response_model=dict, dependencies=[Depends(_rl_admin_login)])
 def admin_login(request: AdminLoginRequest, db: Session = Depends(get_db)):
     """Admin login - returns JWT with tenant context"""
     admin = db.query(Admin).filter(Admin.email == request.email).first()
@@ -802,4 +808,55 @@ def get_stats(
         "active_users": active_users,
         "inactive_users": total_users - active_users,
         "online_users": online_count
+    }
+
+
+@router.get("/login-events")
+def get_login_events(
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+    page: int = 1,
+    per_page: int = 50,
+    event_type: str = None,
+    app_id: str = None,
+):
+    """Get login events for the admin's tenant (paginated, with optional filters)"""
+    from app.models.login_event import LoginEvent
+
+    query = db.query(LoginEvent).filter(LoginEvent.tenant_id == admin.tenant_id)
+
+    if event_type:
+        query = query.filter(LoginEvent.event_type == event_type)
+    if app_id:
+        query = query.filter(LoginEvent.app_id == app_id)
+
+    total = query.count()
+    events = (
+        query.order_by(LoginEvent.created_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "events": [
+            {
+                "id": e.id,
+                "user_id": e.user_id,
+                "app_id": e.app_id,
+                "event_type": e.event_type,
+                "ip_address": e.ip_address,
+                "city": e.city,
+                "region": e.region,
+                "country": e.country,
+                "lat": e.lat,
+                "lon": e.lon,
+                "isp": e.isp,
+                "created_at": str(e.created_at) if e.created_at else None,
+            }
+            for e in events
+        ],
     }

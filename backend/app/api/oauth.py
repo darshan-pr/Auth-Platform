@@ -39,6 +39,10 @@ from app.services.passkey_service import (
 )
 from app.api.auth import generate_tokens_for_user
 from app.services.jwt_service import mark_user_online, is_user_blacklisted, clear_user_blacklist
+from app.services.rate_limiter import create_rate_limit_dependency
+from app.services.geo_service import record_login_event
+from app.services.dpop_service import validate_dpop_proof, create_dpop_thumbprint
+from app.config import settings
 
 
 def _get_admin_contact_email(db: Session, tenant_id: int) -> str:
@@ -47,6 +51,10 @@ def _get_admin_contact_email(db: Session, tenant_id: int) -> str:
     return admin.email if admin else "your administrator"
 
 router = APIRouter(prefix="/oauth")
+
+# Rate limit dependencies
+_rl_oauth_auth = create_rate_limit_dependency("oauth_auth", max_requests=settings.RATE_LIMIT_LOGIN)
+_rl_oauth_token = create_rate_limit_dependency("oauth_token", max_requests=settings.RATE_LIMIT_GENERAL)
 
 templates = Jinja2Templates(
     directory=str(Path(__file__).resolve().parent.parent / "templates")
@@ -153,8 +161,8 @@ class AuthenticateRequest(BaseModel):
     rp_id: Optional[str] = None
 
 
-@router.post("/authenticate")
-def authenticate(req: AuthenticateRequest, db: Session = Depends(get_db)):
+@router.post("/authenticate", dependencies=[Depends(_rl_oauth_auth)])
+def authenticate(req: AuthenticateRequest, request: Request = None, db: Session = Depends(get_db)):
     """
     Internal API called by the hosted login page.
     
@@ -181,9 +189,9 @@ def authenticate(req: AuthenticateRequest, db: Session = Depends(get_db)):
     if req.action == "signup":
         return _handle_signup(req, session, app, db)
     elif req.action == "login":
-        return _handle_login(req, session, app, db)
+        return _handle_login(req, session, app, db, request)
     elif req.action == "verify_otp":
-        return _handle_verify_otp(req, session, app, db)
+        return _handle_verify_otp(req, session, app, db, request)
     elif req.action == "forgot_password":
         return _handle_forgot_password(req, session, app, db)
     elif req.action == "reset_password":
@@ -242,7 +250,7 @@ def _handle_signup(req: AuthenticateRequest, session: dict, app: App, db: Sessio
     }
 
 
-def _handle_login(req: AuthenticateRequest, session: dict, app: App, db: Session):
+def _handle_login(req: AuthenticateRequest, session: dict, app: App, db: Session, http_request: Request = None):
     """Verify email + password, then either issue code or request OTP"""
     user = db.query(User).filter(
         User.email == req.email,
@@ -283,10 +291,10 @@ def _handle_login(req: AuthenticateRequest, session: dict, app: App, db: Session
             )
     else:
         # No OTP needed — complete authentication
-        return _complete_auth(session, user, req.session_id, app)
+        return _complete_auth(session, user, req.session_id, app, db=db, http_request=http_request)
 
 
-def _handle_verify_otp(req: AuthenticateRequest, session: dict, app: App, db: Session):
+def _handle_verify_otp(req: AuthenticateRequest, session: dict, app: App, db: Session, http_request: Request = None):
     """Verify OTP and complete authentication"""
     if not req.otp:
         raise HTTPException(status_code=400, detail="Verification code is required")
@@ -302,7 +310,7 @@ def _handle_verify_otp(req: AuthenticateRequest, session: dict, app: App, db: Se
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    return _complete_auth(session, user, req.session_id, app)
+    return _complete_auth(session, user, req.session_id, app, db=db, http_request=http_request)
 
 
 def _handle_forgot_password(req: AuthenticateRequest, session: dict, app: App, db: Session):
@@ -523,7 +531,7 @@ def _handle_passkey_auth_complete(req: AuthenticateRequest, session: dict, app: 
     return _complete_auth(session, user, req.session_id, app)
 
 
-def _complete_auth(session: dict, user: User, session_id: str, app: App = None):
+def _complete_auth(session: dict, user: User, session_id: str, app: App = None, db: Session = None, http_request: Request = None):
     """
     Generate authorization code and return redirect URL.
     This is the final step — the login page redirects the user back to the client app.
@@ -555,6 +563,10 @@ def _complete_auth(session: dict, user: User, session_id: str, app: App = None):
             refresh_token_expiry_days=app.refresh_token_expiry_days,
         )
 
+    # Record login event with IP/location
+    if db and http_request and app:
+        record_login_event(db, user.id, session["client_id"], app.tenant_id, http_request, "oauth_login")
+
     # Build redirect URL with code and state
     redirect_uri = session["redirect_uri"]
     separator = "&" if "?" in redirect_uri else "?"
@@ -571,10 +583,11 @@ class TokenExchangeRequest(BaseModel):
     client_id: str
     redirect_uri: str
     code_verifier: str  # PKCE proof — proves this is the same client that started the flow
+    client_secret: Optional[str] = None  # Optional: for confidential clients (backend apps)
 
 
-@router.post("/token")
-def token_exchange(req: TokenExchangeRequest, db: Session = Depends(get_db)):
+@router.post("/token", dependencies=[Depends(_rl_oauth_token)])
+def token_exchange(req: TokenExchangeRequest, request: Request = None, db: Session = Depends(get_db)):
     """
     OAuth 2.0 Token Endpoint.
     
@@ -609,6 +622,13 @@ def token_exchange(req: TokenExchangeRequest, db: Session = Depends(get_db)):
     # Get app for token expiry settings and tenant context
     app = db.query(App).filter(App.app_id == req.client_id).first()
 
+    # --- Client Authentication (confidential clients) ---
+    if req.client_secret:
+        if not app:
+            raise HTTPException(status_code=401, detail="Invalid client_id")
+        if app.app_secret != req.client_secret:
+            raise HTTPException(status_code=401, detail="Invalid client_secret")
+
     # Get user for this tenant and app
     user = db.query(User).filter(
         User.email == code_data["user_email"],
@@ -618,12 +638,30 @@ def token_exchange(req: TokenExchangeRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Generate tokens
-    access_token, refresh_token = generate_tokens_for_user(user, app)
+    # --- DPoP (Sender-Constrained Tokens) ---
+    dpop_header = None
+    cnf_claim = None
+    if request:
+        dpop_header = request.headers.get("DPoP")
+    if dpop_header:
+        http_uri = str(request.url).split("?")[0]  # Strip query params
+        dpop_result = validate_dpop_proof(dpop_header, "POST", http_uri)
+        if not dpop_result:
+            raise HTTPException(status_code=400, detail="Invalid DPoP proof")
+        cnf_claim = {"jkt": dpop_result["jkt"]}
+
+    # Generate tokens (with optional DPoP binding)
+    access_token, refresh_token = generate_tokens_for_user(user, app, cnf=cnf_claim)
+
+    # Record login event
+    if request and app:
+        record_login_event(db, user.id, req.client_id, app.tenant_id, request, "oauth_token_exchange")
+
+    token_type = "DPoP" if cnf_claim else "bearer"
 
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "bearer",
+        "token_type": token_type,
         "expires_in": (app.access_token_expiry_minutes if app else 30) * 60,
     }

@@ -39,6 +39,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 # Mock Redis client
 mock_redis = MagicMock()
 mock_redis_store = {}
+mock_redis_sorted_sets = {}  # For rate limiter
 
 
 def mock_redis_setex(key, ttl, value):
@@ -51,6 +52,39 @@ def mock_redis_get(key):
 
 def mock_redis_delete(key):
     mock_redis_store.pop(key, None)
+    mock_redis_sorted_sets.pop(key, None)
+
+
+def mock_redis_exists(key):
+    return key in mock_redis_store
+
+
+# Rate limiter sorted set mocks
+def mock_redis_zadd(key, mapping):
+    if key not in mock_redis_sorted_sets:
+        mock_redis_sorted_sets[key] = {}
+    mock_redis_sorted_sets[key].update(mapping)
+    return len(mapping)
+
+
+def mock_redis_zcard(key):
+    return len(mock_redis_sorted_sets.get(key, {}))
+
+
+def mock_redis_zremrangebyscore(key, min_score, max_score):
+    if key in mock_redis_sorted_sets:
+        mock_redis_sorted_sets[key] = {
+            k: v for k, v in mock_redis_sorted_sets[key].items()
+            if not (float(min_score) <= float(v) <= float(max_score))
+        }
+    return 0
+
+
+def mock_redis_zrange(key, start, stop, withscores=False):
+    items = list(mock_redis_sorted_sets.get(key, {}).items())
+    if withscores:
+        return [(k, float(v)) for k, v in items[start:stop+1 if stop >= 0 else None]]
+    return [k for k, _ in items[start:stop+1 if stop >= 0 else None]]
 
 
 mock_redis.setex = mock_redis_setex
@@ -62,10 +96,24 @@ mock_redis.delete = mock_redis_delete
 def mock_redis_client():
     """Mock Redis for all tests"""
     mock_redis_store.clear()
+    mock_redis_sorted_sets.clear()
+
+    # Pipeline mock for rate limiter — always allows requests in tests
+    mock_pipeline = MagicMock()
+    mock_pipeline.zremrangebyscore.return_value = mock_pipeline
+    mock_pipeline.zcard.return_value = mock_pipeline
+    mock_pipeline.zadd.return_value = mock_pipeline
+    mock_pipeline.expire.return_value = mock_pipeline
+    mock_pipeline.execute.return_value = [0, 0, 1, True]
+    mock_redis.pipeline.return_value = mock_pipeline
+    mock_redis.exists.return_value = False
+
     with patch("app.services.otp_service.redis_client", mock_redis), \
          patch("app.services.password_service.redis_client", mock_redis), \
          patch("app.services.oauth_service.redis_client", mock_redis), \
-         patch("app.services.passkey_service.redis_client", mock_redis):
+         patch("app.services.passkey_service.redis_client", mock_redis), \
+         patch("app.redis.redis_client", mock_redis), \
+         patch("app.services.geo_service.get_location", return_value={}):
         yield mock_redis
 
 

@@ -50,4 +50,10 @@ class Settings:
     # Falls back to AUTH_SERVER_URL if not set.
     DOCS_AUTH_SERVER_URL: str = os.getenv("DOCS_AUTH_SERVER_URL", "")
 
+    # Rate Limiting (requests per minute)
+    RATE_LIMIT_LOGIN: int = int(os.getenv("RATE_LIMIT_LOGIN", "5"))
+    RATE_LIMIT_OTP: int = int(os.getenv("RATE_LIMIT_OTP", "3"))
+    RATE_LIMIT_SIGNUP: int = int(os.getenv("RATE_LIMIT_SIGNUP", "10"))
+    RATE_LIMIT_GENERAL: int = int(os.getenv("RATE_LIMIT_GENERAL", "60"))
+
 settings = Settings()

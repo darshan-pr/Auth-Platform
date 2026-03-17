@@ -123,6 +123,46 @@ sample-app/       # Notes app showing end-to-end integration
 run.sh            # Service runner
 ```
 
+## Security Features
+
+### Rate Limiting
+Redis-backed sliding window rate limiter applied to all auth endpoints. Configurable via environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `RATE_LIMIT_LOGIN` | 5 | Max login attempts per minute per IP |
+| `RATE_LIMIT_OTP` | 3 | Max OTP requests per minute per IP |
+| `RATE_LIMIT_SIGNUP` | 10 | Max signups per minute per IP |
+| `RATE_LIMIT_GENERAL` | 60 | Max general API calls per minute per IP |
+
+Returns `429 Too Many Requests` with `Retry-After` header when exceeded.
+
+### Anti-CSRF (Double-Submit Cookie)
+Middleware that sets a `csrf_token` cookie on GET requests. State-changing requests (POST/PUT/DELETE) require a matching `X-CSRF-Token` header. Exempted for:
+- `application/json` API requests (inherently CSRF-safe)
+- Bearer-authenticated requests (API-to-API)
+- `/oauth/token` endpoint (protected by PKCE)
+
+### IP & Location Tracking
+Every authentication event (login, signup, OAuth, admin login) records:
+- Client IP (supports `X-Forwarded-For`, `X-Real-IP` headers)
+- Geolocation data (city, region, country, coordinates, ISP) via [ip-api.com](http://ip-api.com)
+- Results cached in Redis for 24h to minimize API calls
+
+View events via `GET /admin/login-events` (paginated, filterable by `event_type` and `app_id`).
+
+### Client Authentication (OAuth Token Exchange)
+The `/oauth/token` endpoint now supports optional `client_secret` for confidential clients:
+- **Public clients** (SPAs): PKCE-only (existing behavior, no change)
+- **Confidential clients** (backend apps): PKCE + `client_secret`
+
+### Sender-Constrained Tokens (DPoP)
+[RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449) DPoP implementation. Opt-in per request:
+1. Client sends a `DPoP` header with a signed JWS proof during `/oauth/token`
+2. Server validates the proof and binds the token via `cnf.jkt` claim
+3. Returns `token_type: "DPoP"` instead of `"bearer"`
+4. `/token/verify` enforces DPoP proof for tokens with `cnf.jkt` claims
+
 ## Deployment
 - **Railway**: ready out-of-the-box. Steps — create project, add PostgreSQL + Redis, set env vars, deploy. See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) for details.
 - **Other platforms**: any host with Python 3.8+, PostgreSQL, Redis, and environment variables (Heroku, Render, Fly.io, AWS, GCP, Azure, etc.).
