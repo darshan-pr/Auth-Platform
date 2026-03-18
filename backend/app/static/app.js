@@ -46,11 +46,21 @@ const API_URL = window.location.origin;
 let currentPage = 'dashboard';
 let apps = [];
 let users = [];
+let userAddMode = 'single';
 let editingAppId = null;
 let editingUserId = null;
 let deleteCallback = null;
 let selectedAppFilter = '';
 let selectedUserIds = new Set();
+let parsedCsvUsers = [];
+let csvUploadBtnResetTimer = null;
+let csvUploadState = {
+    running: false,
+    total: 0,
+    processed: 0,
+    added: 0,
+    failed: 0
+};
 let _autoRefreshTimer = null;
 
 // ==================== Init ====================
@@ -240,7 +250,7 @@ function navigateTo(page) {
 function showPageSkeleton(page) {
     if (page === 'apps') {
         const tbody = document.getElementById('appsTableBody');
-        if (tbody) tbody.innerHTML = generateTableSkeleton(5, 9);
+        if (tbody) tbody.innerHTML = generateTableSkeleton(5, 7);
     } else if (page === 'users') {
         const tbody = document.getElementById('usersTableBody');
         if (tbody) tbody.innerHTML = generateTableSkeleton(5, 6);
@@ -332,7 +342,7 @@ async function loadApps() {
     const container = tbody.closest('.table-container');
     
     // Show skeleton loading (instant visual feedback)
-    tbody.innerHTML = generateTableSkeleton(5, 9);
+    tbody.innerHTML = generateTableSkeleton(5, 7);
     if (container) container.classList.add('refreshing');
 
     try {
@@ -342,7 +352,7 @@ async function loadApps() {
         if (container) container.classList.remove('refreshing');
 
         if (apps.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="loading">No applications yet. Create your first app.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="loading">No applications yet. Create your first app.</td></tr>';
             return;
         }
 
@@ -356,16 +366,14 @@ async function loadApps() {
                 <td data-label="OTP"><span class="status-badge ${app.otp_enabled ? 'active' : 'inactive'}">${app.otp_enabled ? 'Enabled' : 'Disabled'}</span></td>
                 <td data-label="Passkey"><span class="status-badge ${app.passkey_enabled ? 'active' : 'inactive'}">${app.passkey_enabled ? 'Enabled' : 'Disabled'}</span></td>
                 <td data-label="Notification"><span class="status-badge ${app.login_notification_enabled ? 'active' : 'inactive'}">${app.login_notification_enabled ? 'On' : 'Off'}</span></td>
-                <td>${app.access_token_expiry_minutes}m / ${app.refresh_token_expiry_days}d</td>
-                <td class="redirect-uris">${app.redirect_uris ? escapeHtml(app.redirect_uris) : '<span style="color:#94a3b8">Not set</span>'}</td>
-                <td>${formatDate(app.created_at)}</td>
-                <td>
+                <td data-label="Created">${formatDate(app.created_at)}</td>
+                <td data-label="Actions">
                     <div class="action-btns">
                         <button class="btn-icon" data-action="credentials" data-app-id="${safeAppId}" title="View Credentials">
                             <i data-lucide="key-round"></i>
                         </button>
-                        <button class="btn-icon" data-action="edit-app" data-app-id="${safeAppId}" title="Edit">
-                            <i data-lucide="pencil"></i>
+                        <button class="btn-icon" data-action="edit-app" data-app-id="${safeAppId}" title="Settings">
+                            <i data-lucide="settings-2"></i>
                         </button>
                         <button class="btn-icon danger" data-action="delete-app" data-app-id="${safeAppId}" data-app-name="${safeName}" title="Delete">
                             <i data-lucide="trash-2"></i>
@@ -389,7 +397,7 @@ async function loadApps() {
         renderIcons();
     } catch (error) {
         console.error('Error loading apps:', error);
-        tbody.innerHTML = '<tr><td colspan="9" class="loading">Failed to load applications</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="loading">Failed to load applications</td></tr>';
     }
 }
 
@@ -437,8 +445,13 @@ async function saveApp() {
     const access_token_expiry_minutes = parseInt(document.getElementById('appAccessTokenExpiry').value) || 30;
     const refresh_token_expiry_days = parseInt(document.getElementById('appRefreshTokenExpiry').value) || 7;
     const redirect_uris = document.getElementById('appRedirectUris').value.trim();
+    const submitBtn = document.getElementById('appFormSubmit');
+    const originalBtnHtml = submitBtn.innerHTML;
 
     if (!name) { showToast('Please enter an app name', 'error'); return; }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="btn-inline-spinner" aria-hidden="true"></span>${editingAppId ? 'Saving...' : 'Adding...'} `;
 
     try {
         const body = { name, description, otp_enabled, passkey_enabled, login_notification_enabled, force_logout_notification_enabled, access_token_expiry_minutes, refresh_token_expiry_days };
@@ -479,6 +492,10 @@ async function saveApp() {
     } catch (error) {
         console.error('Error:', error);
         showToast('Failed to save application', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnHtml;
+        renderIcons();
     }
 }
 
@@ -500,7 +517,15 @@ async function showCredentials(appId) {
 
 function confirmDeleteApp(appId, appName) {
     document.getElementById('deleteTargetName').textContent = appName;
+    const warningEl = document.querySelector('#deleteModal .delete-warning');
+    if (warningEl) {
+        warningEl.textContent = 'This action cannot be undone.';
+    }
     deleteCallback = async () => {
+        const deleteBtn = document.getElementById('deleteConfirmBtn');
+        const originalHtml = deleteBtn.innerHTML;
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<span class="btn-inline-spinner" aria-hidden="true"></span>Deleting...';
         try {
             const response = await fetch(`${API_URL}/admin/apps/${appId}`, { method: 'DELETE' });
             if (response.ok) {
@@ -516,7 +541,13 @@ function confirmDeleteApp(appId, appName) {
             } else {
                 showToast('Failed to delete application', 'error');
             }
-        } catch { showToast('Failed to delete application', 'error'); }
+        } catch {
+            showToast('Failed to delete application', 'error');
+        } finally {
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = originalHtml;
+            renderIcons();
+        }
     };
     document.getElementById('deleteConfirmBtn').onclick = deleteCallback;
     openModal('deleteModal');
@@ -610,11 +641,21 @@ async function loadUsers() {
 function showCreateUserModal() {
     editingUserId = null;
     document.getElementById('userModalTitle').textContent = 'Add New User';
-    document.getElementById('userFormSubmit').textContent = 'Add User';
     document.getElementById('userForm').reset();
     document.getElementById('userEmail').disabled = false;
     document.getElementById('userAppId').disabled = false;
     document.getElementById('userStatusGroup').classList.add('hidden');
+    document.getElementById('bulkCsvPanel').classList.remove('hidden');
+    const modeSwitch = document.getElementById('userAddModeSwitch');
+    if (modeSwitch) modeSwitch.classList.remove('hidden');
+    if (!csvUploadState.running) {
+        resetCsvUploadState();
+        setUserAddMode('single');
+    } else {
+        setUserAddMode('multiple');
+        syncCsvProgressUi();
+    }
+    updateUserModalPrimaryAction();
     var flGroup = document.getElementById('forceLogoutGroup');
     if (flGroup) flGroup.classList.add('hidden');
     loadAppsForSelect();
@@ -640,11 +681,16 @@ function editUser(userId) {
 
     editingUserId = userId;
     document.getElementById('userModalTitle').textContent = 'Edit User';
-    document.getElementById('userFormSubmit').textContent = 'Save Changes';
     document.getElementById('userEmail').value = user.email;
     document.getElementById('userEmail').disabled = true;
     document.getElementById('userAppId').disabled = true;
     document.getElementById('userStatusGroup').classList.remove('hidden');
+    document.getElementById('bulkCsvPanel').classList.add('hidden');
+    document.getElementById('singleUserPanel').classList.remove('hidden');
+    const modeSwitch = document.getElementById('userAddModeSwitch');
+    if (modeSwitch) modeSwitch.classList.add('hidden');
+    userAddMode = 'single';
+    updateUserModalPrimaryAction();
     document.getElementById('userStatus').value = user.is_active ? 'true' : 'false';
     // Show force-logout button only if user is online
     const flGroup = document.getElementById('forceLogoutGroup');
@@ -660,9 +706,14 @@ function editUser(userId) {
 async function saveUser() {
     const email = document.getElementById('userEmail').value.trim();
     const app_id = document.getElementById('userAppId').value;
+    const submitBtn = document.getElementById('userFormSubmit');
+    const originalBtnHtml = submitBtn.innerHTML;
 
     if (!email) { showToast('Please enter an email', 'error'); return; }
     if (!app_id) { showToast('Please select an application', 'error'); return; }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="btn-inline-spinner" aria-hidden="true"></span>${editingUserId ? 'Saving...' : 'Adding...'} `;
 
     try {
         let response;
@@ -688,18 +739,40 @@ async function saveUser() {
             loadUsers();
             loadDashboard();
             showToast(editingUserId ? 'User updated' : 'User created', 'success');
+            if (!editingUserId) {
+                resetCsvUploadState();
+            }
         } else {
             showToast(data.detail || 'Operation failed', 'error');
         }
     } catch (error) {
         showToast('Failed to save user', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnHtml;
+        renderIcons();
     }
 }
 
 function confirmDeleteUser(userId, email) {
     document.getElementById('deleteTargetName').textContent = email;
+    const warningEl = document.querySelector('#deleteModal .delete-warning');
+    const user = users.find(u => u.id === userId);
+    const shouldForceLogout = !!(user && user.is_online);
+    if (warningEl) {
+        warningEl.textContent = shouldForceLogout
+            ? 'User is online. Active sessions will be revoked first, then permanently deleted.'
+            : 'User is offline. User will be permanently deleted.';
+    }
     deleteCallback = async () => {
+        const deleteBtn = document.getElementById('deleteConfirmBtn');
+        const originalHtml = deleteBtn.innerHTML;
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<span class="btn-inline-spinner" aria-hidden="true"></span>Deleting...';
         try {
+            if (shouldForceLogout) {
+                await fetch(`${API_URL}/admin/users/${userId}/force-logout`, { method: 'POST' });
+            }
             const response = await fetch(`${API_URL}/admin/users/${userId}`, { method: 'DELETE' });
             if (response.ok) {
                 closeModal('deleteModal');
@@ -709,7 +782,13 @@ function confirmDeleteUser(userId, email) {
             } else {
                 showToast('Failed to delete user', 'error');
             }
-        } catch { showToast('Failed to delete user', 'error'); }
+        } catch {
+            showToast('Failed to delete user', 'error');
+        } finally {
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = originalHtml;
+            renderIcons();
+        }
     };
     document.getElementById('deleteConfirmBtn').onclick = deleteCallback;
     openModal('deleteModal');
@@ -818,9 +897,9 @@ function bulkAction(action) {
 
     if (action === 'delete') {
         titleEl.textContent = 'Bulk Delete Users';
-        msgEl.textContent = 'Are you sure you want to permanently delete:';
+        msgEl.textContent = 'Delete the following users after forcing them offline:';
         countEl.textContent = `${count} user${count > 1 ? 's' : ''}`;
-        warnEl.textContent = 'This action cannot be undone.';
+        warnEl.textContent = 'Sessions are revoked first. Deletion cannot be undone.';
         btn.textContent = 'Delete All';
         btn.className = 'btn btn-danger';
     } else if (action === 'force-logout') {
@@ -850,6 +929,27 @@ async function executeBulkAction(action) {
     btn.textContent = 'Processing...';
 
     try {
+        if (action === 'delete') {
+            const ids = Array.from(selectedUserIds);
+            let processed = 0;
+
+            for (const id of ids) {
+                const target = users.find(u => u.id === id);
+                if (target && target.is_online) {
+                    await fetch(`${API_URL}/admin/users/${id}/force-logout`, { method: 'POST' });
+                }
+                const delRes = await fetch(`${API_URL}/admin/users/${id}`, { method: 'DELETE' });
+                if (delRes.ok) processed += 1;
+            }
+
+            closeModal('bulkConfirmModal');
+            showToast(`${processed} user${processed !== 1 ? 's' : ''} deleted (force logout done first)`, 'success');
+            clearBulkSelection();
+            loadUsers();
+            loadDashboard();
+            return;
+        }
+
         const response = await fetch(`${API_URL}/admin/users/bulk-action`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -923,8 +1023,383 @@ function setupForms() {
 
     document.getElementById('userForm').addEventListener('submit', (e) => {
         e.preventDefault();
+        if (!editingUserId && userAddMode === 'multiple') {
+            uploadUsersFromCsv();
+            return;
+        }
         saveUser();
     });
+
+    const csvInput = document.getElementById('bulkUserCsvFile');
+    if (csvInput) {
+        csvInput.addEventListener('change', onCsvFileSelected);
+    }
+}
+
+// ==================== Bulk CSV Upload ====================
+
+function updateUserModalPrimaryAction() {
+    const submitBtn = document.getElementById('userFormSubmit');
+    if (!submitBtn) return;
+
+    if (editingUserId) {
+        submitBtn.textContent = 'Save Changes';
+        submitBtn.disabled = false;
+        return;
+    }
+
+    if (csvUploadState.running) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="btn-inline-spinner" aria-hidden="true"></span>Adding...';
+        return;
+    }
+
+    if (userAddMode === 'multiple') {
+        submitBtn.disabled = parsedCsvUsers.length === 0;
+        submitBtn.innerHTML = 'Add From CSV';
+        return;
+    }
+
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = 'Add User';
+}
+
+function setCloseWhileAddingVisible(visible) {
+    const closeBtn = document.getElementById('userModalCloseWhileAddingBtn');
+    if (!closeBtn) return;
+    closeBtn.classList.toggle('hidden', !visible);
+}
+
+function resetCsvUploadState() {
+    parsedCsvUsers = [];
+    csvUploadState = {
+        running: false,
+        total: 0,
+        processed: 0,
+        added: 0,
+        failed: 0
+    };
+    const summary = document.getElementById('bulkCsvSummary');
+    const input = document.getElementById('bulkUserCsvFile');
+    const fileName = document.getElementById('bulkUserCsvFileName');
+    const submitBtn = document.getElementById('userFormSubmit');
+    const list = document.getElementById('bulkCsvList');
+    const bar = document.getElementById('bulkCsvProgressBar');
+    if (summary) summary.textContent = 'Select a CSV file to preview users.';
+    if (submitBtn && !editingUserId && userAddMode !== 'multiple') submitBtn.disabled = false;
+    if (input) input.value = '';
+    if (fileName) fileName.textContent = 'No file chosen';
+    if (list) list.innerHTML = '<div class="bulk-csv-list-empty">No users loaded yet.</div>';
+    if (bar) bar.style.width = '0%';
+    setCloseWhileAddingVisible(false);
+    updateUserModalPrimaryAction();
+    updateAddUserButtonProgress();
+}
+
+function setUserAddMode(mode) {
+    const singlePanel = document.getElementById('singleUserPanel');
+    const bulkPanel = document.getElementById('bulkCsvPanel');
+    const singleBtn = document.getElementById('userModeSingleBtn');
+    const multipleBtn = document.getElementById('userModeMultipleBtn');
+    if (!singlePanel || !bulkPanel || !singleBtn || !multipleBtn) return;
+
+    userAddMode = mode === 'multiple' ? 'multiple' : 'single';
+
+    const isMultiple = userAddMode === 'multiple';
+    singlePanel.classList.toggle('hidden', isMultiple);
+    bulkPanel.classList.toggle('hidden', !isMultiple);
+    singleBtn.classList.toggle('active', !isMultiple);
+    multipleBtn.classList.toggle('active', isMultiple);
+
+    const emailInput = document.getElementById('userEmail');
+    if (emailInput && !editingUserId) {
+        emailInput.required = !isMultiple;
+    }
+
+    updateUserModalPrimaryAction();
+
+    renderIcons();
+}
+
+async function onCsvFileSelected(event) {
+    const file = event.target.files && event.target.files[0];
+    const summary = document.getElementById('bulkCsvSummary');
+    const fileName = document.getElementById('bulkUserCsvFileName');
+    parsedCsvUsers = [];
+
+    if (!file) {
+        if (summary) summary.textContent = 'Select a CSV file to preview users.';
+        if (fileName) fileName.textContent = 'No file chosen';
+        updateUserModalPrimaryAction();
+        return;
+    }
+
+    if (fileName) fileName.textContent = file.name;
+
+    try {
+        const text = await file.text();
+        const parsed = parseUsersCsv(text);
+        parsedCsvUsers = parsed.rows;
+
+        const valid = parsed.rows.length;
+        const skipped = parsed.skipped;
+        if (summary) {
+            summary.textContent = `Loaded ${valid} valid user${valid !== 1 ? 's' : ''}${skipped ? `, skipped ${skipped} row${skipped !== 1 ? 's' : ''}` : ''}.`;
+        }
+        renderCsvUserList();
+        syncCsvProgressUi();
+        updateUserModalPrimaryAction();
+    } catch (err) {
+        if (summary) summary.textContent = 'Invalid CSV format. Use headers: email, app_id';
+        if (fileName) fileName.textContent = file.name;
+        showToast('Could not read CSV file', 'error');
+        updateUserModalPrimaryAction();
+    }
+}
+
+function parseUsersCsv(text) {
+    const lines = text
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean);
+
+    if (lines.length < 2) {
+        return { rows: [], skipped: 0 };
+    }
+
+    const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+    const emailIndex = header.indexOf('email');
+    const appIdIndex = header.indexOf('app_id');
+    if (emailIndex === -1) {
+        throw new Error('Missing email header');
+    }
+
+    const rows = [];
+    let skipped = 0;
+    for (let i = 1; i < lines.length; i++) {
+        const cols = parseCsvLine(lines[i]);
+        const email = (cols[emailIndex] || '').trim();
+        const app_id = appIdIndex >= 0 ? (cols[appIdIndex] || '').trim() : '';
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            skipped += 1;
+            continue;
+        }
+        rows.push({ email, app_id, status: 'pending', message: '' });
+    }
+
+    return { rows, skipped };
+}
+
+function renderCsvUserList() {
+    const list = document.getElementById('bulkCsvList');
+    if (!list) return;
+
+    if (!parsedCsvUsers.length) {
+        list.innerHTML = '<div class="bulk-csv-list-empty">No users loaded yet.</div>';
+        return;
+    }
+
+    list.innerHTML = parsedCsvUsers.map((row) => {
+        const appLabel = row.app_id || 'Use selected app';
+        const statusClass = row.status || 'pending';
+        const statusLabel = row.status === 'added'
+            ? '✓ Added'
+            : row.status === 'failed'
+                ? '✗ Failed'
+                : row.status === 'adding'
+                    ? 'Adding...'
+                    : 'Pending';
+        const messageAttr = row.message ? ` title="${escapeAttr(row.message)}"` : '';
+
+        return `
+            <div class="bulk-csv-user-row">
+                <span class="bulk-csv-user-email">${escapeHtml(row.email)}</span>
+                <span class="bulk-csv-user-app">${escapeHtml(appLabel)}</span>
+                <span class="bulk-csv-user-status ${statusClass}"${messageAttr}>${statusLabel}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+function syncCsvProgressUi() {
+    const bar = document.getElementById('bulkCsvProgressBar');
+    const summary = document.getElementById('bulkCsvSummary');
+    const total = csvUploadState.total || parsedCsvUsers.length || 0;
+    const processed = csvUploadState.processed || 0;
+    const added = csvUploadState.added || 0;
+    const failed = csvUploadState.failed || 0;
+    const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
+
+    if (bar) {
+        bar.style.width = `${pct}%`;
+    }
+
+    if (summary && total > 0 && (csvUploadState.running || processed > 0 || added > 0 || failed > 0)) {
+        if (csvUploadState.running) {
+            summary.textContent = `Background add running: ${processed}/${total} processed, ${added} added, ${failed} failed.`;
+        } else {
+            summary.textContent = `Completed: ${added}/${total} added, ${failed} failed.`;
+        }
+    }
+
+    setCloseWhileAddingVisible(csvUploadState.running);
+    updateUserModalPrimaryAction();
+    updateAddUserButtonProgress();
+}
+
+function updateAddUserButtonProgress() {
+    const openBtn = document.getElementById('openAddUserBtn');
+    if (!openBtn) return;
+
+    if (csvUploadState.running && csvUploadState.total > 0) {
+        openBtn.innerHTML = `<span class="btn-inline-spinner" aria-hidden="true"></span>Adding ${csvUploadState.processed}/${csvUploadState.total}`;
+        return;
+    }
+
+    if (!csvUploadState.running && csvUploadState.total > 0 && csvUploadState.processed === csvUploadState.total) {
+        openBtn.innerHTML = `<i data-lucide="check-circle"></i> Added ${csvUploadState.added}/${csvUploadState.total}`;
+        renderIcons();
+        if (csvUploadBtnResetTimer) clearTimeout(csvUploadBtnResetTimer);
+        csvUploadBtnResetTimer = setTimeout(() => {
+            const btn = document.getElementById('openAddUserBtn');
+            if (btn && !csvUploadState.running) {
+                btn.innerHTML = '<i data-lucide="user-plus"></i> Add User';
+                renderIcons();
+            }
+        }, 3500);
+        return;
+    }
+
+    openBtn.innerHTML = '<i data-lucide="user-plus"></i> Add User';
+    renderIcons();
+}
+
+function parseCsvLine(line) {
+    const result = [];
+    let value = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+                value += '"';
+                i++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (ch === ',' && !inQuotes) {
+            result.push(value);
+            value = '';
+        } else {
+            value += ch;
+        }
+    }
+    result.push(value);
+    return result;
+}
+
+async function uploadUsersFromCsv() {
+    if (!parsedCsvUsers.length) {
+        showToast('No valid CSV users to upload', 'error');
+        return;
+    }
+
+    const defaultAppId = document.getElementById('userAppId').value;
+
+    if (!defaultAppId) {
+        showToast('Select an application for rows without app_id', 'error');
+        return;
+    }
+
+    if (csvUploadState.running) {
+        showToast('CSV upload already in progress', 'info');
+        return;
+    }
+
+    csvUploadState = {
+        running: true,
+        total: parsedCsvUsers.length,
+        processed: 0,
+        added: 0,
+        failed: 0
+    };
+
+    parsedCsvUsers.forEach(row => {
+        row.status = 'pending';
+        row.message = '';
+    });
+
+    renderCsvUserList();
+    syncCsvProgressUi();
+
+    processCsvUploadQueue(defaultAppId);
+}
+
+async function processCsvUploadQueue(defaultAppId) {
+    const chunkSize = 3;
+
+    while (csvUploadState.processed < csvUploadState.total) {
+        const start = csvUploadState.processed;
+        const end = Math.min(start + chunkSize, csvUploadState.total);
+
+        for (let i = start; i < end; i++) {
+            const row = parsedCsvUsers[i];
+            const payload = {
+                email: row.email,
+                app_id: row.app_id || defaultAppId
+            };
+
+            try {
+                row.status = 'adding';
+                row.message = '';
+                renderCsvUserList();
+                const res = await fetch(`${API_URL}/admin/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    row.status = 'added';
+                    csvUploadState.added += 1;
+                } else {
+                    row.status = 'failed';
+                    try {
+                        const data = await res.json();
+                        row.message = data && data.detail ? String(data.detail) : 'Request failed';
+                    } catch {
+                        row.message = 'Request failed';
+                    }
+                    csvUploadState.failed += 1;
+                }
+            } catch {
+                row.status = 'failed';
+                row.message = 'Network error';
+                csvUploadState.failed += 1;
+            }
+
+            csvUploadState.processed += 1;
+            renderCsvUserList();
+            syncCsvProgressUi();
+        }
+
+        // Yield control so UI remains responsive while processing large CSVs.
+        await new Promise(resolve => setTimeout(resolve, 30));
+    }
+
+    csvUploadState.running = false;
+    syncCsvProgressUi();
+
+    if (csvUploadState.added > 0) {
+        loadUsers();
+        loadDashboard();
+    }
+
+    if (csvUploadState.failed === 0) {
+        showToast(`Background add complete: ${csvUploadState.added} users added`, 'success');
+    } else {
+        showToast(`Background add complete: ${csvUploadState.added} added, ${csvUploadState.failed} failed`, 'info');
+    }
 }
 
 // ==================== API Health ====================

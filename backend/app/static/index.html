@@ -348,14 +348,12 @@
                                 <th>OTP</th>
                                 <th>Passkey</th>
                                 <th>Login Alert</th>
-                                <th>Token Expiry</th>
-                                <th>Redirect URIs</th>
                                 <th>Created</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="appsTableBody">
-                            <tr><td colspan="8" class="loading">Loading...</td></tr>
+                            <tr><td colspan="7" class="loading">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -385,7 +383,7 @@
                                     <option value="">All Applications</option>
                                 </select>
                             </div>
-                            <button class="btn btn-primary" onclick="showCreateUserModal()">
+                            <button class="btn btn-primary" id="openAddUserBtn" onclick="showCreateUserModal()">
                                 <i data-lucide="user-plus"></i> Add User
                             </button>
                         </div>
@@ -562,32 +560,68 @@
             <form id="userForm">
                 <input type="hidden" id="editUserId">
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="userEmail">Email *</label>
-                        <input type="email" id="userEmail" required placeholder="user@example.com">
-                    </div>
-                    <div class="form-group">
-                        <label for="userAppId">Associated App</label>
-                        <select id="userAppId">
-                            <option value="">None</option>
-                        </select>
-                    </div>
-                    <div class="form-group hidden" id="userStatusGroup">
-                        <label for="userStatus">Status</label>
-                        <select id="userStatus">
-                            <option value="true">Active</option>
-                            <option value="false">Inactive</option>
-                        </select>
-                    </div>
-                    <div class="form-group hidden" id="forceLogoutGroup">
-                        <label>Session Control</label>
-                        <button type="button" class="btn btn-danger" id="forceLogoutBtn" onclick="forceLogoutUser()" style="width:100%;margin-top:4px">
-                            <i data-lucide="log-out"></i> Force Logout (Set Offline)
+                    <div class="user-add-mode-switch" id="userAddModeSwitch">
+                        <button type="button" class="user-mode-btn active" id="userModeSingleBtn" onclick="setUserAddMode('single')">
+                            <i data-lucide="user-plus"></i> Single User
                         </button>
-                        <small>Immediately invalidates the user's session and logs them out</small>
+                        <button type="button" class="user-mode-btn" id="userModeMultipleBtn" onclick="setUserAddMode('multiple')">
+                            <i data-lucide="file-spreadsheet"></i> Multiple Users (CSV)
+                        </button>
+                    </div>
+
+                    <div class="user-add-panel" id="singleUserPanel">
+                        <div class="user-col-header">
+                            <h4><i data-lucide="user-plus"></i> Single User</h4>
+                            <small>Add one user with email and app</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="userEmail">Email *</label>
+                            <input type="email" id="userEmail" required placeholder="user@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="userAppId">Associated App</label>
+                            <select id="userAppId">
+                                <option value="">None</option>
+                            </select>
+                        </div>
+                        <div class="form-group hidden" id="userStatusGroup">
+                            <label for="userStatus">Status</label>
+                            <select id="userStatus">
+                                <option value="true">Active</option>
+                                <option value="false">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="form-group hidden" id="forceLogoutGroup">
+                            <label>Session Control</label>
+                            <button type="button" class="btn btn-danger" id="forceLogoutBtn" onclick="forceLogoutUser()" style="width:100%;margin-top:4px">
+                                <i data-lucide="log-out"></i> Force Logout (Set Offline)
+                            </button>
+                            <small>Immediately invalidates the user's session and logs them out</small>
+                        </div>
+                    </div>
+
+                    <div class="user-add-panel bulk-csv-panel hidden" id="bulkCsvPanel">
+                        <div class="user-col-header bulk-csv-header">
+                            <h4><i data-lucide="file-spreadsheet"></i> Multiple Users (CSV)</h4>
+                            <small>CSV columns: <strong>email</strong> and optional <strong>app_id</strong></small>
+                        </div>
+                        <div class="bulk-csv-actions">
+                            <input type="file" id="bulkUserCsvFile" accept=".csv,text/csv" class="csv-file-input" hidden>
+                            <label for="bulkUserCsvFile" class="csv-file-picker">
+                                <i data-lucide="folder-open"></i> Choose CSV File
+                            </label>
+                            <span class="csv-file-name" id="bulkUserCsvFileName">No file chosen</span>
+                        </div>
+                        <div class="bulk-csv-summary" id="bulkCsvSummary">Select a CSV file to preview users.</div>
+                        <div class="bulk-csv-progress-track" id="bulkCsvProgressTrack">
+                            <div class="bulk-csv-progress-bar" id="bulkCsvProgressBar"></div>
+                        </div>
+                        <div class="bulk-csv-list" id="bulkCsvList"></div>
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-outline hidden" id="userModalCloseWhileAddingBtn" onclick="closeModal('userModal')">Close (Run In Background)</button>
                     <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="userFormSubmit">Add User</button>
                 </div>

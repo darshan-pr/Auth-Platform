@@ -670,6 +670,209 @@ body.mobile-adaptive .checkbox-label input[type="checkbox"] { margin-top: 2px; f
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .checkbox-group { display: flex; flex-direction: column; }
 
+.user-add-panel {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: #fbfdff;
+    padding: 14px;
+}
+
+.user-add-mode-switch {
+    display: inline-flex;
+    width: 100%;
+    gap: 6px;
+    padding: 4px;
+    border: 1px solid #dbeafe;
+    border-radius: 10px;
+    background: #f8fbff;
+    margin-bottom: 12px;
+}
+
+.user-mode-btn {
+    flex: 1;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #475569;
+    font-size: 0.84rem;
+    font-weight: 700;
+    border-radius: 8px;
+    padding: 9px 10px;
+    cursor: pointer;
+    display: inline-flex;
+    gap: 7px;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.user-mode-btn:hover {
+    background: #ffffff;
+    border-color: #dbeafe;
+}
+
+.user-mode-btn.active {
+    background: #ffffff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+    box-shadow: 0 1px 2px rgba(29, 78, 216, 0.12);
+}
+
+.user-col-header {
+    margin-bottom: 10px;
+}
+
+.user-col-header h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    margin-bottom: 2px;
+}
+
+.user-col-header small {
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+}
+
+.bulk-csv-panel {
+    margin-bottom: 0;
+    border: 1px solid #dbeafe;
+    background: #f8fbff;
+}
+
+.bulk-csv-header h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.86rem;
+    color: #1e3a8a;
+    margin-bottom: 2px;
+}
+
+.bulk-csv-header small {
+    display: block;
+    color: #64748b;
+    margin-bottom: 10px;
+    font-size: 0.76rem;
+}
+
+.bulk-csv-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.csv-file-input {
+    display: none;
+}
+
+.csv-file-picker {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #0f172a;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.csv-file-picker:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
+}
+
+.csv-file-name {
+    font-size: 0.82rem;
+    color: #64748b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.bulk-csv-summary {
+    margin-top: 8px;
+    font-size: 0.78rem;
+    color: #475569;
+}
+
+.bulk-csv-progress-track {
+    height: 7px;
+    width: 100%;
+    background: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 10px;
+}
+
+.bulk-csv-progress-bar {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #06b6d4);
+    transition: width 0.2s ease;
+}
+
+.bulk-csv-list {
+    margin-top: 10px;
+    border: 1px solid #dbeafe;
+    border-radius: 8px;
+    background: #ffffff;
+    max-height: 230px;
+    overflow: auto;
+}
+
+.bulk-csv-list-empty {
+    padding: 12px;
+    font-size: 0.78rem;
+    color: #94a3b8;
+}
+
+.bulk-csv-user-row {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px solid #eef2f7;
+    font-size: 0.78rem;
+}
+
+.bulk-csv-user-row:last-child {
+    border-bottom: none;
+}
+
+.bulk-csv-user-email {
+    color: #0f172a;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bulk-csv-user-app {
+    color: #64748b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bulk-csv-user-status {
+    font-weight: 700;
+    min-width: 64px;
+    text-align: right;
+}
+
+.bulk-csv-user-status.pending { color: #94a3b8; }
+.bulk-csv-user-status.adding { color: #0ea5e9; }
+.bulk-csv-user-status.added { color: #16a34a; }
+.bulk-csv-user-status.failed { color: #dc2626; }
+
 .checkbox-label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: normal !important; }
 .checkbox-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); }
 .checkbox-label span { font-weight: 500; font-size: 0.875rem; color: var(--text); }
@@ -1001,6 +1204,33 @@ body.mobile-adaptive .checkbox-label input[type="checkbox"] { margin-top: 2px; f
     .checkbox-label { align-items: flex-start; }
     .checkbox-label input[type="checkbox"] { margin-top: 2px; flex-shrink: 0; }
 
+    .user-add-mode-switch {
+        flex-direction: column;
+    }
+
+    .user-mode-btn {
+        justify-content: flex-start;
+    }
+
+    .bulk-csv-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .bulk-csv-user-row {
+        grid-template-columns: 1fr;
+        gap: 2px;
+        text-align: left;
+    }
+
+    .bulk-csv-user-status {
+        text-align: left;
+    }
+
+    .csv-file-name {
+        width: 100%;
+    }
+
     #toastContainer { bottom: 16px; right: 12px; left: 12px; }
     .toast { width: 100%; max-width: 100%; justify-content: flex-start; }
 }
@@ -1163,8 +1393,8 @@ body.mobile-adaptive .checkbox-label input[type="checkbox"] { margin-top: 2px; f
     width: 14px;
     height: 14px;
     margin-right: 8px;
-    border: 2px solid rgba(255,255,255,0.35);
-    border-top-color: #ffffff;
+    border: 2px solid rgba(15, 23, 42, 0.2);
+    border-top-color: currentColor;
     border-radius: 50%;
     vertical-align: -2px;
     animation: spin 0.7s linear infinite;

@@ -790,6 +790,9 @@ def bulk_user_action(
 
     if request.action == "delete":
         for user in target_users:
+            # Revoke session only when the user is currently online.
+            if is_user_online(user.id, admin.tenant_id):
+                force_user_offline(user.id, admin.tenant_id)
             db.query(PasskeyCredential).filter(
                 PasskeyCredential.user_id == user.id,
                 PasskeyCredential.tenant_id == admin.tenant_id
@@ -908,6 +911,10 @@ def delete_user(
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Revoke active sessions before deleting user data only if user is online.
+    if is_user_online(user.id, admin.tenant_id):
+        force_user_offline(user.id, admin.tenant_id)
     
     # Delete user's passkey credentials
     db.query(PasskeyCredential).filter(

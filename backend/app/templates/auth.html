@@ -581,9 +581,9 @@
             text-align: center;
             margin-top: 10px;
             padding: 16px;
-            background: #fefaf6;
-            border: 1px solid #fde68a;
-            border-radius: 10px;
+            background: #fff9f7;
+            border: 1px solid #fed7c9;
+            border-radius: 12px;
             animation: fadeIn 0.3s ease;
         }
 
@@ -591,11 +591,51 @@
             display: block;
         }
 
+        .passkey-otp-inline .pk-steps {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .passkey-otp-inline .pk-step {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: #b08978;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #fff2ec;
+            border: 1px solid #ffd8c9;
+        }
+
+        .passkey-otp-inline .pk-step.active {
+            color: #ffffff;
+            background: #e8583e;
+            border-color: #e8583e;
+        }
+
+        .passkey-otp-inline .pk-step-dash {
+            width: 18px;
+            height: 2px;
+            background: #ffd8c9;
+            border-radius: 2px;
+        }
+
         .passkey-otp-inline .pk-otp-info {
             font-size: 13px;
             color: #92400e;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             font-weight: 500;
+        }
+
+        .passkey-otp-inline .pk-otp-sub {
+            font-size: 11px;
+            color: #a16207;
+            margin-bottom: 10px;
+            min-height: 16px;
         }
 
         .passkey-otp-inline .pk-otp-inputs {
@@ -892,7 +932,13 @@
                     </div>
                     <!-- Passkey OTP inline verification form -->
                     <div class="passkey-otp-inline" id="passkeyOtpInline">
+                        <div class="pk-steps">
+                            <span class="pk-step active" id="pkStepVerify">Step 1: Verify</span>
+                            <span class="pk-step-dash"></span>
+                            <span class="pk-step" id="pkStepSetup">Step 2: Set Up</span>
+                        </div>
                         <div class="pk-otp-info" id="pkOtpInfo">Enter the 6-digit code sent to your email</div>
+                        <div class="pk-otp-sub" id="pkOtpSub">Complete verification first, then set up your passkey.</div>
                         <div class="pk-otp-inputs" id="pkOtpInputs">
                             <input type="text" maxlength="1" class="pk-otp-input" data-index="0" inputmode="numeric">
                             <input type="text" maxlength="1" class="pk-otp-input" data-index="1" inputmode="numeric">
@@ -901,7 +947,7 @@
                             <input type="text" maxlength="1" class="pk-otp-input" data-index="4" inputmode="numeric">
                             <input type="text" maxlength="1" class="pk-otp-input" data-index="5" inputmode="numeric">
                         </div>
-                        <button type="button" class="pk-otp-btn" id="pkOtpVerifyBtn" onclick="handlePasskeyOtpVerify()">Verify & Set Up Passkey</button>
+                        <button type="button" class="pk-otp-btn" id="pkOtpVerifyBtn" onclick="handlePasskeyOtpVerify()">Step 1: Verify Code</button>
                         <button type="button" class="pk-otp-resend" id="pkOtpResendBtn" onclick="handlePasskeyOtpResend()">Resend code</button>
                         <button type="button" class="pk-otp-cancel" onclick="cancelPasskeyOtp()">Cancel</button>
                     </div>
@@ -1153,6 +1199,7 @@
             if (passkeyDivider) passkeyDivider.style.display = "";
             if (passkeyBtn) passkeyBtn.style.display = "";
             if (passkeyRegRow) passkeyRegRow.style.display = "";
+            if (loginBtn) loginBtn.style.display = "";
 
             const passkeyOtpInline = document.getElementById("passkeyOtpInline");
             if (passkeyOtpInline) passkeyOtpInline.classList.remove("active");
@@ -1629,14 +1676,24 @@
             const regRow = document.getElementById("passkeyRegisterRow");
             const passkeyBtn = document.getElementById("passkeyLoginBtn");
             const divider = document.querySelector("#loginSection .divider");
+            const loginBtn = document.getElementById("loginBtn");
+            const verifyStep = document.getElementById("pkStepVerify");
+            const setupStep = document.getElementById("pkStepSetup");
+            const sub = document.getElementById("pkOtpSub");
+            const verifyBtn = document.getElementById("pkOtpVerifyBtn");
 
             if (regRow) regRow.style.display = "none";
             if (passkeyBtn) passkeyBtn.style.display = "none";
             if (divider) divider.style.display = "none";
+            if (loginBtn) loginBtn.style.display = "none";
             enablePasskeySetupMode();
 
             document.getElementById("pkOtpInfo").innerHTML =
                 `Enter the 6-digit code sent to<br><strong>${email}</strong>`;
+            if (sub) sub.textContent = "Complete verification first, then set up your passkey.";
+            if (verifyStep) verifyStep.classList.add("active");
+            if (setupStep) setupStep.classList.remove("active");
+            if (verifyBtn) verifyBtn.textContent = "Step 1: Verify Code";
             otpForm.classList.add("active");
 
             // Clear any previous values
@@ -1656,8 +1713,10 @@
             // Restore passkey buttons
             const passkeyBtn = document.getElementById("passkeyLoginBtn");
             const divider = document.querySelector("#loginSection .divider");
+            const loginBtn = document.getElementById("loginBtn");
             if (passkeyBtn) passkeyBtn.style.display = "";
             if (divider) divider.style.display = "";
+            if (loginBtn) loginBtn.style.display = "";
             disablePasskeySetupMode();
             checkPasskeyStatus();
         }
@@ -1739,9 +1798,15 @@
 
                     // Store options and require a second explicit click for WebAuthn user gesture reliability.
                     passkeyPendingOptions = otpData.options;
+                    const verifyStep = document.getElementById("pkStepVerify");
+                    const setupStep = document.getElementById("pkStepSetup");
+                    const sub = document.getElementById("pkOtpSub");
+                    if (verifyStep) verifyStep.classList.remove("active");
+                    if (setupStep) setupStep.classList.add("active");
+                    if (sub) sub.textContent = "Verification complete. Continue to create your passkey.";
                     verifyBtn.disabled = false;
-                    verifyBtn.textContent = "Continue passkey setup";
-                    showSuccess("Code verified. Click 'Continue passkey setup' to finish.");
+                    verifyBtn.textContent = "Step 2: Set Up Passkey";
+                    showSuccess("Code verified. Click 'Step 2: Set Up Passkey' to finish.");
                     return;
                 }
 
@@ -1809,12 +1874,14 @@
                         showSuccess(completeData.message || "Passkey registered! You can now use it to sign in.");
                         // Hide the setup row since passkey now exists
                         const regRow = document.getElementById("passkeyRegisterRow");
+                        const loginBtn = document.getElementById("loginBtn");
                         if (regRow) regRow.style.display = "none";
                         // Restore login buttons
                         const passkeyBtn = document.getElementById("passkeyLoginBtn");
                         const divider = document.querySelector("#loginSection .divider");
                         if (passkeyBtn) passkeyBtn.style.display = "";
                         if (divider) divider.style.display = "";
+                        if (loginBtn) loginBtn.style.display = "";
                         disablePasskeySetupMode();
                     }, 1500);
                 } else {
@@ -1839,10 +1906,10 @@
             } finally {
                 if (passkeyPendingOptions) {
                     verifyBtn.disabled = false;
-                    verifyBtn.textContent = "Continue passkey setup";
+                    verifyBtn.textContent = "Step 2: Set Up Passkey";
                 } else {
                     verifyBtn.disabled = false;
-                    verifyBtn.textContent = "Verify & Set Up Passkey";
+                    verifyBtn.textContent = "Step 1: Verify Code";
                 }
             }
         }
