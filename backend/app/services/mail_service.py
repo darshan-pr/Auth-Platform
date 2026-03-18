@@ -13,6 +13,11 @@ DEV_MODE = False
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 
+def _get_logo_url() -> str:
+    """Return a public logo URL that email clients can always load."""
+    return "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRrugJcpnwgDvPDr6Gr41KzsEcfImRD9kpn45FCA-InPo42p8ht"
+
+
 def _load_template(template_name: str, **kwargs) -> str:
     """Load an HTML template and substitute {{ key }} placeholders."""
     template_path = TEMPLATES_DIR / template_name
@@ -90,7 +95,7 @@ def send_otp_email(to: str, otp: str, app_name: str = "Auth Platform") -> bool:
             f"If you didn't request this code, please ignore this email.\n\n"
             f"Best regards,\n{app_name} Team\n\nSecured by Auth Platform !"
         )
-        html = _load_template("otp.html", app_name=app_name, otp=otp)
+        html = _load_template("otp.html", app_name=app_name, otp=otp, logo_url=_get_logo_url())
 
         _send_email(to, f"Your OTP Code - {app_name}", plain, html)
         logger.info(f"OTP email sent to {to}")
@@ -119,7 +124,12 @@ def send_password_reset_email(to: str, otp: str, app_name: str = "Auth Platform"
             f"If you didn't request a password reset, please ignore this email.\n\n"
             f"Best regards,\n{app_name} Team\nSecured by Auth Platform !"
         )
-        html = _load_template("forgot_password_otp.html", app_name=app_name, otp=otp)
+        html = _load_template(
+            "forgot_password_otp.html",
+            app_name=app_name,
+            otp=otp,
+            logo_url=_get_logo_url(),
+        )
 
         _send_email(to, f"Password Reset Request - {app_name}", plain, html)
         logger.info(f"Password reset OTP email sent to {to}")
@@ -148,7 +158,12 @@ def send_password_reset_token_email(to: str, token: str, app_name: str = "Auth P
             f"If you didn't request a password reset, please ignore this email.\n\n"
             f"Best regards,\n{app_name} Team\nSecured by Auth Platform !"
         )
-        html = _load_template("forgot_password_token.html", app_name=app_name, token=token)
+        html = _load_template(
+            "forgot_password_token.html",
+            app_name=app_name,
+            token=token,
+            logo_url=_get_logo_url(),
+        )
 
         _send_email(to, f"Password Reset Request - {app_name}", plain, html)
         logger.info(f"Password reset token email sent to {to}")
@@ -201,6 +216,7 @@ def send_login_notification_email(
             session_expiry=session_expiry,
             access_token_expiry_minutes=str(access_token_expiry_minutes),
             refresh_token_expiry_days=str(refresh_token_expiry_days),
+            logo_url=_get_logo_url(),
         )
 
         _send_email(to, f"New Login Detected - {app_name}", plain, html)
@@ -240,6 +256,7 @@ def send_admin_welcome_email(to: str, tenant_name: str, app_name: str = "Auth Pl
             app_name=app_name,
             tenant_name=tenant_name,
             admin_email=to,
+            logo_url=_get_logo_url(),
         )
 
         _send_email(to, f"Welcome to {app_name}", plain, html)
@@ -270,7 +287,12 @@ def send_set_password_email(to: str, reset_link: str, app_name: str = "Auth Plat
             f"If you didn't expect this email, you can safely ignore it.\n\n"
             f"Best regards,\n{app_name} Team\nSecured by Auth Platform !"
         )
-        html = _load_template("set_password.html", app_name=app_name, reset_link=reset_link)
+        html = _load_template(
+            "set_password.html",
+            app_name=app_name,
+            reset_link=reset_link,
+            logo_url=_get_logo_url(),
+        )
 
         _send_email(to, f"Set Your Password - {app_name}", plain, html)
         logger.info(f"Set password email sent to {to}")
@@ -310,6 +332,7 @@ def send_force_logout_email(to: str, app_name: str = "Auth Platform") -> bool:
             app_name=app_name,
             email=to,
             revoked_at=revoked_at,
+            logo_url=_get_logo_url(),
         )
 
         _send_email(to, f"Session Revoked - {app_name}", plain, html)

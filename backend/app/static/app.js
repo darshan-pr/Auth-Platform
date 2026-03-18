@@ -724,12 +724,10 @@ async function forceLogoutUserById(userId, email) {
 function confirmForceLogout(userId, email) {
     document.getElementById('forceLogoutTargetName').textContent = email;
     document.getElementById('forceLogoutConfirmBtn').onclick = async () => {
-        // Disable button to prevent double-click
         const btn = document.getElementById('forceLogoutConfirmBtn');
         const originalText = btn.innerHTML;
         btn.disabled = true;
-        btn.innerHTML = '<i data-lucide="loader"></i> Logging out...';
-        renderIcons();
+        btn.innerHTML = '<span class="btn-inline-spinner" aria-hidden="true"></span>Forcing logout...';
 
         try {
             const response = await fetch(`${API_URL}/admin/users/${userId}/force-logout`, { method: 'POST' });

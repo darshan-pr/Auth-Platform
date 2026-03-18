@@ -3,97 +3,148 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>New Login Detected</title>
+<title>New Login Detected — {{ app_name }}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+  body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+  @media only screen and (max-width:600px) {
+    .email-wrapper { padding:16px 8px !important; }
+    .email-card { border-radius:16px !important; }
+    .card-body { padding:28px 20px !important; }
+    .card-header { padding:28px 20px !important; }
+    .detail-label { width:100px !important; }
+  }
+</style>
 </head>
-<body style="margin:0;padding:0;background:transparent;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:transparent;padding:24px 12px;">
+<body style="margin:0;padding:0;background:#F5F3EE;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="email-wrapper" style="background:#F5F3EE;padding:32px 16px;">
 <tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;box-shadow:0 2px 16px rgba(0,0,0,0.08);overflow:hidden;">
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="email-card" style="max-width:540px;background:#FFFFFF;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
 
     <!-- Header -->
     <tr>
-        <td style="background:linear-gradient(135deg,#27ae60 0%,#2ecc71 100%);padding:32px 36px;text-align:center;">
-            <div style="width:48px;height:48px;margin:0 auto 12px;background:rgba(255,255,255,0.2);border-radius:12px;line-height:48px;font-size:20px;color:#fff;font-weight:700;">LOG</div>
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">Successful Login</h1>
-            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">{{ app_name }}</p>
-        </td>
+      <td class="card-header" style="padding:36px 40px 28px;text-align:center;border-bottom:1px solid #F0EDE8;">
+        <img src="{{ logo_url }}" alt="{{ app_name }}" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;-webkit-border-radius:14px;object-fit:cover;">
+        <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:#F97316;">SECURITY ALERT</p>
+        <h1 style="margin:8px 0 4px;font-size:22px;font-weight:700;color:#111827;line-height:1.3;">New Login Detected</h1>
+        <p style="margin:0;font-size:13px;color:#9CA3AF;">{{ app_name }}</p>
+      </td>
     </tr>
 
     <!-- Body -->
     <tr>
-        <td style="padding:36px;">
-            <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.6;">Hello,</p>
-            <p style="margin:0 0 24px;font-size:15px;color:#333;line-height:1.6;">
-                A successful login was detected on your account. Here are the details:
-            </p>
+      <td class="card-body" style="padding:32px 40px;">
 
-            <!-- Session Info Card -->
-            <div style="background:#f8f9fa;border-radius:12px;padding:24px;margin:0 0 24px;">
+        <p style="margin:0 0 20px;font-size:14px;color:#374151;line-height:1.7;">
+          A successful login was detected on your account. Review the details below. If this wasn't you, reset your password immediately.
+        </p>
+
+        <!-- Session Card -->
+        <div style="background:#FAFAF8;border:1px solid #F0EDE8;border-radius:14px;overflow:hidden;margin:0 0 24px;">
+
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="padding:13px 18px;border-bottom:1px solid #F0EDE8;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                        <td style="padding:8px 0;font-size:13px;color:#888;width:140px;">Email</td>
-                        <td style="padding:8px 0;font-size:14px;color:#333;font-weight:500;">{{ email }}</td>
-                    </tr>
-                    <tr>
-                        <td colspan="2" style="border-bottom:1px solid #eee;"></td>
-                    </tr>
-                    <tr>
-                        <td style="padding:8px 0;font-size:13px;color:#888;">Login Time</td>
-                        <td style="padding:8px 0;font-size:14px;color:#333;font-weight:500;">{{ login_time }}</td>
-                    </tr>
-                    <tr>
-                        <td colspan="2" style="border-bottom:1px solid #eee;"></td>
-                    </tr>
-                    <tr>
-                        <td style="padding:8px 0;font-size:13px;color:#888;">Location</td>
-                        <td style="padding:8px 0;font-size:14px;color:#333;font-weight:500;">{{ location }}</td>
-                    </tr>
-                    <tr>
-                        <td colspan="2" style="border-bottom:1px solid #eee;"></td>
-                    </tr>
-                    <tr>
-                        <td style="padding:8px 0;font-size:13px;color:#888;">Session Expiry</td>
-                        <td style="padding:8px 0;font-size:14px;color:#333;font-weight:500;">{{ session_expiry }}</td>
-                    </tr>
-                    <tr>
-                        <td colspan="2" style="border-bottom:1px solid #eee;"></td>
-                    </tr>
-                    <tr>
-                        <td style="padding:8px 0;font-size:13px;color:#888;">Access Token</td>
-                        <td style="padding:8px 0;font-size:14px;color:#333;">Expires in <strong>{{ access_token_expiry_minutes }} minutes</strong></td>
-                    </tr>
-                    <tr>
-                        <td colspan="2" style="border-bottom:1px solid #eee;"></td>
-                    </tr>
-                    <tr>
-                        <td style="padding:8px 0;font-size:13px;color:#888;">Refresh Token</td>
-                        <td style="padding:8px 0;font-size:14px;color:#333;">Expires in <strong>{{ refresh_token_expiry_days }} days</strong></td>
-                    </tr>
+                  <tr>
+                    <td class="detail-label" style="font-size:12px;color:#9CA3AF;font-weight:500;width:130px;">Email</td>
+                    <td style="font-size:13.5px;color:#111827;font-weight:500;">{{ email }}</td>
+                  </tr>
                 </table>
-            </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:13px 18px;border-bottom:1px solid #F0EDE8;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td class="detail-label" style="font-size:12px;color:#9CA3AF;font-weight:500;width:130px;">Login Time</td>
+                    <td style="font-size:13.5px;color:#111827;font-weight:500;">{{ login_time }}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:13px 18px;border-bottom:1px solid #F0EDE8;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td class="detail-label" style="font-size:12px;color:#9CA3AF;font-weight:500;width:130px;">Location</td>
+                    <td style="font-size:13.5px;color:#111827;font-weight:500;">{{ location }}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:13px 18px;border-bottom:1px solid #F0EDE8;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td class="detail-label" style="font-size:12px;color:#9CA3AF;font-weight:500;width:130px;">Session Expiry</td>
+                    <td style="font-size:13.5px;color:#111827;font-weight:500;">{{ session_expiry }}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:13px 18px;border-bottom:1px solid #F0EDE8;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td class="detail-label" style="font-size:12px;color:#9CA3AF;font-weight:500;width:130px;">Access Token</td>
+                    <td style="font-size:13.5px;color:#111827;">Expires in <strong>{{ access_token_expiry_minutes }} min</strong></td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:13px 18px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td class="detail-label" style="font-size:12px;color:#9CA3AF;font-weight:500;width:130px;">Refresh Token</td>
+                    <td style="font-size:13.5px;color:#111827;">Expires in <strong>{{ refresh_token_expiry_days }} days</strong></td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
 
-            <div style="background:#fef2f2;border-left:4px solid #e74c3c;border-radius:0 8px 8px 0;padding:14px 16px;margin:0 0 24px;">
-                <p style="margin:0;font-size:13px;color:#991b1b;line-height:1.5;">
-                    <strong>Not you?</strong> If you didn't perform this login, please reset your password immediately and secure your account.
-                </p>
-            </div>
+        </div>
 
-            <p style="margin:0;font-size:13px;color:#888;line-height:1.5;">
-                This is an automated security notification. You're receiving this because login alerts are enabled for {{ app_name }}.
-            </p>
-        </td>
+        <!-- Not you alert -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+          <tr>
+            <td style="background:#FFF1F0;border-radius:10px;padding:14px 16px;border-left:3px solid #EF4444;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="vertical-align:top;padding-right:10px;font-size:16px;line-height:1;">🚨</td>
+                  <td style="font-size:13px;color:#B91C1C;line-height:1.6;">
+                    <strong>Not you?</strong> Reset your password immediately and review your account for any unauthorized activity.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+
+        <div style="height:1px;background:#F0EDE8;margin:0 0 20px;"></div>
+
+        <p style="margin:0;font-size:12.5px;color:#9CA3AF;line-height:1.7;">
+          This is an automated security notification. You're receiving this because login alerts are enabled for {{ app_name }}.
+        </p>
+
+      </td>
     </tr>
 
     <!-- Footer -->
     <tr>
-        <td style="background:#f8f9fa;padding:20px 36px;text-align:center;border-top:1px solid #eee;">
-            <p style="margin:0;font-size:12px;color:#aaa;">
-                Secured by <strong style="color:#667eea;">Auth Platform</strong>
-            </p>
-        </td>
+      <td style="padding:18px 40px;text-align:center;background:#FAFAF8;border-top:1px solid #F0EDE8;">
+        <p style="margin:0;font-size:11.5px;color:#9CA3AF;">
+          Secured by <strong style="color:#F97316;">{{ app_name }}</strong> · Auth Platform
+        </p>
+      </td>
     </tr>
 
-</table>
+  </table>
+
 </td></tr>
 </table>
 </body>

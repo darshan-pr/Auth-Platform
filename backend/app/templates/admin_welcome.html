@@ -3,50 +3,139 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Welcome to {{ app_name }}</title>
+<title>Welcome — {{ app_name }}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+  body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+  table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
+  img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
+  @media only screen and (max-width:600px) {
+    .email-wrapper { padding:16px 8px !important; }
+    .email-card { border-radius:16px !important; }
+    .card-body { padding:28px 20px !important; }
+    .card-header { padding:28px 20px !important; }
+    .card-footer { padding:16px 20px !important; }
+    .service-item { font-size:13px !important; }
+  }
+</style>
 </head>
-<body style="margin:0;padding:0;background:transparent;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:transparent;padding:24px 12px;">
+<body style="margin:0;padding:0;background:#F5F3EE;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="email-wrapper" style="background:#F5F3EE;padding:32px 16px;">
 <tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;box-shadow:0 2px 16px rgba(0,0,0,0.08);overflow:hidden;">
 
+  <!-- Email Card -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="email-card" style="max-width:540px;background:#FFFFFF;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+
+    <!-- Header -->
     <tr>
-        <td style="background:linear-gradient(135deg,#1f2937 0%,#111827 100%);padding:28px 28px;text-align:center;">
-            <div style="width:44px;height:44px;margin:0 auto 10px;background:rgba(255,255,255,0.16);border-radius:10px;line-height:44px;font-size:18px;color:#fff;font-weight:700;">ADM</div>
-            <h1 style="margin:0;color:#ffffff;font-size:21px;font-weight:600;">Welcome</h1>
-            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">{{ app_name }}</p>
-        </td>
+      <td class="card-header" style="padding:36px 40px 28px;text-align:center;border-bottom:1px solid #F0EDE8;">
+        <img src="{{ logo_url }}" alt="{{ app_name }}" width="52" height="52" style="display:block;margin:0 auto 16px;border-radius:14px;-webkit-border-radius:14px;object-fit:cover;">
+        <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:#F97316;">ADMIN ACCESS GRANTED</p>
+        <h1 style="margin:8px 0 4px;font-size:22px;font-weight:700;color:#111827;line-height:1.3;">Welcome to {{ app_name }}</h1>
+        <p style="margin:0;font-size:13px;color:#9CA3AF;">Your admin account is ready to go</p>
+      </td>
     </tr>
 
+    <!-- Body -->
     <tr>
-        <td style="padding:28px;">
-            <p style="margin:0 0 14px;font-size:15px;color:#1f2937;line-height:1.6;">Hello {{ admin_email }},</p>
-            <p style="margin:0 0 18px;font-size:14px;color:#374151;line-height:1.6;">
-                Your admin account is now active for tenant <strong>{{ tenant_name }}</strong>.
-            </p>
+      <td class="card-body" style="padding:32px 40px;">
 
-            <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px;margin:0 0 18px;">
-                <p style="margin:0 0 10px;font-size:13px;color:#6b7280;font-weight:600;">Available Services</p>
-                <p style="margin:0 0 6px;font-size:14px;color:#374151;line-height:1.5;">1. OAuth 2.0 with PKCE and hosted login flow</p>
-                <p style="margin:0 0 6px;font-size:14px;color:#374151;line-height:1.5;">2. OTP and passkey authentication controls</p>
-                <p style="margin:0 0 6px;font-size:14px;color:#374151;line-height:1.5;">3. Multi-tenant app and user management</p>
-                <p style="margin:0 0 6px;font-size:14px;color:#374151;line-height:1.5;">4. Login event tracking and security notifications</p>
-                <p style="margin:0;font-size:14px;color:#374151;line-height:1.5;">5. Token and session lifecycle controls</p>
-            </div>
+        <p style="margin:0 0 6px;font-size:13px;color:#6B7280;">Hello,</p>
+        <p style="margin:0 0 24px;font-size:14px;color:#374151;line-height:1.7;">
+          Your admin account has been activated for tenant <strong style="color:#111827;">{{ tenant_name }}</strong>. You now have full access to configure and manage your authentication platform.
+        </p>
 
-            <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.6;">
-                You can now sign in to the admin console and configure your first application.
-            </p>
-        </td>
+        <!-- Divider -->
+        <div style="height:1px;background:#F0EDE8;margin:0 0 24px;"></div>
+
+        <!-- Services -->
+        <p style="margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#9CA3AF;">Available Services</p>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:9px 0;border-bottom:1px solid #F9F8F6;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="width:28px;padding-right:4px;">
+                    <div style="width:24px;height:24px;background:#FFF3E8;border-radius:6px;text-align:center;line-height:24px;font-size:12px;">🔐</div>
+                  </td>
+                  <td class="service-item" style="font-size:13.5px;color:#374151;">OAuth 2.0 with PKCE &amp; hosted login flow</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:9px 0;border-bottom:1px solid #F9F8F6;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="width:28px;padding-right:4px;">
+                    <div style="width:24px;height:24px;background:#FFF3E8;border-radius:6px;text-align:center;line-height:24px;font-size:12px;">📱</div>
+                  </td>
+                  <td class="service-item" style="font-size:13.5px;color:#374151;">OTP and passkey authentication controls</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:9px 0;border-bottom:1px solid #F9F8F6;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="width:28px;padding-right:4px;">
+                    <div style="width:24px;height:24px;background:#FFF3E8;border-radius:6px;text-align:center;line-height:24px;font-size:12px;">🏢</div>
+                  </td>
+                  <td class="service-item" style="font-size:13.5px;color:#374151;">Multi-tenant app and user management</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:9px 0;border-bottom:1px solid #F9F8F6;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="width:28px;padding-right:4px;">
+                    <div style="width:24px;height:24px;background:#FFF3E8;border-radius:6px;text-align:center;line-height:24px;font-size:12px;">🔔</div>
+                  </td>
+                  <td class="service-item" style="font-size:13.5px;color:#374151;">Login event tracking &amp; security notifications</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:9px 0;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="width:28px;padding-right:4px;">
+                    <div style="width:24px;height:24px;background:#FFF3E8;border-radius:6px;text-align:center;line-height:24px;font-size:12px;">⚡</div>
+                  </td>
+                  <td class="service-item" style="font-size:13.5px;color:#374151;">Token and session lifecycle controls</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Divider -->
+        <div style="height:1px;background:#F0EDE8;margin:24px 0;"></div>
+
+        <p style="margin:0;font-size:13px;color:#6B7280;line-height:1.7;">
+          Sign in to the admin console to configure your first application. If you have any questions, reach out to your platform team.
+        </p>
+
+      </td>
     </tr>
 
+    <!-- Footer -->
     <tr>
-        <td style="background:#f9fafb;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb;">
-            <p style="margin:0;font-size:12px;color:#9ca3af;">Secured by <strong style="color:#4b5563;">Auth Platform</strong></p>
-        </td>
+      <td class="card-footer" style="padding:18px 40px;text-align:center;background:#FAFAF8;border-top:1px solid #F0EDE8;">
+        <p style="margin:0;font-size:11.5px;color:#9CA3AF;">
+          Secured by <strong style="color:#F97316;">{{ app_name }}</strong> · Auth Platform
+        </p>
+      </td>
     </tr>
 
-</table>
+  </table>
+
 </td></tr>
 </table>
 </body>

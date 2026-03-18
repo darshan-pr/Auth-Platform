@@ -452,16 +452,24 @@
 
         /* ====== Responsive ====== */
         @media (max-width: 720px) {
+            html { background: transparent !important; }
+            body { background: transparent !important; }
             .illustration-panel { display: none; }
             .mobile-illust { display: flex; }
+            .auth-container { padding: 0; }
 
             .auth-card {
+                background: transparent;
                 border-radius: 20px;
+                box-shadow: none;
                 height: auto;
                 min-height: unset;
             }
 
             .form-panel {
+                background: #fff;
+                border-radius: 20px;
+                box-shadow: 0 8px 30px rgba(0,0,0,0.10);
                 padding: 28px 24px 24px;
             }
 
@@ -479,7 +487,7 @@
         }
 
         @media (max-width: 400px) {
-            .auth-container { padding: 12px; }
+            .auth-container { padding: 0 !important; }
             .form-panel { padding: 24px 18px 22px; }
             .otp-input { width: 40px; height: 46px; font-size: 18px; }
             .otp-inputs { gap: 6px; }
@@ -541,7 +549,7 @@
                             <button type="button" class="forgot-link" onclick="showSection('forgot')">Forgot password?</button>
                         </div>
                         <button type="submit" class="btn-primary" id="loginBtn">
-                            Login
+                            <span class="btn-label">Login</span>
                             <span class="spinner"></span>
                         </button>
                     </form>
@@ -568,7 +576,7 @@
                             <input type="password" class="input-field" id="signupConfirmPassword" placeholder="Confirm Password" required autocomplete="new-password">
                         </div>
                         <button type="submit" class="btn-primary" id="signupBtn">
-                            Create Account
+                            <span class="btn-label">Create Account</span>
                             <span class="spinner"></span>
                         </button>
                     </form>
@@ -594,7 +602,7 @@
                             <input type="text" maxlength="1" class="otp-input" data-index="5" inputmode="numeric">
                         </div>
                         <button type="submit" class="btn-primary" id="otpBtn">
-                            Verify and Continue
+                            <span class="btn-label">Verify and Continue</span>
                             <span class="spinner"></span>
                         </button>
                         <button type="button" class="btn-link" onclick="showSection('login')">Back to sign in</button>
@@ -612,7 +620,7 @@
                             <input type="email" class="input-field" id="forgotEmail" placeholder="Email" required autocomplete="email">
                         </div>
                         <button type="submit" class="btn-primary" id="forgotBtn">
-                            Send Reset Code
+                            <span class="btn-label">Send Reset Code</span>
                             <span class="spinner"></span>
                         </button>
                         <button type="button" class="btn-link" onclick="showSection('login')">Back to sign in</button>
@@ -644,7 +652,7 @@
                             <input type="password" class="input-field" id="resetConfirmPassword" placeholder="Confirm New Password" required autocomplete="new-password">
                         </div>
                         <button type="submit" class="btn-primary" id="resetBtn">
-                            Reset Password
+                            <span class="btn-label">Reset Password</span>
                             <span class="spinner"></span>
                         </button>
                         <button type="button" class="btn-link" onclick="showSection('forgot')">Back</button>
@@ -836,7 +844,7 @@
             const password = document.getElementById("loginPassword").value;
             currentEmail = email;
 
-            setLoading("loginBtn", true);
+            setLoading("loginBtn", true, "Verifying...");
 
             try {
                 const res = await fetch(`${API_BASE}/oauth/authenticate`, {
@@ -853,6 +861,8 @@
 
                 if (res.ok) {
                     if (data.action === "show_otp") {
+                        setLoading("loginBtn", true, "Sending OTP...");
+                        await new Promise(resolve => setTimeout(resolve, 220));
                         showSection("otp");
                         document.getElementById("otpEmailDisplay").textContent = email;
                         setTimeout(() => {
@@ -923,7 +933,7 @@
             const email = document.getElementById("forgotEmail").value.trim();
             resetEmail = email;
 
-            setLoading("forgotBtn", true);
+            setLoading("forgotBtn", true, "Verifying...");
 
             try {
                 const res = await fetch(`${API_BASE}/oauth/authenticate`, {
@@ -938,6 +948,8 @@
                 const data = await res.json();
 
                 if (res.ok) {
+                    setLoading("forgotBtn", true, "Sending OTP...");
+                    await new Promise(resolve => setTimeout(resolve, 220));
                     showSection("resetOtp");
                     document.getElementById("resetOtpEmailDisplay").textContent = email;
                     setTimeout(() => {
@@ -1067,10 +1079,25 @@
             document.getElementById("successMsg").className = "msg";
         }
 
-        function setLoading(btnId, loading) {
+        function setLoading(btnId, loading, loadingText = null) {
             const btn = document.getElementById(btnId);
+            if (!btn) return;
+
+            const labelEl = btn.querySelector(".btn-label");
+            if (labelEl && !btn.dataset.defaultLabel) {
+                btn.dataset.defaultLabel = labelEl.textContent.trim();
+            }
+
             btn.classList.toggle("loading", loading);
             btn.disabled = loading;
+
+            if (labelEl) {
+                if (loading && loadingText) {
+                    labelEl.textContent = loadingText;
+                } else if (!loading && btn.dataset.defaultLabel) {
+                    labelEl.textContent = btn.dataset.defaultLabel;
+                }
+            }
         }
     </script>
     {% endif %}
