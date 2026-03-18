@@ -575,6 +575,98 @@
             margin-right: 4px;
         }
 
+        /* ====== Passkey OTP Inline ====== */
+        .passkey-otp-inline {
+            display: none;
+            text-align: center;
+            margin-top: 10px;
+            padding: 16px;
+            background: #fefaf6;
+            border: 1px solid #fde68a;
+            border-radius: 10px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .passkey-otp-inline.active {
+            display: block;
+        }
+
+        .passkey-otp-inline .pk-otp-info {
+            font-size: 13px;
+            color: #92400e;
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+
+        .passkey-otp-inline .pk-otp-inputs {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .passkey-otp-inline .pk-otp-input {
+            width: 40px;
+            height: 46px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: 600;
+            border: 1.5px solid #e2e2e5;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+
+        .passkey-otp-inline .pk-otp-input:focus {
+            border-color: #e8583e;
+            box-shadow: 0 0 0 3px rgba(232, 88, 62, 0.1);
+        }
+
+        .passkey-otp-inline .pk-otp-btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            background: #e8583e;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+
+        .passkey-otp-inline .pk-otp-btn:hover {
+            background: #d44a30;
+        }
+
+        .passkey-otp-inline .pk-otp-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .passkey-otp-inline .pk-otp-resend {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #a16207;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            text-decoration: underline;
+        }
+
+        .passkey-otp-inline .pk-otp-cancel {
+            margin-top: 4px;
+            font-size: 11px;
+            color: #888;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
         /* ====== Bottom Row ====== */
         .bottom-row {
             display: flex;
@@ -738,7 +830,7 @@
                     <form onsubmit="handleLogin(event)">
                         <div class="form-group">
                             <label for="loginEmail">Email</label>
-                            <input type="email" class="input-field" id="loginEmail" placeholder="Email" required autocomplete="email">
+                            <input type="email" class="input-field" id="loginEmail" placeholder="Email" required autocomplete="email" onblur="checkPasskeyStatus()">
                         </div>
 
                         <!-- Password group (hidden when OTP is showing) -->
@@ -784,11 +876,26 @@
                         </svg>
                         Sign in with passkey
                     </button>
-                    <div class="passkey-register-row" id="passkeyRegisterRow">
-                        <button type="button" class="passkey-register-link" onclick="handlePasskeyRegister()">
+                    <div class="passkey-register-row" id="passkeyRegisterRow" style="display:none">
+                        <button type="button" class="passkey-register-link" id="passkeyRegisterBtn" onclick="handlePasskeyRegister()">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
                             Set up a passkey for faster sign-in
                         </button>
+                    </div>
+                    <!-- Passkey OTP inline verification form -->
+                    <div class="passkey-otp-inline" id="passkeyOtpInline">
+                        <div class="pk-otp-info" id="pkOtpInfo">Enter the 6-digit code sent to your email</div>
+                        <div class="pk-otp-inputs" id="pkOtpInputs">
+                            <input type="text" maxlength="1" class="pk-otp-input" data-index="0" inputmode="numeric">
+                            <input type="text" maxlength="1" class="pk-otp-input" data-index="1" inputmode="numeric">
+                            <input type="text" maxlength="1" class="pk-otp-input" data-index="2" inputmode="numeric">
+                            <input type="text" maxlength="1" class="pk-otp-input" data-index="3" inputmode="numeric">
+                            <input type="text" maxlength="1" class="pk-otp-input" data-index="4" inputmode="numeric">
+                            <input type="text" maxlength="1" class="pk-otp-input" data-index="5" inputmode="numeric">
+                        </div>
+                        <button type="button" class="pk-otp-btn" id="pkOtpVerifyBtn" onclick="handlePasskeyOtpVerify()">Verify & Set Up Passkey</button>
+                        <button type="button" class="pk-otp-resend" id="pkOtpResendBtn" onclick="handlePasskeyOtpResend()">Resend code</button>
+                        <button type="button" class="pk-otp-cancel" onclick="cancelPasskeyOtp()">Cancel</button>
                     </div>
                     {% endif %}
 
@@ -917,6 +1024,8 @@
         let resetEmail = "";
         let activeSection = "login";
         let loginState = "password"; // "password" or "otp"
+        let passkeySetupMode = false;
+        let passkeyPendingOptions = null;
 
         // ==================== Section Transitions ====================
 
@@ -1027,6 +1136,10 @@
             if (passkeyDivider) passkeyDivider.style.display = "";
             if (passkeyBtn) passkeyBtn.style.display = "";
             if (passkeyRegRow) passkeyRegRow.style.display = "";
+
+            const passkeyOtpInline = document.getElementById("passkeyOtpInline");
+            if (passkeyOtpInline) passkeyOtpInline.classList.remove("active");
+            passkeySetupMode = false;
         }
 
         // ==================== Signup ====================
@@ -1173,13 +1286,11 @@
         function showPasskeyOverlay(state, status, hint) {
             const overlay = document.getElementById('passkeyOverlay');
             const icon = document.getElementById('pkIcon');
-            const ring = document.getElementById('pkRing');
             const statusEl = document.getElementById('pkStatus');
             const hintEl = document.getElementById('pkHint');
-            if (!overlay) return;
+            if (!overlay || !icon || !statusEl || !hintEl) return;
 
             icon.className = 'pk-icon ' + state;
-            ring.style.display = state === 'waiting' ? '' : 'none';
 
             // Swap icon SVG based on state
             if (state === 'success') {
@@ -1188,6 +1299,11 @@
                 icon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
             } else {
                 icon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg><div class="pk-ring" id="pkRing"></div>';
+            }
+
+            const ring = icon.querySelector('#pkRing');
+            if (ring) {
+                ring.style.display = state === 'waiting' ? '' : 'none';
             }
 
             statusEl.textContent = status;
@@ -1200,12 +1316,73 @@
             if (overlay) overlay.classList.remove('active');
         }
 
+        function setButtonBusy(btn, busy, busyLabel) {
+            if (!btn) return;
+            if (busy) {
+                if (!btn.dataset.originalHtml) {
+                    btn.dataset.originalHtml = btn.innerHTML;
+                }
+                btn.disabled = true;
+                btn.classList.add("loading");
+                btn.textContent = busyLabel;
+                return;
+            }
+            btn.disabled = false;
+            btn.classList.remove("loading");
+            if (btn.dataset.originalHtml) {
+                btn.innerHTML = btn.dataset.originalHtml;
+            }
+        }
+
+        async function parseApiResponse(res) {
+            const contentType = (res.headers.get("content-type") || "").toLowerCase();
+            if (contentType.includes("application/json")) {
+                try {
+                    return await res.json();
+                } catch {
+                    // Fall through to text parser for malformed JSON bodies.
+                }
+            }
+            const text = await res.text();
+            return {
+                detail: text || `Request failed (HTTP ${res.status})`,
+                raw: text || ""
+            };
+        }
+
+        function enablePasskeySetupMode() {
+            if (passkeySetupMode) return;
+            passkeySetupMode = true;
+
+            const pwGroup = document.getElementById("loginPasswordGroup");
+            const loginPassword = document.getElementById("loginPassword");
+            if (pwGroup) pwGroup.style.display = "none";
+            if (loginPassword) loginPassword.removeAttribute("required");
+        }
+
+        function disablePasskeySetupMode() {
+            passkeySetupMode = false;
+            if (loginState !== "password") return;
+
+            const pwGroup = document.getElementById("loginPasswordGroup");
+            const loginPassword = document.getElementById("loginPassword");
+            if (pwGroup) pwGroup.style.display = "";
+            if (loginPassword) loginPassword.setAttribute("required", "");
+        }
+
         async function handlePasskeyLogin() {
             if (!PASSKEY_ENABLED) return;
             clearMessages();
 
+            const email = document.getElementById("loginEmail").value.trim();
+            if (!email) {
+                showError("Enter your email first to sign in with passkey.");
+                document.getElementById("loginEmail").focus();
+                return;
+            }
+
             const btn = document.getElementById("passkeyLoginBtn");
-            btn.classList.add("loading");
+            setButtonBusy(btn, true, "Checking account...");
             showPasskeyOverlay('waiting', 'Initiating passkey...', 'Connecting to server');
 
             try {
@@ -1217,10 +1394,11 @@
                     body: JSON.stringify({
                         session_id: SESSION_ID,
                         action: "passkey_auth_begin",
+                        email: email,
                         rp_id: rpId
                     })
                 });
-                const beginData = await beginRes.json();
+                const beginData = await parseApiResponse(beginRes);
 
                 if (!beginRes.ok) {
                     showPasskeyOverlay('error', 'Connection failed', beginData.detail || '');
@@ -1228,10 +1406,11 @@
                     return;
                 }
 
-                // If no passkeys registered, prompt user to create one
-                if (beginData.action === "no_passkeys") {
+                // If no passkey for this account, prompt user to create one
+                if (beginData.action === "no_passkey_for_account") {
                     hidePasskeyOverlay();
                     showPasskeySetupPrompt();
+                    showError(beginData.message || "No passkey is linked to this account.");
                     return;
                 }
 
@@ -1265,6 +1444,7 @@
                     body: JSON.stringify({
                         session_id: SESSION_ID,
                         action: "passkey_auth_complete",
+                        email: email,
                         rp_id: rpId,
                         credential: {
                             id: bufferToBase64url(assertion.rawId),
@@ -1274,7 +1454,7 @@
                         }
                     })
                 });
-                const completeData = await completeRes.json();
+                const completeData = await parseApiResponse(completeRes);
 
                 if (completeRes.ok && completeData.action === "redirect") {
                     showPasskeyOverlay('success', 'Authenticated!', 'Redirecting you now...');
@@ -1294,7 +1474,7 @@
                 }
                 setTimeout(hidePasskeyOverlay, 2000);
             } finally {
-                btn.classList.remove("loading");
+                setButtonBusy(btn, false);
             }
         }
 
@@ -1312,11 +1492,11 @@
                         <circle cx="16.5" cy="7.5" r=".5" fill="#d97706"/>
                     </svg>
                     <div style="flex:1; min-width:0;">
-                        <span style="font-size: 13px; color: #92400e; font-weight: 500;">No passkey found.</span>
-                        <span style="font-size: 12px; color: #a16207;"> Sign in with password, or </span>
+                        <span style="font-size: 13px; color: #92400e; font-weight: 500;">No passkey linked to this account.</span>
+                        <span style="font-size: 12px; color: #a16207;"> Use OTP to set one up now.</span>
                         <button type="button" onclick="dismissPasskeyPrompt(); handlePasskeyRegister();" 
                                 style="font-size: 12px; color: #d97706; font-weight: 600; background: none; border: none; cursor: pointer; font-family: inherit; padding: 0; text-decoration: underline;">
-                            set one up now</button>
+                            Set up passkey</button>
                     </div>
                     <button type="button" onclick="dismissPasskeyPrompt()" style="background: none; border: none; cursor: pointer; padding: 2px; color: #d97706; flex-shrink: 0; line-height: 1;" aria-label="Dismiss">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -1343,6 +1523,43 @@
             if (passkeyRegRow) passkeyRegRow.style.display = "";
         }
 
+        // ==================== Passkey Check & Conditional Setup ====================
+
+        let passkeyCheckTimeout = null;
+
+        async function checkPasskeyStatus() {
+            if (!PASSKEY_ENABLED) return;
+            const email = document.getElementById("loginEmail").value.trim();
+            const regRow = document.getElementById("passkeyRegisterRow");
+            if (!regRow) return;
+
+            if (!email) {
+                regRow.style.display = "none";
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/oauth/authenticate`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        session_id: SESSION_ID,
+                        action: "passkey_check",
+                        email: email
+                    })
+                });
+                const data = await parseApiResponse(res);
+                // Show "Set up passkey" only if user has NO passkey
+                regRow.style.display = data.has_passkey ? "none" : "";
+            } catch {
+                regRow.style.display = "none";
+            }
+        }
+
+        // ==================== Passkey Registration (3-step OTP flow) ====================
+
+        let passkeyRegEmail = "";
+
         async function handlePasskeyRegister() {
             if (!PASSKEY_ENABLED) return;
             clearMessages();
@@ -1354,10 +1571,12 @@
                 return;
             }
 
-            try {
-                const rpId = window.location.hostname;
+            passkeyRegEmail = email;
+            const registerBtn = document.getElementById("passkeyRegisterBtn");
+            setButtonBusy(registerBtn, true, "Sending OTP...");
 
-                // 1. Get registration options
+            try {
+                // Step 1: Request OTP
                 const beginRes = await fetch(`${API_BASE}/oauth/authenticate`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1365,19 +1584,155 @@
                         session_id: SESSION_ID,
                         action: "passkey_register_begin",
                         email: email,
-                        rp_id: rpId
+                        rp_id: window.location.hostname
                     })
                 });
-                const beginData = await beginRes.json();
+                const beginData = await parseApiResponse(beginRes);
 
                 if (!beginRes.ok) {
                     showError(beginData.detail || "Failed to start passkey registration");
                     return;
                 }
 
-                const options = beginData.options;
+                // Show OTP inline form
+                showPasskeyOtpForm(email);
+                showSuccess(beginData.message || "Verification code sent to your email.");
 
-                // 2. Call WebAuthn API
+            } catch (err) {
+                showError("Connection error. Please try again.");
+            } finally {
+                setButtonBusy(registerBtn, false);
+            }
+        }
+
+        function showPasskeyOtpForm(email) {
+            const otpForm = document.getElementById("passkeyOtpInline");
+            const regRow = document.getElementById("passkeyRegisterRow");
+            const passkeyBtn = document.getElementById("passkeyLoginBtn");
+            const divider = document.querySelector("#loginSection .divider");
+
+            if (regRow) regRow.style.display = "none";
+            if (passkeyBtn) passkeyBtn.style.display = "none";
+            if (divider) divider.style.display = "none";
+            enablePasskeySetupMode();
+
+            document.getElementById("pkOtpInfo").innerHTML =
+                `Enter the 6-digit code sent to<br><strong>${email}</strong>`;
+            otpForm.classList.add("active");
+
+            // Clear any previous values
+            document.querySelectorAll("#pkOtpInputs .pk-otp-input").forEach(i => { i.value = ""; });
+            setTimeout(() => {
+                const first = document.querySelector("#pkOtpInputs .pk-otp-input");
+                if (first) first.focus();
+            }, 100);
+        }
+
+        function cancelPasskeyOtp() {
+            const otpForm = document.getElementById("passkeyOtpInline");
+            otpForm.classList.remove("active");
+            clearMessages();
+            passkeyPendingOptions = null;
+
+            // Restore passkey buttons
+            const passkeyBtn = document.getElementById("passkeyLoginBtn");
+            const divider = document.querySelector("#loginSection .divider");
+            if (passkeyBtn) passkeyBtn.style.display = "";
+            if (divider) divider.style.display = "";
+            disablePasskeySetupMode();
+            checkPasskeyStatus();
+        }
+
+        async function handlePasskeyOtpResend() {
+            clearMessages();
+            if (!passkeyRegEmail) return;
+            const resendBtn = document.getElementById("pkOtpResendBtn");
+            if (resendBtn) {
+                resendBtn.disabled = true;
+                resendBtn.textContent = "Sending...";
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/oauth/authenticate`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        session_id: SESSION_ID,
+                        action: "passkey_register_begin",
+                        email: passkeyRegEmail,
+                        rp_id: window.location.hostname
+                    })
+                });
+                const data = await parseApiResponse(res);
+                if (res.ok) {
+                    showSuccess("New verification code sent.");
+                } else {
+                    showError(data.detail || "Failed to resend code.");
+                }
+            } catch {
+                showError("Connection error.");
+            } finally {
+                if (resendBtn) {
+                    resendBtn.disabled = false;
+                    resendBtn.textContent = "Resend code";
+                }
+            }
+        }
+
+        async function handlePasskeyOtpVerify() {
+            clearMessages();
+
+            const inputs = document.querySelectorAll("#pkOtpInputs .pk-otp-input");
+            const verifyBtn = document.getElementById("pkOtpVerifyBtn");
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = passkeyPendingOptions ? "Setting up..." : "Verifying...";
+
+            try {
+                const rpId = window.location.hostname;
+
+                if (!passkeyPendingOptions) {
+                    const otp = Array.from(inputs).map(i => i.value).join("");
+                    if (otp.length !== 6) {
+                        showError("Please enter the complete 6-digit code.");
+                        return;
+                    }
+
+                    // Step 2: Verify OTP and fetch WebAuthn challenge
+                    const otpRes = await fetch(`${API_BASE}/oauth/authenticate`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            session_id: SESSION_ID,
+                            action: "passkey_register_verify_otp",
+                            email: passkeyRegEmail,
+                            otp: otp,
+                            rp_id: rpId
+                        })
+                    });
+                    const otpData = await parseApiResponse(otpRes);
+
+                    if (!otpRes.ok) {
+                        showError(otpData.detail || "Invalid verification code.");
+                        inputs.forEach(i => { i.value = ""; });
+                        inputs[0].focus();
+                        return;
+                    }
+
+                    // Store options and require a second explicit click for WebAuthn user gesture reliability.
+                    passkeyPendingOptions = otpData.options;
+                    verifyBtn.disabled = false;
+                    verifyBtn.textContent = "Continue passkey setup";
+                    showSuccess("Code verified. Click 'Continue passkey setup' to finish.");
+                    return;
+                }
+
+                // Hide OTP form, show passkey overlay
+                document.getElementById("passkeyOtpInline").classList.remove("active");
+                showPasskeyOverlay('waiting', 'Creating passkey...', 'Follow your browser or device prompt');
+
+                const options = passkeyPendingOptions;
+
+                // Step 3: Call WebAuthn API
                 const publicKeyOptions = {
                     challenge: base64urlToBuffer(options.challenge),
                     rp: { name: options.rp.name, id: options.rp.id },
@@ -1401,14 +1756,16 @@
 
                 const credential = await navigator.credentials.create({ publicKey: publicKeyOptions });
 
-                // 3. Send registration to server
+                showPasskeyOverlay('waiting', 'Saving passkey...', 'Almost done');
+
+                // Step 4: Complete registration on server
                 const completeRes = await fetch(`${API_BASE}/oauth/authenticate`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         session_id: SESSION_ID,
                         action: "passkey_register_complete",
-                        email: email,
+                        email: passkeyRegEmail,
                         rp_id: rpId,
                         credential: {
                             id: bufferToBase64url(credential.rawId),
@@ -1421,21 +1778,52 @@
                         }
                     })
                 });
-                const completeData = await completeRes.json();
+                const completeData = await parseApiResponse(completeRes);
 
                 if (completeRes.ok) {
-                    showSuccess(completeData.message || "Passkey registered! You can now use it to sign in.");
+                    passkeyPendingOptions = null;
+                    verifyBtn.disabled = true;
+                    verifyBtn.textContent = "Passkey setup successful";
+                    showPasskeyOverlay('success', 'Passkey created!', 'You can now sign in with your passkey');
+                    setTimeout(() => {
+                        hidePasskeyOverlay();
+                        showSuccess(completeData.message || "Passkey registered! You can now use it to sign in.");
+                        // Hide the setup row since passkey now exists
+                        const regRow = document.getElementById("passkeyRegisterRow");
+                        if (regRow) regRow.style.display = "none";
+                        // Restore login buttons
+                        const passkeyBtn = document.getElementById("passkeyLoginBtn");
+                        const divider = document.querySelector("#loginSection .divider");
+                        if (passkeyBtn) passkeyBtn.style.display = "";
+                        if (divider) divider.style.display = "";
+                        disablePasskeySetupMode();
+                    }, 1500);
                 } else {
-                    showError(completeData.detail || "Passkey registration failed");
+                    passkeyPendingOptions = null;
+                    showPasskeyOverlay('error', 'Registration failed', completeData.detail || '');
+                    setTimeout(hidePasskeyOverlay, 2000);
                 }
             } catch (err) {
+                hidePasskeyOverlay();
+                passkeyPendingOptions = null;
                 if (err.name === "NotAllowedError") {
                     showError("Passkey registration was cancelled.");
                 } else if (err.name === "InvalidStateError") {
                     showError("A passkey already exists for this account on this device.");
+                } else if (err.name === "SecurityError") {
+                    showError("Passkey setup requires HTTPS or localhost.");
                 } else {
                     console.error("Passkey reg error:", err);
                     showError("Passkey registration failed.");
+                }
+                cancelPasskeyOtp();
+            } finally {
+                if (passkeyPendingOptions) {
+                    verifyBtn.disabled = false;
+                    verifyBtn.textContent = "Continue passkey setup";
+                } else {
+                    verifyBtn.disabled = false;
+                    verifyBtn.textContent = "Verify & Set Up Passkey";
                 }
             }
         }
@@ -1563,8 +1951,8 @@
 
         // ==================== OTP Input Navigation ====================
 
-        function setupOtpInputs(container) {
-            const inputs = container.querySelectorAll(".otp-input");
+        function setupOtpInputs(container, inputSelector = ".otp-input") {
+            const inputs = container.querySelectorAll(inputSelector);
             inputs.forEach((input, index) => {
                 input.addEventListener("input", (e) => {
                     e.target.value = e.target.value.replace(/[^0-9]/g, "");
@@ -1593,6 +1981,9 @@
 
         setupOtpInputs(document.getElementById("loginOtpInputs"));
         setupOtpInputs(document.getElementById("resetOtpInputs"));
+        if (document.getElementById("pkOtpInputs")) {
+            setupOtpInputs(document.getElementById("pkOtpInputs"), ".pk-otp-input");
+        }
 
         // ==================== UI Helpers ====================
 

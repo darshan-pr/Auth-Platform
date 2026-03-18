@@ -55,6 +55,8 @@ def run_migrations():
                         conn.execute(text(statement))
                     except Exception as e:
                         logger.warning(f"Migration statement skipped ({mig_file.name}): {e}")
+                        # Clear failed transaction state so later statements can still run.
+                        conn.rollback()
             conn.commit()
     logger.info("All migrations applied successfully.")
 

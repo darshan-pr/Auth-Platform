@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Welcome to {{ app_name }}</title>
+</head>
+<body style="margin:0;padding:0;background:transparent;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:transparent;padding:24px 12px;">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;box-shadow:0 2px 16px rgba(0,0,0,0.08);overflow:hidden;">
+
+    <tr>
+        <td style="background:linear-gradient(135deg,#1f2937 0%,#111827 100%);padding:28px 28px;text-align:center;">
+            <div style="width:44px;height:44px;margin:0 auto 10px;background:rgba(255,255,255,0.16);border-radius:10px;line-height:44px;font-size:18px;color:#fff;font-weight:700;">ADM</div>
+            <h1 style="margin:0;color:#ffffff;font-size:21px;font-weight:600;">Welcome</h1>
+            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">{{ app_name }}</p>
+        </td>
+    </tr>
+
+    <tr>
+        <td style="padding:28px;">
+            <p style="margin:0 0 14px;font-size:15px;color:#1f2937;line-height:1.6;">Hello {{ admin_email }},</p>
+            <p style="margin:0 0 18px;font-size:14px;color:#374151;line-height:1.6;">
+                Your admin account is now active for tenant <strong>{{ tenant_name }}</strong>.
+            </p>
+
+            <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px;margin:0 0 18px;">
+                <p style="margin:0 0 10px;font-size:13px;color:#6b7280;font-weight:600;">Available Services</p>
+                <p style="margin:0 0 6px;font-size:14px;color:#374151;line-height:1.5;">1. OAuth 2.0 with PKCE and hosted login flow</p>
+                <p style="margin:0 0 6px;font-size:14px;color:#374151;line-height:1.5;">2. OTP and passkey authentication controls</p>
+                <p style="margin:0 0 6px;font-size:14px;color:#374151;line-height:1.5;">3. Multi-tenant app and user management</p>
+                <p style="margin:0 0 6px;font-size:14px;color:#374151;line-height:1.5;">4. Login event tracking and security notifications</p>
+                <p style="margin:0;font-size:14px;color:#374151;line-height:1.5;">5. Token and session lifecycle controls</p>
+            </div>
+
+            <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.6;">
+                You can now sign in to the admin console and configure your first application.
+            </p>
+        </td>
+    </tr>
+
+    <tr>
+        <td style="background:#f9fafb;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">Secured by <strong style="color:#4b5563;">Auth Platform</strong></p>
+        </td>
+    </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

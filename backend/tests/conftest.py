@@ -59,6 +59,22 @@ def mock_redis_exists(key):
     return key in mock_redis_store
 
 
+def mock_redis_incr(key):
+    val = int(mock_redis_store.get(key, 0)) + 1
+    mock_redis_store[key] = str(val)
+    return val
+
+
+def mock_redis_expire(key, ttl):
+    pass  # no-op for tests
+
+
+def mock_redis_ttl(key):
+    if key in mock_redis_store:
+        return 900  # Simulate active lockout
+    return -2  # Key doesn't exist
+
+
 # Rate limiter sorted set mocks
 def mock_redis_zadd(key, mapping):
     if key not in mock_redis_sorted_sets:
@@ -90,6 +106,9 @@ def mock_redis_zrange(key, start, stop, withscores=False):
 mock_redis.setex = mock_redis_setex
 mock_redis.get = mock_redis_get
 mock_redis.delete = mock_redis_delete
+mock_redis.incr = mock_redis_incr
+mock_redis.expire = mock_redis_expire
+mock_redis.ttl = mock_redis_ttl
 
 
 @pytest.fixture(autouse=True)
@@ -112,6 +131,8 @@ def mock_redis_client():
          patch("app.services.password_service.redis_client", mock_redis), \
          patch("app.services.oauth_service.redis_client", mock_redis), \
          patch("app.services.passkey_service.redis_client", mock_redis), \
+         patch("app.api.auth.redis_client", mock_redis), \
+         patch("app.api.admin.redis_client", mock_redis), \
          patch("app.redis.redis_client", mock_redis), \
          patch("app.services.geo_service.get_location", return_value={}):
         yield mock_redis
@@ -153,37 +174,74 @@ def client(db):
 
 @pytest.fixture
 def admin_token(client):
-    """Register an admin and return their auth token + metadata"""
-    response = client.post("/admin/register", json={
+    """Register an admin via 2-step OTP flow and return their auth token + metadata"""
+    # Step 1: Send OTP
+    reg_response = client.post("/admin/register", json={
         "email": "admin@test.com",
         "password": "TestPass123!",
         "tenant_name": "Test Org"
     })
+    assert reg_response.status_code == 200
+    
+    # Step 2: Retrieve OTP from mock Redis and verify
+    otp = mock_redis_store.get("otp:admin@test.com")
+    assert otp is not None, "OTP was not generated in mock Redis"
+    
+    response = client.post("/admin/register/verify-otp", json={
+        "email": "admin@test.com",
+        "otp": otp
+    })
     assert response.status_code == 200
     data = response.json()
+    
+    # Extract token from HttpOnly cookie set by the server
+    token = None
+    for cookie_header in response.headers.get_list('set-cookie'):
+        if 'admin_token=' in cookie_header:
+            token = cookie_header.split('admin_token=')[1].split(';')[0]
+            break
+    
     return {
-        "token": data["access_token"],
+        "token": token,
         "tenant_id": data["tenant_id"],
         "admin_id": data["admin_id"],
-        "headers": {"Authorization": f"Bearer {data['access_token']}"}
+        "headers": {"Authorization": f"Bearer {token}"} if token else {}
     }
 
 
 @pytest.fixture
 def second_admin_token(client):
-    """Register a second admin with separate tenant"""
-    response = client.post("/admin/register", json={
+    """Register a second admin via 2-step OTP flow with separate tenant"""
+    # Step 1: Send OTP
+    reg_response = client.post("/admin/register", json={
         "email": "admin2@other.com",
         "password": "TestPass456!",
         "tenant_name": "Other Org"
     })
+    assert reg_response.status_code == 200
+    
+    # Step 2: Retrieve OTP from mock Redis and verify
+    otp = mock_redis_store.get("otp:admin2@other.com")
+    assert otp is not None, "OTP was not generated in mock Redis"
+    
+    response = client.post("/admin/register/verify-otp", json={
+        "email": "admin2@other.com",
+        "otp": otp
+    })
     assert response.status_code == 200
     data = response.json()
+    
+    token = None
+    for cookie_header in response.headers.get_list('set-cookie'):
+        if 'admin_token=' in cookie_header:
+            token = cookie_header.split('admin_token=')[1].split(';')[0]
+            break
+    
     return {
-        "token": data["access_token"],
+        "token": token,
         "tenant_id": data["tenant_id"],
         "admin_id": data["admin_id"],
-        "headers": {"Authorization": f"Bearer {data['access_token']}"}
+        "headers": {"Authorization": f"Bearer {token}"} if token else {}
     }
 
 

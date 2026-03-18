@@ -2,12 +2,14 @@
 Tests for tenant management and admin authentication.
 Covers: admin registration, login, tenant CRUD, JWT validation.
 """
+from tests.conftest import mock_redis_store
 
 
 class TestAdminRegistration:
     """Test admin registration creates admin + tenant"""
 
     def test_register_admin_creates_tenant(self, client):
+        # Step 1: Send OTP
         response = client.post("/admin/register", json={
             "email": "newadmin@test.com",
             "password": "SecurePass1!",
@@ -15,10 +17,24 @@ class TestAdminRegistration:
         })
         assert response.status_code == 200
         data = response.json()
-        assert "access_token" in data
-        assert data["tenant_name"] == "My Company"
-        assert data["tenant_id"] is not None
-        assert data["admin_id"] is not None
+        assert "OTP" in data["message"] or "otp" in data["message"].lower()
+        
+        # Step 2: Verify OTP
+        otp = mock_redis_store.get("otp:newadmin@test.com")
+        assert otp is not None
+        
+        response2 = client.post("/admin/register/verify-otp", json={
+            "email": "newadmin@test.com",
+            "otp": otp
+        })
+        assert response2.status_code == 200
+        data2 = response2.json()
+        # Token is now in HttpOnly cookie, not response body
+        cookies = response2.headers.get_list('set-cookie')
+        assert any('admin_token=' in c for c in cookies)
+        assert data2["tenant_name"] == "My Company"
+        assert data2["tenant_id"] is not None
+        assert data2["admin_id"] is not None
 
     def test_register_duplicate_email_fails(self, client, admin_token):
         response = client.post("/admin/register", json={
@@ -30,6 +46,7 @@ class TestAdminRegistration:
         assert "already exists" in response.json()["detail"]
 
     def test_register_creates_unique_slugs(self, client):
+        # Step 1 for both admins: send OTPs
         r1 = client.post("/admin/register", json={
             "email": "a1@test.com", "password": "Pass1234!", "tenant_name": "Same Name"
         })
@@ -38,7 +55,14 @@ class TestAdminRegistration:
         })
         assert r1.status_code == 200
         assert r2.status_code == 200
-        # Both succeed - slugs are made unique
+        # Both OTP requests succeed — slugs created on verify
+        # Verify both
+        otp1 = mock_redis_store.get("otp:a1@test.com")
+        otp2 = mock_redis_store.get("otp:a2@test.com")
+        v1 = client.post("/admin/register/verify-otp", json={"email": "a1@test.com", "otp": otp1})
+        v2 = client.post("/admin/register/verify-otp", json={"email": "a2@test.com", "otp": otp2})
+        assert v1.status_code == 200
+        assert v2.status_code == 200
 
 
 class TestAdminLogin:
@@ -51,7 +75,9 @@ class TestAdminLogin:
         })
         assert response.status_code == 200
         data = response.json()
-        assert "access_token" in data
+        # Token is now in HttpOnly cookie, not response body
+        cookies = response.headers.get_list('set-cookie')
+        assert any('admin_token=' in c for c in cookies)
         assert data["tenant_id"] == admin_token["tenant_id"]
         assert data["tenant_name"] == "Test Org"
 

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.db import get_db
@@ -12,6 +13,8 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime, timedelta
 import secrets
+import hashlib
+import hmac
 import logging
 
 from app.services.jwt_service import create_access_token, verify_token
@@ -19,13 +22,15 @@ from app.services.jwt_service import is_user_online, force_user_offline
 from app.services.password_service import hash_password, verify_password, generate_reset_token
 from app.services.tenant_service import create_tenant
 from app.services.mail_service import send_set_password_email, send_force_logout_email
+from app.services.mail_service import send_admin_welcome_email
 from app.services.rate_limiter import create_rate_limit_dependency
 from app.config import settings as app_settings
+from app.redis import redis_client
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin")
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 # Rate limit dependencies
 _rl_admin_login = create_rate_limit_dependency("admin_login", max_requests=app_settings.RATE_LIMIT_LOGIN)
@@ -79,7 +84,8 @@ class AppResponse(BaseModel):
 
 class AppCredentialsResponse(BaseModel):
     app_id: str
-    app_secret: str
+    app_secret_hint: str  # Only shows last 4 characters
+    app_secret: Optional[str] = None  # Only populated on create/regenerate (plaintext shown once)
 
 class UserCreateRequest(BaseModel):
     email: EmailStr
@@ -102,11 +108,28 @@ class UserResponse(BaseModel):
 # ============== Admin Auth ==============
 
 def get_current_admin(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ) -> Admin:
-    """Validate admin JWT and return the admin with tenant context"""
-    payload = verify_token(credentials.credentials)
+    """Validate admin JWT from Authorization header or HttpOnly cookie and return the admin"""
+    token = None
+    
+    # 1. Try Authorization header first (explicit, takes precedence)
+    if credentials:
+        token = credentials.credentials
+    
+    # 2. Fallback to HttpOnly cookie (browser sessions)
+    if not token and request and hasattr(request, 'cookies'):
+        token = request.cookies.get('admin_token')
+    
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
+    
+    payload = verify_token(token)
     if not payload or payload.get("type") != "admin_access":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -121,9 +144,70 @@ def get_current_admin(
     return admin
 
 
+# ============== Brute-Force Protection for Admin Login ==============
+
+MAX_ADMIN_LOGIN_ATTEMPTS = 5
+ADMIN_LOCKOUT_SECONDS = 900  # 15 minutes
+
+
+def _check_admin_lockout(email: str):
+    """Check if admin account is locked out."""
+    try:
+        ttl = redis_client.ttl(f"admin_lockout:{email}")
+        if ttl and ttl > 0:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Account temporarily locked. Try again in {ttl // 60 + 1} minutes."
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+
+def _record_admin_failed_login(email: str):
+    """Record a failed admin login attempt."""
+    try:
+        key = f"admin_attempts:{email}"
+        count = redis_client.incr(key)
+        redis_client.expire(key, ADMIN_LOCKOUT_SECONDS)
+        if count >= MAX_ADMIN_LOGIN_ATTEMPTS:
+            redis_client.setex(f"admin_lockout:{email}", ADMIN_LOCKOUT_SECONDS, "1")
+            redis_client.delete(key)
+            logger.warning(f"Admin account locked: {email} after {count} failed attempts")
+    except Exception:
+        pass
+
+
+def _clear_admin_login_attempts(email: str):
+    try:
+        redis_client.delete(f"admin_attempts:{email}")
+        redis_client.delete(f"admin_lockout:{email}")
+    except Exception:
+        pass
+
+
+# ============== App Secret Hashing ==============
+
+def _hash_app_secret(secret: str) -> str:
+    """Hash an app secret using SHA-256 for secure storage."""
+    return hashlib.sha256(secret.encode()).hexdigest()
+
+
+def _verify_app_secret(provided: str, stored_hash: str) -> bool:
+    """Verify a provided app secret against its stored hash."""
+    return hmac.compare_digest(
+        hashlib.sha256(provided.encode()).hexdigest(),
+        stored_hash
+    )
+
+
 @router.post("/register", response_model=dict, dependencies=[Depends(_rl_admin_register)])
 def admin_register(request: AdminRegisterRequest, db: Session = Depends(get_db)):
-    """Register a new admin and create their tenant"""
+    """Step 1: Validate input and send OTP to admin email for verification"""
+    from app.services.otp_service import generate_otp
+    from app.services.mail_service import send_otp_email
+    
     # Check if admin already exists
     existing = db.query(Admin).filter(Admin.email == request.email).first()
     if existing:
@@ -132,13 +216,67 @@ def admin_register(request: AdminRegisterRequest, db: Session = Depends(get_db))
             detail="An admin with this email already exists"
         )
     
+    # Store pending registration data in Redis (expires in 10 minutes)
+    import json
+    pending_key = f"admin_pending_reg:{request.email}"
+    redis_client.setex(pending_key, 600, json.dumps({
+        "email": request.email,
+        "password": request.password,
+        "tenant_name": request.tenant_name
+    }))
+    
+    # Generate and send OTP
+    otp = generate_otp(request.email)
+    send_otp_email(request.email, otp, "Auth Platform Admin")
+    
+    return {"message": "OTP sent to your email. Please verify to complete registration.", "email": request.email}
+
+
+class AdminVerifyOTPRequest(BaseModel):
+    email: EmailStr
+    otp: str
+
+
+@router.post("/register/verify-otp", response_model=dict)
+def admin_register_verify_otp(request: AdminVerifyOTPRequest, db: Session = Depends(get_db)):
+    """Step 2: Verify OTP and complete admin registration"""
+    from app.services.otp_service import verify_otp
+    import json
+    
+    # Verify OTP
+    if not verify_otp(request.email, request.otp):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OTP"
+        )
+    
+    # Retrieve pending registration data
+    pending_key = f"admin_pending_reg:{request.email}"
+    pending_data = redis_client.get(pending_key)
+    if not pending_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Registration session expired. Please start again."
+        )
+    
+    data = json.loads(pending_data)
+    redis_client.delete(pending_key)
+    
+    # Double-check admin doesn't exist (race condition guard)
+    existing = db.query(Admin).filter(Admin.email == data["email"]).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="An admin with this email already exists"
+        )
+    
     # Create tenant
-    tenant = create_tenant(db, request.tenant_name)
+    tenant = create_tenant(db, data["tenant_name"])
     
     # Create admin
     admin = Admin(
-        email=request.email,
-        password_hash=hash_password(request.password),
+        email=data["email"],
+        password_hash=hash_password(data["password"]),
         tenant_id=tenant.id
     )
     db.add(admin)
@@ -155,25 +293,45 @@ def admin_register(request: AdminRegisterRequest, db: Session = Depends(get_db))
     }
     access_token = create_access_token(token_data, timedelta(hours=24))
     
-    return {
+    # Set token as HttpOnly cookie
+    response = JSONResponse(content={
         "admin_id": admin.id,
         "tenant_id": tenant.id,
         "tenant_name": tenant.name,
-        "access_token": access_token,
         "token_type": "bearer",
         "message": "Admin registered successfully"
-    }
+    })
+    response.set_cookie(
+        key="admin_token",
+        value=access_token,
+        httponly=True,
+        samesite="lax",
+        max_age=86400,  # 24 hours
+        path="/"
+    )
+
+    # Non-blocking welcome email for new admin signup
+    send_admin_welcome_email(to=admin.email, tenant_name=tenant.name, app_name="Auth Platform")
+
+    return response
 
 
 @router.post("/login", response_model=dict, dependencies=[Depends(_rl_admin_login)])
 def admin_login(request: AdminLoginRequest, db: Session = Depends(get_db)):
-    """Admin login - returns JWT with tenant context"""
+    """Admin login — sets JWT as HttpOnly cookie with brute-force protection"""
+    # Check lockout
+    _check_admin_lockout(request.email)
+    
     admin = db.query(Admin).filter(Admin.email == request.email).first()
     if not admin or not verify_password(request.password, admin.password_hash):
+        _record_admin_failed_login(request.email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
+    
+    # Clear failed attempts on success
+    _clear_admin_login_attempts(request.email)
     
     tenant = db.query(Tenant).filter(Tenant.id == admin.tenant_id).first()
     
@@ -185,12 +343,29 @@ def admin_login(request: AdminLoginRequest, db: Session = Depends(get_db)):
     }
     access_token = create_access_token(token_data, timedelta(hours=24))
     
-    return {
-        "access_token": access_token,
+    # Set token as HttpOnly cookie
+    response = JSONResponse(content={
         "token_type": "bearer",
         "tenant_id": admin.tenant_id,
         "tenant_name": tenant.name if tenant else ""
-    }
+    })
+    response.set_cookie(
+        key="admin_token",
+        value=access_token,
+        httponly=True,
+        samesite="lax",
+        max_age=86400,  # 24 hours
+        path="/"
+    )
+    return response
+
+
+@router.post("/logout")
+def admin_logout():
+    """Admin logout — clears the HttpOnly cookie"""
+    response = JSONResponse(content={"message": "Logged out successfully"})
+    response.delete_cookie(key="admin_token", path="/")
+    return response
 
 
 # ============== Tenant Management ==============
@@ -246,10 +421,11 @@ def create_app(
     try:
         app_id = secrets.token_hex(8)
         app_secret = secrets.token_hex(16)
+        app_secret_hash = _hash_app_secret(app_secret)
 
         app = App(
             app_id=app_id, 
-            app_secret=app_secret,
+            app_secret=app_secret_hash,
             tenant_id=admin.tenant_id,
             name=request.name,
             description=request.description,
@@ -268,7 +444,7 @@ def create_app(
         return {
             "id": app.id,
             "app_id": app_id, 
-            "app_secret": app_secret,
+            "app_secret": app_secret,  # Plaintext shown ONLY on creation
             "name": app.name,
             "tenant_id": app.tenant_id,
             "otp_enabled": app.otp_enabled,
@@ -460,7 +636,7 @@ def get_app_credentials(
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
     
-    return AppCredentialsResponse(app_id=app.app_id, app_secret=app.app_secret)
+    return AppCredentialsResponse(app_id=app.app_id, app_secret_hint="****" + app.app_secret[-4:] if len(app.app_secret) > 4 else "****")
 
 @router.post("/apps/{app_id}/regenerate-secret", response_model=AppCredentialsResponse)
 def regenerate_app_secret(
@@ -476,11 +652,13 @@ def regenerate_app_secret(
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
     
-    app.app_secret = secrets.token_hex(16)
+    new_secret = secrets.token_hex(16)
+    app.app_secret = _hash_app_secret(new_secret)
     db.commit()
     db.refresh(app)
     
-    return AppCredentialsResponse(app_id=app.app_id, app_secret=app.app_secret)
+    # Return plaintext just this once; also include the hint for display
+    return {"app_id": app.app_id, "app_secret": new_secret, "app_secret_hint": "****" + new_secret[-4:]}
 
 # ============== User Management ==============
 

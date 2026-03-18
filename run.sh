@@ -54,24 +54,57 @@ load_env() {
     fi
 }
 
+free_port() {
+    local port="$1"
+    local pids
+    pids=$(lsof -ti tcp:"$port" 2>/dev/null | sort -u || true)
+    if [ -n "$pids" ]; then
+        echo "[*] Port $port in use. Stopping process(es): $pids"
+        kill $pids 2>/dev/null || true
+        sleep 1
+
+        # Hard kill only if still alive
+        local remaining
+        remaining=$(lsof -ti tcp:"$port" 2>/dev/null | sort -u || true)
+        if [ -n "$remaining" ]; then
+            kill -9 $remaining 2>/dev/null || true
+            sleep 1
+        fi
+    fi
+}
+
 # -------------------- Service Control --------------------
 
 start_backend() {
     echo "[*] Starting Backend API on port $BACKEND_PORT ..."
+    free_port "$BACKEND_PORT"
     activate_venv
     load_env
     cd "$SCRIPT_DIR/backend"
     uvicorn app.main:app --reload --host 0.0.0.0 --port $BACKEND_PORT &
-    echo $! > "$SCRIPT_DIR/.backend.pid"
+    local pid=$!
+    sleep 1
+    if ! kill -0 "$pid" 2>/dev/null; then
+        echo "[!] Backend failed to start on port $BACKEND_PORT"
+        return 1
+    fi
+    echo "$pid" > "$SCRIPT_DIR/.backend.pid"
     echo "    -> http://localhost:$BACKEND_PORT"
     echo "    -> http://localhost:$BACKEND_PORT/docs  (Swagger)"
 }
 
 start_admin() {
     echo "[*] Starting Admin Console on port $ADMIN_CONSOLE_PORT ..."
+    free_port "$ADMIN_CONSOLE_PORT"
     cd "$SCRIPT_DIR/frontend/admin-console"
     python3 -m http.server $ADMIN_CONSOLE_PORT &
-    echo $! > "$SCRIPT_DIR/.admin.pid"
+    local pid=$!
+    sleep 1
+    if ! kill -0 "$pid" 2>/dev/null; then
+        echo "[!] Admin console failed to start on port $ADMIN_CONSOLE_PORT"
+        return 1
+    fi
+    echo "$pid" > "$SCRIPT_DIR/.admin.pid"
     echo "    -> http://localhost:$ADMIN_CONSOLE_PORT"
 }
 

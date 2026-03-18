@@ -163,6 +163,7 @@ def send_login_notification_email(
     app_name: str = "Auth Platform",
     access_token_expiry_minutes: int = 30,
     refresh_token_expiry_days: int = 7,
+    location: str = "Unavailable",
 ) -> bool:
     """Send login notification email with session expiry details"""
     
@@ -184,6 +185,7 @@ def send_login_notification_email(
             f"A successful login was detected on your account at {app_name}.\n\n"
             f"Email: {to}\n"
             f"Login Time: {login_time}\n"
+            f"Location: {location}\n"
             f"Session Expiry: {session_expiry}\n"
             f"Access Token: Expires in {access_token_expiry_minutes} minutes\n"
             f"Refresh Token: Expires in {refresh_token_expiry_days} days\n\n"
@@ -195,6 +197,7 @@ def send_login_notification_email(
             app_name=app_name,
             email=to,
             login_time=login_time,
+            location=location,
             session_expiry=session_expiry,
             access_token_expiry_minutes=str(access_token_expiry_minutes),
             refresh_token_expiry_days=str(refresh_token_expiry_days),
@@ -206,6 +209,44 @@ def send_login_notification_email(
     except Exception as e:
         logger.error(f"Failed to send login notification email to {to}: {str(e)}")
         # Don't raise — login notification is non-critical
+        return False
+
+
+def send_admin_welcome_email(to: str, tenant_name: str, app_name: str = "Auth Platform") -> bool:
+    """Send welcome email after first-time admin signup."""
+
+    if DEV_MODE:
+        logger.info(f"[DEV MODE] Admin welcome email for {to} in tenant {tenant_name}")
+        print(f"\n{'='*50}")
+        print(f"[DEV MODE] Admin welcome email for {to} in tenant {tenant_name}")
+        print(f"{'='*50}\n")
+        return True
+
+    try:
+        plain = (
+            f"Hello,\n\n"
+            f"Welcome to {app_name}. Your admin account is now active for tenant: {tenant_name}.\n\n"
+            f"Services available:\n"
+            f"- Multi-tenant app and user management\n"
+            f"- OAuth 2.0 with PKCE\n"
+            f"- OTP and passkey authentication\n"
+            f"- Security notifications and login event tracking\n"
+            f"- Token lifecycle and session controls\n\n"
+            f"You can now sign in to the admin console and configure your first application.\n\n"
+            f"Best regards,\n{app_name} Team\n"
+        )
+        html = _load_template(
+            "admin_welcome.html",
+            app_name=app_name,
+            tenant_name=tenant_name,
+            admin_email=to,
+        )
+
+        _send_email(to, f"Welcome to {app_name}", plain, html)
+        logger.info(f"Admin welcome email sent to {to}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send admin welcome email to {to}: {str(e)}")
         return False
 
 

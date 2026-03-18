@@ -13,6 +13,7 @@ class PasskeyCredential(Base):
     credential_id = Column(String, nullable=False, index=True)
     public_key = Column(String, nullable=False)
     sign_count = Column(Integer, default=0, nullable=False)
+    algorithm = Column(Integer, default=-7, nullable=False)  # COSE algorithm: -7=ES256, -257=RS256
     device_name = Column(String, default="Unknown Device")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_used_at = Column(DateTime(timezone=True))

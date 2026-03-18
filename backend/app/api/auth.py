@@ -12,14 +12,71 @@ from app.services.jwt_service import create_access_token, create_refresh_token, 
 from app.services.password_service import hash_password, verify_password, generate_reset_token, verify_reset_token
 from app.services.tenant_service import get_or_create_default_tenant
 from app.services.rate_limiter import create_rate_limit_dependency
-from app.services.geo_service import record_login_event
+from app.services.geo_service import record_login_event, get_client_ip, get_location
 from app.config import settings
 from app.db import get_db
 from app.models.user import User
 from app.models.app import App
+from app.redis import redis_client
 from pydantic import BaseModel
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth")
+
+# ============== Brute-Force Protection ==============
+
+MAX_LOGIN_ATTEMPTS = 5
+ACCOUNT_LOCKOUT_SECONDS = 900  # 15 minutes
+
+
+def _get_login_lockout_key(app_id: str, email: str) -> str:
+    return f"login_lockout:{app_id}:{email}"
+
+
+def _get_login_attempts_key(app_id: str, email: str) -> str:
+    return f"login_attempts:{app_id}:{email}"
+
+
+def _check_account_lockout(app_id: str, email: str):
+    """Check if an account is locked out. Raises HTTPException if locked."""
+    lockout_key = _get_login_lockout_key(app_id, email)
+    try:
+        ttl = redis_client.ttl(lockout_key)
+        if ttl and ttl > 0:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Account temporarily locked due to too many failed attempts. Try again in {ttl // 60 + 1} minutes."
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # Redis down — fail open
+
+
+def _record_failed_login(app_id: str, email: str):
+    """Record a failed login attempt. Locks account after MAX_LOGIN_ATTEMPTS."""
+    try:
+        attempts_key = _get_login_attempts_key(app_id, email)
+        count = redis_client.incr(attempts_key)
+        redis_client.expire(attempts_key, ACCOUNT_LOCKOUT_SECONDS)
+        if count >= MAX_LOGIN_ATTEMPTS:
+            lockout_key = _get_login_lockout_key(app_id, email)
+            redis_client.setex(lockout_key, ACCOUNT_LOCKOUT_SECONDS, "1")
+            redis_client.delete(attempts_key)
+            logger.warning(f"Account locked: {email} for app {app_id} after {count} failed attempts")
+    except Exception:
+        pass  # Redis down — fail open
+
+
+def _clear_login_attempts(app_id: str, email: str):
+    """Clear failed attempt counter on successful login."""
+    try:
+        redis_client.delete(_get_login_attempts_key(app_id, email))
+        redis_client.delete(_get_login_lockout_key(app_id, email))
+    except Exception:
+        pass
 
 # Rate limit dependencies
 _rl_login = create_rate_limit_dependency("login", max_requests=settings.RATE_LIMIT_LOGIN)
@@ -28,7 +85,12 @@ _rl_otp = create_rate_limit_dependency("otp", max_requests=settings.RATE_LIMIT_O
 _rl_forgot = create_rate_limit_dependency("forgot_password", max_requests=settings.RATE_LIMIT_OTP)
 
 def validate_app_credentials(db: Session, app_id: str, app_secret: str) -> App:
-    """Validate app credentials and return the app if valid"""
+    """Validate app credentials and return the app if valid.
+    Supports both hashed (SHA-256) and legacy plaintext secrets for backward compatibility.
+    """
+    import hashlib
+    import hmac
+    
     if not app_id or not app_secret:
         return None
     
@@ -38,11 +100,22 @@ def validate_app_credentials(db: Session, app_id: str, app_secret: str) -> App:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid app credentials"
         )
-    if app.app_secret != app_secret:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid app credentials"
-        )
+    
+    # Check hashed secret (SHA-256 hex digest = 64 chars)
+    if len(app.app_secret) == 64:
+        provided_hash = hashlib.sha256(app_secret.encode()).hexdigest()
+        if not hmac.compare_digest(provided_hash, app.app_secret):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid app credentials"
+            )
+    else:
+        # Legacy plaintext comparison (for pre-migration apps)
+        if app.app_secret != app_secret:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid app credentials"
+            )
     return app
 
 def generate_tokens_for_user(user: User, app: App, cnf: dict = None):
@@ -143,8 +216,8 @@ def login(request: LoginRequest, http_request: Request = None, db: Session = Dep
     ).first()
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
         )
     
     # Check if user has a password set
@@ -154,11 +227,15 @@ def login(request: LoginRequest, http_request: Request = None, db: Session = Dep
             detail="User does not have a password set. Please sign up first."
         )
     
+    # Check brute-force lockout BEFORE verifying password
+    _check_account_lockout(request.app_id, request.email)
+    
     # Verify password
     if not verify_password(request.password, user.password_hash):
+        _record_failed_login(request.app_id, request.email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
+            detail="Invalid password"
         )
     
     # Check if user is active
@@ -194,15 +271,26 @@ def login(request: LoginRequest, http_request: Request = None, db: Session = Dep
         access_token, refresh_token = generate_tokens_for_user(user, app)
         # Send login notification if enabled
         if app.login_notification_enabled:
+            location_str = "Unavailable"
+            if http_request:
+                ip = get_client_ip(http_request)
+                geo = get_location(ip)
+                parts = [geo.get("city"), geo.get("region"), geo.get("country")]
+                location_str = ", ".join([p for p in parts if p]) or "Unavailable"
             send_login_notification_email(
                 to=user.email,
                 app_name=app.name or "Auth Platform",
                 access_token_expiry_minutes=app.access_token_expiry_minutes,
                 refresh_token_expiry_days=app.refresh_token_expiry_days,
+                location=location_str,
             )
         # Record login event
         if http_request:
             record_login_event(db, user.id, request.app_id, app.tenant_id, http_request, "login")
+        
+        # Clear failed attempt counter on successful login
+        _clear_login_attempts(request.app_id, request.email)
+        
         return LoginResponse(
             message="Login successful",
             email=request.email,
@@ -213,7 +301,7 @@ def login(request: LoginRequest, http_request: Request = None, db: Session = Dep
         )
 
 @router.post("/login/verify-otp", response_model=AuthResponse, dependencies=[Depends(_rl_otp)])
-def login_verify_otp(request: LoginOTPVerifyRequest, db: Session = Depends(get_db)):
+def login_verify_otp(request: LoginOTPVerifyRequest, http_request: Request = None, db: Session = Depends(get_db)):
     """Verify OTP after password-based login"""
     # Validate app credentials
     app = validate_app_credentials(db, request.app_id, request.app_secret)
@@ -247,11 +335,18 @@ def login_verify_otp(request: LoginOTPVerifyRequest, db: Session = Depends(get_d
     
     # Send login notification if enabled
     if app.login_notification_enabled:
+        location_str = "Unavailable"
+        if http_request:
+            ip = get_client_ip(http_request)
+            geo = get_location(ip)
+            parts = [geo.get("city"), geo.get("region"), geo.get("country")]
+            location_str = ", ".join([p for p in parts if p]) or "Unavailable"
         send_login_notification_email(
             to=user.email,
             app_name=app.name or "Auth Platform",
             access_token_expiry_minutes=app.access_token_expiry_minutes,
             refresh_token_expiry_days=app.refresh_token_expiry_days,
+            location=location_str,
         )
     
     return AuthResponse(
@@ -286,17 +381,21 @@ def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db
     ).first()
     
     if not user:
-        # Don't reveal if user exists or not for security
-        # But still return success to prevent email enumeration
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+        # Don't reveal if user exists — always return success
+        logger.info(f"Forgot password requested for non-existent user: {request.email}")
+        return ForgotPasswordResponse(
+            message="If an account with this email exists, a password reset has been sent.",
+            email=request.email,
+            method="otp" if app.otp_enabled else "token"
         )
     
     if not user.password_hash:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User does not have a password set"
+        # User exists but has no password (e.g., OTP-only) — still return generic success
+        logger.info(f"Forgot password requested for user without password: {request.email}")
+        return ForgotPasswordResponse(
+            message="If an account with this email exists, a password reset has been sent.",
+            email=request.email,
+            method="otp" if app.otp_enabled else "token"
         )
     
     try:

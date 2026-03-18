@@ -351,31 +351,46 @@
         </button>
     </form>
 
+    <!-- ========== OTP Verification Form (shown after signup) ========== -->
+    <form id="otpForm" class="auth-form" onsubmit="handleVerifyOTP(event)" style="display:none;">
+        <div class="divider">email verification</div>
+        <p style="text-align:center;color:#94a3b8;margin-bottom:1rem;font-size:0.9rem;">
+            We've sent a 6-digit code to <strong id="otpEmailDisplay" style="color:#e2e8f0;"></strong>
+        </p>
+        <div class="form-group">
+            <label for="otpCode">Verification Code</label>
+            <input type="text" id="otpCode" placeholder="Enter 6-digit OTP" required maxlength="6"
+                   pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code"
+                   style="text-align:center;letter-spacing:0.5em;font-size:1.3rem;">
+        </div>
+        <button type="submit" class="btn-submit" id="verifyOtpBtn">
+            <i data-lucide="check-circle"></i> Verify & Create Account
+        </button>
+        <p style="text-align:center;margin-top:0.75rem;">
+            <button type="button" class="toggle-pw" onclick="handleResendOTP()" id="resendOtpBtn"
+                    style="background:none;border:none;color:#818cf8;cursor:pointer;font-size:0.85rem;">
+                Resend OTP
+            </button>
+        </p>
+    </form>
+
     <p class="auth-footer">Secure multi-tenant authentication</p>
 </div>
 
 <script>
     const API = window.location.origin;
 
-    // If token exists, validate it before redirecting — prevents redirect loop
+    // If session exists, validate it before redirecting — prevents redirect loop
     (async function checkExistingSession() {
-        const tk = localStorage.getItem('admin_token');
-        if (!tk) return;
         try {
             const res = await fetch(API + '/admin/tenant', {
-                headers: { 'Authorization': 'Bearer ' + tk }
+                credentials: 'include'
             });
             if (res.ok) {
-                // Token is valid — sync cookie and redirect
-                document.cookie = `admin_token=${tk}; path=/; SameSite=Lax; max-age=86400`;
+                // Cookie is valid — redirect
                 window.location.href = '/dashboard/';
-            } else {
-                // Token expired/invalid — clear everything, stay on login
-                localStorage.removeItem('admin_token');
-                localStorage.removeItem('tenant_id');
-                localStorage.removeItem('tenant_name');
-                document.cookie = 'admin_token=; path=/; max-age=0';
             }
+            // Otherwise stay on login page (cookie expired/missing)
         } catch {
             // Network error — don't redirect, let user login fresh
         }
@@ -456,15 +471,15 @@
             const res = await fetch(API + '/admin/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ email, password })
             });
             const data = await res.json();
 
             if (res.ok) {
-                localStorage.setItem('admin_token', data.access_token);
-                localStorage.setItem('tenant_id', String(data.tenant_id));
-                localStorage.setItem('tenant_name', data.tenant_name || '');
-                document.cookie = `admin_token=${data.access_token}; path=/; SameSite=Lax; max-age=86400`;
+                // Token is now set as HttpOnly cookie by the server
+                sessionStorage.setItem('tenant_id', String(data.tenant_id));
+                sessionStorage.setItem('tenant_name', data.tenant_name || '');
                 showSuccess('Login successful! Redirecting\u2026');
                 setTimeout(() => { window.location.href = '/dashboard/'; }, 500);
             } else {
@@ -477,7 +492,9 @@
         }
     }
 
-    // ===== Sign Up =====
+    // ===== Sign Up (Step 1: Send OTP) =====
+    let pendingSignupEmail = '';  // Track email for OTP verification
+
     async function handleSignUp(e) {
         e.preventDefault();
         hideMessages();
@@ -487,26 +504,30 @@
 
         if (!tenant_name || !email || !password) { showError('Please fill in all fields.'); return; }
         if (password.length < 8) { showError('Password must be at least 8 characters.'); return; }
-        if (!/[A-Z]/.test(password)) { showError('Password needs at least one uppercase letter.'); return; }
-        if (!/[a-z]/.test(password)) { showError('Password needs at least one lowercase letter.'); return; }
-        if (!/\d/.test(password))    { showError('Password needs at least one number.'); return; }
+        if (/[A-Z]/.test(password) === false) { showError('Password needs at least one uppercase letter.'); return; }
+        if (/[a-z]/.test(password) === false) { showError('Password needs at least one lowercase letter.'); return; }
+        if (/\d/.test(password) === false)    { showError('Password needs at least one number.'); return; }
 
         setLoading('signupBtn', true);
         try {
             const res = await fetch(API + '/admin/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ email, password, tenant_name })
             });
             const data = await res.json();
 
             if (res.ok) {
-                localStorage.setItem('admin_token', data.access_token);
-                localStorage.setItem('tenant_id', String(data.tenant_id));
-                localStorage.setItem('tenant_name', data.tenant_name || '');
-                document.cookie = `admin_token=${data.access_token}; path=/; SameSite=Lax; max-age=86400`;
-                showSuccess('Account created! Redirecting to dashboard…');
-                setTimeout(() => { window.location.href = '/dashboard/'; }, 800);
+                // OTP sent — show verification form
+                pendingSignupEmail = email;
+                document.getElementById('signupForm').style.display = 'none';
+                document.getElementById('otpForm').style.display = 'block';
+                document.getElementById('otpEmailDisplay').textContent = email;
+                document.getElementById('otpCode').focus();
+                // Hide tabs so user can't switch away
+                document.querySelector('.auth-tabs').style.display = 'none';
+                showSuccess(data.message || 'OTP sent! Check your email.');
             } else {
                 showError(data.detail || 'Registration failed. Please try again.');
             }
@@ -514,6 +535,72 @@
             showError('Network error. Please check your connection.');
         } finally {
             setLoading('signupBtn', false);
+        }
+    }
+
+    // ===== Sign Up (Step 2: Verify OTP) =====
+    async function handleVerifyOTP(e) {
+        e.preventDefault();
+        hideMessages();
+        const otp = document.getElementById('otpCode').value.trim();
+
+        if (!otp || otp.length !== 6) { showError('Please enter the 6-digit code.'); return; }
+
+        setLoading('verifyOtpBtn', true);
+        try {
+            const res = await fetch(API + '/admin/register/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ email: pendingSignupEmail, otp })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                // Token is now set as HttpOnly cookie by the server
+                sessionStorage.setItem('tenant_id', String(data.tenant_id));
+                sessionStorage.setItem('tenant_name', data.tenant_name || '');
+                showSuccess('Account created! Redirecting to dashboard\u2026');
+                setTimeout(() => { window.location.href = '/dashboard/'; }, 800);
+            } else {
+                showError(data.detail || 'Invalid OTP. Please try again.');
+            }
+        } catch {
+            showError('Network error. Please check your connection.');
+        } finally {
+            setLoading('verifyOtpBtn', false);
+        }
+    }
+
+    // ===== Resend OTP =====
+    async function handleResendOTP() {
+        hideMessages();
+        if (!pendingSignupEmail) { showError('No pending registration. Please start over.'); return; }
+
+        const tenant_name = document.getElementById('suOrgName').value.trim();
+        const password = document.getElementById('suPassword').value;
+
+        document.getElementById('resendOtpBtn').disabled = true;
+        document.getElementById('resendOtpBtn').textContent = 'Sending\u2026';
+        try {
+            const res = await fetch(API + '/admin/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ email: pendingSignupEmail, password, tenant_name })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                showSuccess('New OTP sent! Check your email.');
+            } else {
+                showError(data.detail || 'Failed to resend OTP.');
+            }
+        } catch {
+            showError('Network error.');
+        } finally {
+            document.getElementById('resendOtpBtn').disabled = false;
+            document.getElementById('resendOtpBtn').textContent = 'Resend OTP';
         }
     }
 </script>
