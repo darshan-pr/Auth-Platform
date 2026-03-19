@@ -52,7 +52,7 @@
         .auth-card {
             background: #fff;
             border-radius: 24px;
-            box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+            box-shadow: none;
             display: flex;
             overflow: hidden;
             min-height: 560px;
@@ -72,6 +72,7 @@
             flex-direction: column;
             position: relative;
             overflow: hidden;
+            box-shadow: none;
         }
 
         .form-body {
@@ -84,9 +85,9 @@
             height: 42px;
             border-radius: 12px;
             object-fit: cover;
-            border: 1px solid #e2e8f0;
-            background: #fff;
-            box-shadow: 0 3px 10px rgba(15, 23, 42, 0.12);
+            border: none;
+            background: transparent;
+            box-shadow: none;
             flex-shrink: 0;
         }
 
@@ -122,7 +123,7 @@
         }
 
         .app-name-inline {
-            margin-top: 8px;
+            margin-top: 20px;
             font-size: 12px;
             font-weight: 700;
             color: #334155;
@@ -131,7 +132,7 @@
             display: inline-flex;
             align-items: center;
             padding: 5px 10px;
-            border-radius: 999px;
+            border-radius: 10px;
             border: 1px solid #dbe4ff;
             background: #f5f8ff;
         }
@@ -151,16 +152,16 @@
             transition: background-color 0.4s, color 0.4s;
         }
 
-        body.mode-login .form-header h1 { color: #e85832; }
+        body.mode-login .form-header h1 { color: #000; }
         body.mode-login .app-badge { background: #fff3ee; color: #e85832; }
 
-        body.mode-signup .form-header h1 { color: #0d9e6d; }
+        body.mode-signup .form-header h1 { color: #000; }
         body.mode-signup .app-badge { background: #eafaf3; color: #0d9e6d; }
 
-        body.mode-forgot .form-header h1 { color: #3b6ade; }
+        body.mode-forgot .form-header h1 { color: #000; }
         body.mode-forgot .app-badge,
         body.mode-reset-otp .app-badge { background: #eef2fe; color: #3b6ade; }
-        body.mode-reset-otp .form-header h1 { color: #3b6ade; }
+        body.mode-reset-otp .form-header h1 { color: #000; }
         body.mode-login .app-name-inline { background: #fff3ee; border-color: #fed7c9; color: #c2410c; }
         body.mode-signup .app-name-inline { background: #ecfdf3; border-color: #bbf7d0; color: #15803d; }
         body.mode-forgot .app-name-inline,
@@ -258,7 +259,7 @@
             padding: 14px 16px;
             border: 1.5px solid #e2e2e5;
             border-radius: 10px;
-            font-size: 5px;
+            font-size: 12px;
             color: #1a1a2e;
             outline: none;
             background: #fafafa;
@@ -879,8 +880,7 @@
         @media (max-width: 720px) {
             html,
             body {
-                background:
-                    radial-gradient(1200px 420px at 50% -220px, #e5e9ff 0%, #f3f6ff 42%, #f6f8ff 100%) !important;
+                background: #fef5f0 !important;
             }
 
             body,
@@ -888,8 +888,6 @@
             body.mode-signup,
             body.mode-forgot,
             body.mode-reset-otp {
-                background:
-                    radial-gradient(1200px 420px at 50% -220px, #e5e9ff 0%, #f3f6ff 42%, #f6f8ff 100%) !important;
                 align-items: center;
                 justify-content: center;
                 overflow-y: auto;
@@ -898,6 +896,11 @@
                 color: #1f2937;
                 padding: 0;
             }
+
+            body.mode-login { background: #fef5f0 !important; }
+            body.mode-signup { background: #eefbf5 !important; }
+            body.mode-forgot,
+            body.mode-reset-otp { background: #f0f4fe !important; }
 
             .illustration-panel { display: none; }
 
@@ -917,12 +920,10 @@
             }
 
             .auth-card {
-                background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
-                border: 1px solid #e6e9f5;
+                background: transparent;
+                border: none;
                 border-radius: 22px;
-                box-shadow:
-                    0 24px 60px rgba(15, 23, 42, 0.14),
-                    0 6px 16px rgba(99, 102, 241, 0.08);
+                box-shadow: none;
                 min-height: unset;
                 overflow: visible;
             }
@@ -938,8 +939,9 @@
                 width: 36px;
                 height: 36px;
                 border-radius: 10px;
-                border-color: #dbe4ff;
-                box-shadow: 0 3px 10px rgba(79, 70, 229, 0.16);
+                border: none;
+                background: transparent;
+                box-shadow: none;
             }
 
             .form-title-row {
@@ -953,7 +955,7 @@
 
             .app-name-inline {
                 font-size: 11px;
-                margin-top: 7px;
+                margin-top: 18px;
                 padding: 4px 9px;
             }
 
@@ -1269,6 +1271,24 @@
                 color: #8a94a8;
             }
 
+            .footer::before {
+                content: "";
+                display: block;
+                width: min(66vw, 240px);
+                height: 3px;
+                margin: 0 auto 8px;
+                border-radius: 999px;
+                background: linear-gradient(
+                    90deg,
+                    rgba(255, 255, 255, 0) 0%,
+                    rgba(255, 255, 255, 0.55) 16%,
+                    rgba(255, 255, 255, 1) 50%,
+                    rgba(255, 255, 255, 0.55) 84%,
+                    rgba(255, 255, 255, 0) 100%
+                );
+                box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+            }
+
             .footer a { color: #4f46e5; }
             .footer a:hover { color: #4338ca; }
         }
@@ -1279,12 +1299,12 @@
             .form-panel { padding: 20px 14px 14px; }
             .form-header h1 { font-size: 19px; }
             .form-header .subtitle { font-size: 10px; }
-            .app-badge { font-size: 10px; margin-bottom: 12px; }
+            .app-badge { font-size: 10px; margin-bottom: 15px; }
             .otp-input { width: 31px; height: 38px; font-size: 16px; border-radius: 8px; }
             .otp-inputs { gap: 4px; }
-            .btn-primary { padding: 10px; font-size: 13px; border-radius: 9px; }
-            .btn-passkey { padding: 9px 10px; font-size: 12px; border-radius: 9px; }
-            .input-field { padding: 10px 11px; font-size: 16px; border-radius: 9px; }
+            .btn-primary { padding: 10px; font-size: 13px; border-radius: 13px; }
+            .btn-passkey { padding: 9px 10px; font-size: 12px; border-radius: 13px; }
+            .input-field { padding: 10px 11px; font-size: 16px; border-radius: 13px; }
             .form-group label { font-size: 10px; margin-bottom: 5px; }
             .form-group { margin-bottom: 10px; }
             .bottom-row .switch-link { font-size: 10px; }
@@ -1335,11 +1355,11 @@
                             onerror="this.onerror=null;this.src='/assets/logo.png';"
                         >
                         <div class="form-title-stack">
-                            <h1 id="formTitle">Sign In</h1>
+                            <h1 id="formTitle">{{ app_name }}</h1>
                             <p class="subtitle" id="formSubtitle">Access your account</p>
                         </div>
                     </div>
-                    <div class="app-name-inline">{{ app_name }}</div>
+                    <div class="app-name-inline" id="inlineModeTitle">Sign In</div>
                 </div>
 
                 <!-- Messages -->
@@ -1647,7 +1667,7 @@
 
             document.body.className = "mode-" + config.mode;
 
-            document.getElementById("formTitle").textContent = config.title;
+            document.getElementById("inlineModeTitle").textContent = config.title;
             document.getElementById("formSubtitle").textContent = config.subtitle;
 
             document.querySelectorAll(".illust").forEach(el => el.classList.remove("active"));
