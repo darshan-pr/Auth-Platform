@@ -95,16 +95,17 @@
             font-size: 14px;
             color: #777;
             margin-top: 4px;
+            margin-bottom: 10px;
         }
 
         .app-badge {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            margin-top: 10px;
+            margin-top: 20px;
             margin-bottom: 20px;
             padding: 5px 14px;
-            border-radius: 20px;
+            border-radius: 10px;
             font-size: 12px;
             font-weight: 500;
             transition: background-color 0.4s, color 0.4s;
@@ -322,6 +323,9 @@
         .btn-primary.loading .spinner { display: block; }
         .btn-primary.loading { padding-right: 44px; }
 
+        /* Extra spacing for the Create Account action in signup view */
+        #signupBtn { margin-top: 16px; }
+
         @keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
 
         /* ====== Bottom Row ====== */
@@ -479,6 +483,7 @@
             }
 
             .form-header h1 { font-size: 24px; }
+            .app-badge { margin-top: 25px; }
 
             .mobile-illust img {
                 height: 72px;

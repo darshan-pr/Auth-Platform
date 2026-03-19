@@ -74,6 +74,20 @@ free_port() {
     fi
 }
 
+run_backend_migrations() {
+    local migrations_log="/tmp/auth_migrations.log"
+    echo "[*] Applying database migrations ..."
+    cd "$SCRIPT_DIR/backend"
+    RUN_DB_MIGRATIONS_ON_STARTUP=false python -m app.migration_runner > "$migrations_log" 2>&1
+    local rc=$?
+    if [ "$rc" -ne 0 ]; then
+        echo "[!] Migration runner failed. Check $migrations_log"
+        return 1
+    fi
+    echo "    -> Migration check complete. Log: $migrations_log"
+    return 0
+}
+
 # -------------------- Cloudflare Tunnel --------------------
 
 # start_cloudflare_tunnel <port> <label> <pidfile> <url_outfile>
@@ -125,7 +139,9 @@ start_backend() {
     free_port "$BACKEND_PORT"
     activate_venv
     load_env
+    run_backend_migrations || return 1
     cd "$SCRIPT_DIR/backend"
+    export RUN_DB_MIGRATIONS_ON_STARTUP=false
     uvicorn app.main:app --reload --host 0.0.0.0 --port $BACKEND_PORT &
     local pid=$!
     sleep 1
@@ -144,19 +160,26 @@ start_backend_prod() {
     free_port "$BACKEND_PORT"
     activate_venv
     load_env
+    run_backend_migrations || return 1
     cd "$SCRIPT_DIR/backend"
 
     # macOS blocks Objective-C runtime calls after fork() by default.
     # Gunicorn's pre-fork worker model triggers this — setting this env var disables the guard.
     export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+    export RUN_DB_MIGRATIONS_ON_STARTUP=false
+    : > /tmp/gunicorn_access.log
+    : > /tmp/gunicorn_error.log
 
     gunicorn app.main:app \
         --worker-class uvicorn.workers.UvicornWorker \
         --workers "${GUNICORN_WORKERS:-2}" \
         --bind "0.0.0.0:$BACKEND_PORT" \
         --log-level info \
-        --access-logfile "/tmp/gunicorn_access.log" \
-        --error-logfile  "/tmp/gunicorn_error.log" &
+        --capture-output \
+        --access-logfile "-" \
+        --error-logfile "-" \
+        > >(tee -a /tmp/gunicorn_access.log) \
+        2> >(tee -a /tmp/gunicorn_error.log >&2) &
     local pid=$!
     sleep 3
     if ! kill -0 "$pid" 2>/dev/null; then

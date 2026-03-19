@@ -258,7 +258,7 @@
             padding: 14px 16px;
             border: 1.5px solid #e2e2e5;
             border-radius: 10px;
-            font-size: 15px;
+            font-size: 5px;
             color: #1a1a2e;
             outline: none;
             background: #fafafa;
@@ -879,7 +879,8 @@
         @media (max-width: 720px) {
             html,
             body {
-                background: #fef5f0 !important;
+                background:
+                    radial-gradient(1200px 420px at 50% -220px, #e5e9ff 0%, #f3f6ff 42%, #f6f8ff 100%) !important;
             }
 
             body,
@@ -887,6 +888,8 @@
             body.mode-signup,
             body.mode-forgot,
             body.mode-reset-otp {
+                background:
+                    radial-gradient(1200px 420px at 50% -220px, #e5e9ff 0%, #f3f6ff 42%, #f6f8ff 100%) !important;
                 align-items: center;
                 justify-content: center;
                 overflow-y: auto;
@@ -895,11 +898,6 @@
                 color: #1f2937;
                 padding: 0;
             }
-
-            body.mode-login { background: #fef5f0 !important; }
-            body.mode-signup { background: #eefbf5 !important; }
-            body.mode-forgot,
-            body.mode-reset-otp { background: #f0f4fe !important; }
 
             .illustration-panel { display: none; }
 
@@ -994,9 +992,9 @@
             }
 
             .input-field {
-                font-size: 0.82rem;
-                line-height: 1.25;
-                padding: 9px 12px;
+                font-size: 16px;
+                line-height: 1.2;
+                padding: 11px 12px;
                 border-radius: 10px;
                 background: #f9faff;
                 border-color: #d8deef;
@@ -1005,11 +1003,7 @@
 
             .input-field::placeholder {
                 color: #94a3b8;
-                font-size: 1em;
-            }
-
-            .input-toggle-wrap .input-field {
-                padding-right: 38px;
+                font-size: 0.9em;
             }
 
             .input-field:focus {
@@ -1290,7 +1284,7 @@
             .otp-inputs { gap: 4px; }
             .btn-primary { padding: 10px; font-size: 13px; border-radius: 9px; }
             .btn-passkey { padding: 9px 10px; font-size: 12px; border-radius: 9px; }
-            .input-field { padding: 8px 10px; font-size: 0.78rem; border-radius: 9px; }
+            .input-field { padding: 10px 11px; font-size: 16px; border-radius: 9px; }
             .form-group label { font-size: 10px; margin-bottom: 5px; }
             .form-group { margin-bottom: 10px; }
             .bottom-row .switch-link { font-size: 10px; }
@@ -1307,7 +1301,7 @@
             .form-header h1 { font-size: 17px; }
             .bottom-row { gap: 6px; }
             .bottom-row .switch-link { font-size: 9px; }
-            .input-field { font-size: 0.78rem; }
+            .input-field { font-size: 16px; }
             .form-group label { font-size: 9px; }
             .btn-primary,
             .btn-passkey { font-size: 10px; }

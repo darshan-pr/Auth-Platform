@@ -1,18 +1,18 @@
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 from typing import Optional
 import logging
 from app.api import admin, auth, health, token, oauth
 from app.db import engine, Base, get_db
 from app.config import settings
+from app.migration_runner import run_migrations
 from app.services.jwt_service import verify_token
 
 logger = logging.getLogger(__name__)
@@ -30,44 +30,14 @@ from app.models.login_event import LoginEvent
 Base.metadata.create_all(bind=engine)
 
 
-def run_migrations():
-    """Run all SQL migration files in order to ensure schema is up to date."""
-    migrations_dir = Path(__file__).resolve().parent.parent / "migrations"
-    if not migrations_dir.exists():
-        logger.info("No migrations directory found, skipping migrations.")
-        return
-
-    migration_files = sorted(migrations_dir.glob("*.sql"))
-    if not migration_files:
-        logger.info("No migration files found.")
-        return
-
-    with engine.connect() as conn:
-        for mig_file in migration_files:
-            logger.info(f"Running migration: {mig_file.name}")
-            sql = mig_file.read_text()
-            # Strip SQL comment lines before splitting on semicolons
-            cleaned_lines = [line for line in sql.splitlines() if not line.strip().startswith("--")]
-            cleaned_sql = "\n".join(cleaned_lines)
-            # Execute each statement separately (split on semicolons)
-            for statement in cleaned_sql.split(";"):
-                statement = statement.strip()
-                if statement:
-                    try:
-                        conn.execute(text(statement))
-                    except Exception as e:
-                        logger.warning(f"Migration statement skipped ({mig_file.name}): {e}")
-                        # Clear failed transaction state so later statements can still run.
-                        conn.rollback()
-            conn.commit()
-    logger.info("All migrations applied successfully.")
-
-
-# Run migrations on startup
-try:
-    run_migrations()
-except Exception as e:
-    logger.error(f"Migration runner failed: {e}")
+# Run migrations on startup unless explicitly disabled.
+if settings.RUN_DB_MIGRATIONS_ON_STARTUP:
+    try:
+        run_migrations()
+    except Exception as e:
+        logger.error(f"Migration runner failed: {e}")
+else:
+    logger.info("Skipping startup migrations (RUN_DB_MIGRATIONS_ON_STARTUP=false).")
 
 
 # ============== Dashboard Auth Middleware ==============
@@ -164,6 +134,76 @@ _templates_dir = Path(__file__).resolve().parent / "templates"
 _reset_templates = Jinja2Templates(directory=str(_templates_dir))
 
 
+def _with_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+def _normalize_redirect_uri(raw: str):
+    candidate = (raw or "").strip().strip("\"'")
+    if not candidate:
+        return None
+
+    parsed = urlparse(candidate)
+
+    # Accept scheme-less entries like "myapp.example.com/callback".
+    if not parsed.scheme and "://" not in candidate:
+        candidate = f"https://{candidate.lstrip('/')}"
+        parsed = urlparse(candidate)
+
+    if parsed.scheme in ("http", "https") and parsed.netloc:
+        return candidate, parsed
+    return None
+
+
+def _is_localhost_target(parsed) -> bool:
+    host = (parsed.hostname or "").lower()
+    return host in {"localhost", "127.0.0.1", "0.0.0.0", "::1"} or host.endswith(".localhost")
+
+
+def _infer_app_signin_url(
+    redirect_uris: Optional[str],
+    allow_localhost_fallback: bool = False,
+) -> Optional[str]:
+    if not redirect_uris:
+        return None
+
+    valid = []
+    for raw in redirect_uris.split(","):
+        normalized = _normalize_redirect_uri(raw)
+        if normalized:
+            valid.append(normalized)
+
+    if not valid:
+        return None
+
+    public = [(candidate, parsed) for candidate, parsed in valid if not _is_localhost_target(parsed)]
+    pool = public if public else (valid if allow_localhost_fallback else [])
+    if not pool:
+        return None
+
+    for candidate, parsed in pool:
+        path = (parsed.path or "").lower()
+        if "signin" in path or "sign-in" in path or "login" in path:
+            return candidate
+
+    candidate, parsed = pool[0]
+    first_path = (parsed.path or "").lower()
+    if "callback" in first_path or "oauth" in first_path:
+        return f"{parsed.scheme}://{parsed.netloc}/login"
+    return candidate
+
+
+def _append_query_params(url: str, params: dict) -> str:
+    parsed = urlparse(url)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    for key, value in params.items():
+        if value is not None and value != "":
+            query[key] = value
+    return urlunparse(parsed._replace(query=urlencode(query)))
+
+
 @app.get("/reset-password", include_in_schema=False, response_class=HTMLResponse)
 async def reset_password_page(
     request: Request,
@@ -173,33 +213,6 @@ async def reset_password_page(
     db: Session = Depends(get_db),
 ):
     """Global reset/set password page — linked from invitation emails."""
-    def _infer_app_signin_url(redirect_uris: Optional[str]) -> Optional[str]:
-        if not redirect_uris:
-            return None
-
-        valid = []
-        for raw in redirect_uris.split(","):
-            candidate = raw.strip()
-            if not candidate:
-                continue
-            parsed = urlparse(candidate)
-            if parsed.scheme in ("http", "https") and parsed.netloc:
-                valid.append((candidate, parsed))
-
-        if not valid:
-            return None
-
-        for candidate, parsed in valid:
-            path = (parsed.path or "").lower()
-            if "signin" in path or "sign-in" in path or "login" in path:
-                return candidate
-
-        candidate, parsed = valid[0]
-        first_path = (parsed.path or "").lower()
-        if "callback" in first_path or "oauth" in first_path:
-            return f"{parsed.scheme}://{parsed.netloc}/login"
-        return candidate
-
     error_ctx = {
         "request": request,
         "error": None,
@@ -207,23 +220,25 @@ async def reset_password_page(
         "auth_platform_url": settings.AUTH_PLATFORM_URL,
         "app_logo_url": "/assets/logo.png",
         "app_signin_url": None,
+        "server_signin_url": None,
     }
 
     if not token or not email or not app_id:
         error_ctx["error"] = "This link is invalid or incomplete. Please check the link in your email."
-        return _reset_templates.TemplateResponse("reset_password.html", error_ctx)
+        return _with_no_cache_headers(_reset_templates.TemplateResponse("reset_password.html", error_ctx))
 
     # Validate the app exists
     from app.models.app import App as AppModel
     app_obj = db.query(AppModel).filter(AppModel.app_id == app_id).first()
     if not app_obj:
         error_ctx["error"] = "The application associated with this link is no longer available."
-        return _reset_templates.TemplateResponse("reset_password.html", error_ctx)
+        return _with_no_cache_headers(_reset_templates.TemplateResponse("reset_password.html", error_ctx))
 
     app_name = app_obj.name or "Application"
     app_signin_url = _infer_app_signin_url(app_obj.redirect_uris)
+    server_signin_url = f"/signin?{urlencode({'client_id': app_id, 'from': 'password_reset'})}"
 
-    return _reset_templates.TemplateResponse("reset_password.html", {
+    return _with_no_cache_headers(_reset_templates.TemplateResponse("reset_password.html", {
         "request": request,
         "token": token,
         "email": email,
@@ -231,9 +246,43 @@ async def reset_password_page(
         "app_name": app_name,
         "app_logo_url": app_obj.logo_url or "/assets/logo.png",
         "app_signin_url": app_signin_url,
+        "server_signin_url": server_signin_url,
         "auth_platform_url": settings.AUTH_PLATFORM_URL,
         "error": None,
-    })
+    }))
+
+
+@app.get("/signin", include_in_schema=False)
+async def app_signin_redirect(
+    client_id: str = None,
+    from_source: str = Query(default="signin", alias="from"),
+    db: Session = Depends(get_db),
+):
+    """Server-side sign-in redirect target for post-reset flows."""
+    if not client_id:
+        return RedirectResponse(url="/login", status_code=302)
+
+    from app.models.app import App as AppModel
+    app_obj = db.query(AppModel).filter(AppModel.app_id == client_id).first()
+    if not app_obj:
+        return RedirectResponse(url="/login", status_code=302)
+
+    app_signin_url = _infer_app_signin_url(app_obj.redirect_uris)
+    if not app_signin_url:
+        logger.warning(
+            "No public redirect URI configured for client_id=%s. redirect_uris=%s",
+            client_id,
+            app_obj.redirect_uris,
+        )
+        return RedirectResponse(url="/login", status_code=302)
+
+    safe_from = (from_source or "signin").strip()[:64]
+    target = _append_query_params(
+        app_signin_url,
+        {"client_id": client_id, "from": safe_from}
+    )
+    logger.info("Post-reset sign-in redirect for client_id=%s -> %s", client_id, target)
+    return RedirectResponse(url=target, status_code=302)
 
 
 # Serve static assets (illustrations etc.)

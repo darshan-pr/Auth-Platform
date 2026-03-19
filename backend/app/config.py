@@ -17,6 +17,13 @@ for env_path in env_paths:
 else:
     load_dotenv()  # Try default .env loading
 
+
+def _as_bool(value: str, default: bool) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 class Settings:
     # Environment detection
     ENVIRONMENT: str = os.getenv("RAILWAY_ENVIRONMENT", os.getenv("ENVIRONMENT", "development"))
@@ -62,5 +69,12 @@ class Settings:
     RATE_LIMIT_OTP: int = int(os.getenv("RATE_LIMIT_OTP", "3"))
     RATE_LIMIT_SIGNUP: int = int(os.getenv("RATE_LIMIT_SIGNUP", "10"))
     RATE_LIMIT_GENERAL: int = int(os.getenv("RATE_LIMIT_GENERAL", "60"))
+
+    # Boot-time migration runner toggle.
+    # In multi-worker production mode, run migrations once externally and keep this false.
+    RUN_DB_MIGRATIONS_ON_STARTUP: bool = _as_bool(
+        os.getenv("RUN_DB_MIGRATIONS_ON_STARTUP"),
+        default=True
+    )
 
 settings = Settings()

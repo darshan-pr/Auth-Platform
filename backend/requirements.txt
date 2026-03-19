@@ -14,3 +14,4 @@ jinja2 # Templating for OAuth login page
 pytest  # Testing framework for Python
 httpx # HTTP client for testing
 requests  # HTTP client for GeoIP API calls
+gunicorn

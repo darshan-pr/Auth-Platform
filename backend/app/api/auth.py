@@ -21,7 +21,7 @@ from app.redis import redis_client
 from pydantic import BaseModel
 from typing import Optional
 import logging
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode
 
 logger = logging.getLogger(__name__)
 
@@ -495,33 +495,62 @@ class SetPasswordRequest(BaseModel):
     new_password: str
 
 
-def _infer_app_signin_url_from_redirects(redirect_uris: Optional[str]) -> Optional[str]:
+def _normalize_redirect_uri(raw: str):
+    candidate = (raw or "").strip().strip("\"'")
+    if not candidate:
+        return None
+
+    parsed = urlparse(candidate)
+    if not parsed.scheme and "://" not in candidate:
+        candidate = f"https://{candidate.lstrip('/')}"
+        parsed = urlparse(candidate)
+
+    if parsed.scheme in ("http", "https") and parsed.netloc:
+        return candidate, parsed
+    return None
+
+
+def _is_localhost_target(parsed) -> bool:
+    host = (parsed.hostname or "").lower()
+    return host in {"localhost", "127.0.0.1", "0.0.0.0", "::1"} or host.endswith(".localhost")
+
+
+def _infer_app_signin_url_from_redirects(
+    redirect_uris: Optional[str],
+    allow_localhost_fallback: bool = False,
+) -> Optional[str]:
     if not redirect_uris:
         return None
 
     valid_urls = []
     for raw in redirect_uris.split(","):
-        candidate = raw.strip()
-        if not candidate:
-            continue
-        parsed = urlparse(candidate)
-        if parsed.scheme in ("http", "https") and parsed.netloc:
-            valid_urls.append((candidate, parsed))
+        normalized = _normalize_redirect_uri(raw)
+        if normalized:
+            valid_urls.append(normalized)
 
     if not valid_urls:
         return None
 
+    public_urls = [(candidate, parsed) for candidate, parsed in valid_urls if not _is_localhost_target(parsed)]
+    pool = public_urls if public_urls else (valid_urls if allow_localhost_fallback else [])
+    if not pool:
+        return None
+
     # Prefer an explicitly configured login path.
-    for candidate, parsed in valid_urls:
+    for candidate, parsed in pool:
         path = (parsed.path or "").lower()
         if "signin" in path or "sign-in" in path or "login" in path:
             return candidate
 
-    first_candidate, first_parsed = valid_urls[0]
+    first_candidate, first_parsed = pool[0]
     first_path = (first_parsed.path or "").lower()
     if "callback" in first_path or "oauth" in first_path:
         return f"{first_parsed.scheme}://{first_parsed.netloc}/login"
     return first_candidate
+
+
+def _build_server_signin_url(client_id: str, source: str = "password_reset") -> str:
+    return f"/signin?{urlencode({'client_id': client_id, 'from': source})}"
 
 @router.post("/set-password")
 def set_password(request: SetPasswordRequest, db: Session = Depends(get_db)):
@@ -573,6 +602,7 @@ def set_password(request: SetPasswordRequest, db: Session = Depends(get_db)):
     return {
         "message": "Password set successfully. You can now sign in.",
         "email": user.email,
+        "server_signin_url": _build_server_signin_url(request.app_id),
         "app_signin_url": _infer_app_signin_url_from_redirects(app.redirect_uris),
     }
 

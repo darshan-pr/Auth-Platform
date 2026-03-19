@@ -77,6 +77,13 @@ templates = Jinja2Templates(
 )
 
 
+def _with_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
 # ==================== Redirect URI Validation ====================
 
 def validate_redirect_uri(app: App, redirect_uri: str) -> bool:
@@ -129,28 +136,28 @@ def authorize(
     # Validate response_type
     if response_type != "code":
         error_ctx["error"] = "Unsupported response_type. Only 'code' is supported."
-        return templates.TemplateResponse("auth.html", error_ctx)
+        return _with_no_cache_headers(templates.TemplateResponse("auth.html", error_ctx))
 
     # Validate client_id
     app = db.query(App).filter(App.app_id == client_id).first()
     if not app:
         error_ctx["error"] = "Invalid client_id. This application is not registered."
-        return templates.TemplateResponse("auth.html", error_ctx)
+        return _with_no_cache_headers(templates.TemplateResponse("auth.html", error_ctx))
 
     # Validate redirect_uri
     if not validate_redirect_uri(app, redirect_uri):
         error_ctx["error"] = "Invalid redirect_uri. This URI is not registered for this application."
-        return templates.TemplateResponse("auth.html", error_ctx)
+        return _with_no_cache_headers(templates.TemplateResponse("auth.html", error_ctx))
 
     # PKCE is mandatory for security
     if not code_challenge:
         error_ctx["error"] = "PKCE code_challenge is required. Public clients must use PKCE."
-        return templates.TemplateResponse("auth.html", error_ctx)
+        return _with_no_cache_headers(templates.TemplateResponse("auth.html", error_ctx))
 
     # State is mandatory for CSRF protection
     if not state:
         error_ctx["error"] = "state parameter is required for CSRF protection."
-        return templates.TemplateResponse("auth.html", error_ctx)
+        return _with_no_cache_headers(templates.TemplateResponse("auth.html", error_ctx))
 
     # Create OAuth session in Redis
     session_id = create_oauth_session(
@@ -161,7 +168,7 @@ def authorize(
         code_challenge_method=code_challenge_method,
     )
 
-    return templates.TemplateResponse("auth.html", {
+    return _with_no_cache_headers(templates.TemplateResponse("auth.html", {
         "request": request,
         "session_id": session_id,
         "app_name": app.name or "Application",
@@ -171,7 +178,7 @@ def authorize(
         "passkey_enabled": app.passkey_enabled,
         "auth_platform_url": settings.AUTH_PLATFORM_URL,
         "error": None,
-    })
+    }))
 
 
 # ==================== POST /oauth/authenticate ====================
