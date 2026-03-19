@@ -7,6 +7,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pathlib import Path
+from urllib.parse import urlparse
+from typing import Optional
 import logging
 from app.api import admin, auth, health, token, oauth
 from app.db import engine, Base, get_db
@@ -171,7 +173,41 @@ async def reset_password_page(
     db: Session = Depends(get_db),
 ):
     """Global reset/set password page — linked from invitation emails."""
-    error_ctx = {"request": request, "error": None, "error_title": "Invalid Link"}
+    def _infer_app_signin_url(redirect_uris: Optional[str]) -> Optional[str]:
+        if not redirect_uris:
+            return None
+
+        valid = []
+        for raw in redirect_uris.split(","):
+            candidate = raw.strip()
+            if not candidate:
+                continue
+            parsed = urlparse(candidate)
+            if parsed.scheme in ("http", "https") and parsed.netloc:
+                valid.append((candidate, parsed))
+
+        if not valid:
+            return None
+
+        for candidate, parsed in valid:
+            path = (parsed.path or "").lower()
+            if "signin" in path or "sign-in" in path or "login" in path:
+                return candidate
+
+        candidate, parsed = valid[0]
+        first_path = (parsed.path or "").lower()
+        if "callback" in first_path or "oauth" in first_path:
+            return f"{parsed.scheme}://{parsed.netloc}/login"
+        return candidate
+
+    error_ctx = {
+        "request": request,
+        "error": None,
+        "error_title": "Invalid Link",
+        "auth_platform_url": settings.AUTH_PLATFORM_URL,
+        "app_logo_url": "/assets/logo.png",
+        "app_signin_url": None,
+    }
 
     if not token or not email or not app_id:
         error_ctx["error"] = "This link is invalid or incomplete. Please check the link in your email."
@@ -185,6 +221,7 @@ async def reset_password_page(
         return _reset_templates.TemplateResponse("reset_password.html", error_ctx)
 
     app_name = app_obj.name or "Application"
+    app_signin_url = _infer_app_signin_url(app_obj.redirect_uris)
 
     return _reset_templates.TemplateResponse("reset_password.html", {
         "request": request,
@@ -192,6 +229,9 @@ async def reset_password_page(
         "email": email,
         "app_id": app_id,
         "app_name": app_name,
+        "app_logo_url": app_obj.logo_url or "/assets/logo.png",
+        "app_signin_url": app_signin_url,
+        "auth_platform_url": settings.AUTH_PLATFORM_URL,
         "error": None,
     })
 

@@ -151,6 +151,27 @@
             margin-top: 3px;
         }
 
+        .form-link-row {
+            margin-top: -4px;
+            margin-bottom: 4px;
+            text-align: right;
+        }
+
+        .form-link-btn {
+            border: none;
+            background: none;
+            color: #a5b4fc;
+            cursor: pointer;
+            font-size: 0.74rem;
+            padding: 0;
+            font-family: inherit;
+        }
+
+        .form-link-btn:hover {
+            color: #c7d2fe;
+            text-decoration: underline;
+        }
+
         .input-wrap { position: relative; }
         .input-wrap input { padding-right: 38px; }
 
@@ -245,6 +266,55 @@
             background: var(--input-border);
         }
 
+        /* ===== OTP UI ===== */
+        .otp-intro {
+            text-align: center;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+            font-size: 0.96rem;
+            line-height: 1.45;
+        }
+
+        .otp-intro strong {
+            display: block;
+            color: var(--text);
+            margin-top: 4px;
+            font-size: 0.98rem;
+            font-weight: 700;
+            word-break: break-word;
+        }
+
+        .otp-inputs {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 12px 0 8px;
+        }
+
+        .otp-digit {
+            width: 44px !important;
+            height: 56px !important;
+            border-radius: 16px !important;
+            border: 2px solid #313131 !important;
+            background: #141414 !important;
+            text-align: center;
+            font-size: 1.35rem !important;
+            font-weight: 700;
+            padding: 0 !important;
+            letter-spacing: 0 !important;
+            caret-color: var(--primary);
+        }
+
+        .otp-digit:focus {
+            border-color: #5b5b5b !important;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.22) !important;
+        }
+
+        .otp-actions {
+            text-align: center;
+            margin-top: 8px;
+        }
+
         /* ===== Responsive ===== */
         @media (max-width: 400px) {
             body { padding: 12px; }
@@ -264,6 +334,10 @@
             .btn-submit { padding: 9px; font-size: 0.78rem; margin-top: 14px; }
             .msg { padding: 7px 10px; font-size: 0.73rem; }
             .auth-footer { font-size: 0.63rem; margin-top: 16px; }
+            .otp-intro { font-size: 0.86rem; }
+            .otp-intro strong { font-size: 0.92rem; }
+            .otp-inputs { gap: 6px; }
+            .otp-digit { width: 38px !important; height: 50px !important; border-radius: 14px !important; font-size: 1.15rem !important; }
         }
 
         @media (max-width: 320px) {
@@ -319,6 +393,9 @@
                 </button>
             </div>
         </div>
+        <div class="form-link-row">
+            <button type="button" class="form-link-btn" onclick="showForgotPasswordForm()">Forgot password?</button>
+        </div>
         <button type="submit" class="btn-submit" id="signinBtn">
             <i data-lucide="log-in"></i> Sign In
         </button>
@@ -354,24 +431,91 @@
     <!-- ========== OTP Verification Form (shown after signup) ========== -->
     <form id="otpForm" class="auth-form" onsubmit="handleVerifyOTP(event)" style="display:none;">
         <div class="divider">email verification</div>
-        <p style="text-align:center;color:#94a3b8;margin-bottom:1rem;font-size:0.9rem;">
-            We've sent a 6-digit code to <strong id="otpEmailDisplay" style="color:#e2e8f0;"></strong>
+        <p class="otp-intro">
+            Enter the 6-digit verification code sent to
+            <strong id="otpEmailDisplay"></strong>
         </p>
-        <div class="form-group">
-            <label for="otpCode">Verification Code</label>
-            <input type="text" id="otpCode" placeholder="Enter 6-digit OTP" required maxlength="6"
-                   pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code"
-                   style="text-align:center;letter-spacing:0.5em;font-size:1.3rem;">
+        <div class="otp-inputs" id="signupOtpInputs">
+            <input type="text" maxlength="1" class="otp-digit" data-index="0" inputmode="numeric" autocomplete="one-time-code">
+            <input type="text" maxlength="1" class="otp-digit" data-index="1" inputmode="numeric">
+            <input type="text" maxlength="1" class="otp-digit" data-index="2" inputmode="numeric">
+            <input type="text" maxlength="1" class="otp-digit" data-index="3" inputmode="numeric">
+            <input type="text" maxlength="1" class="otp-digit" data-index="4" inputmode="numeric">
+            <input type="text" maxlength="1" class="otp-digit" data-index="5" inputmode="numeric">
         </div>
         <button type="submit" class="btn-submit" id="verifyOtpBtn">
             <i data-lucide="check-circle"></i> Verify & Create Account
         </button>
-        <p style="text-align:center;margin-top:0.75rem;">
-            <button type="button" class="toggle-pw" onclick="handleResendOTP()" id="resendOtpBtn"
-                    style="background:none;border:none;color:#818cf8;cursor:pointer;font-size:0.85rem;">
-                Resend OTP
-            </button>
+        <div class="otp-actions">
+            <button type="button" class="form-link-btn" onclick="handleResendOTP()" id="resendOtpBtn">Resend OTP</button>
+        </div>
+    </form>
+
+    <!-- ========== Forgot Password (Admin) ========== -->
+    <form id="forgotForm" class="auth-form" onsubmit="handleForgotPassword(event)" style="display:none;">
+        <div class="divider">password reset</div>
+        <p class="form-hint" style="margin-bottom:10px;">
+            Enter your admin email to receive a 6-digit reset code.
         </p>
+        <div class="form-group">
+            <label for="fpEmail">Email</label>
+            <input type="email" id="fpEmail" placeholder="admin@company.com" required autocomplete="email">
+        </div>
+        <button type="submit" class="btn-submit" id="forgotBtn">
+            <i data-lucide="send"></i> Send Reset Code
+        </button>
+        <div class="otp-actions">
+            <button type="button" class="form-link-btn" onclick="switchTab('signin')">Back to Sign In</button>
+        </div>
+    </form>
+
+    <!-- ========== Reset Password (Step 1 verify OTP, Step 2 set password) ========== -->
+    <form id="resetForm" class="auth-form" onsubmit="handleResetPassword(event)" style="display:none;">
+        <div class="divider">password reset</div>
+        <div id="resetOtpStep">
+            <p class="otp-intro">
+                Enter the 6-digit verification code sent to
+                <strong id="resetEmailDisplay"></strong>
+            </p>
+            <div class="otp-inputs" id="resetOtpInputs">
+                <input type="text" maxlength="1" class="otp-digit" data-index="0" inputmode="numeric" autocomplete="one-time-code">
+                <input type="text" maxlength="1" class="otp-digit" data-index="1" inputmode="numeric">
+                <input type="text" maxlength="1" class="otp-digit" data-index="2" inputmode="numeric">
+                <input type="text" maxlength="1" class="otp-digit" data-index="3" inputmode="numeric">
+                <input type="text" maxlength="1" class="otp-digit" data-index="4" inputmode="numeric">
+                <input type="text" maxlength="1" class="otp-digit" data-index="5" inputmode="numeric">
+            </div>
+        </div>
+        <div id="resetPasswordStep" style="display:none;">
+            <p class="form-hint" style="margin-bottom:10px;">Code verified. Set your new admin password.</p>
+            <div class="form-group">
+                <label for="rpNewPassword">New Password</label>
+                <div class="input-wrap">
+                    <input type="password" id="rpNewPassword" placeholder="Create a strong password" minlength="8" autocomplete="new-password">
+                    <button type="button" class="toggle-pw" onclick="togglePw('rpNewPassword', this)">
+                        <i data-lucide="eye"></i>
+                    </button>
+                </div>
+                <p class="form-hint">Min 8 chars · uppercase · lowercase · number</p>
+            </div>
+            <div class="form-group">
+                <label for="rpConfirmPassword">Confirm Password</label>
+                <div class="input-wrap">
+                    <input type="password" id="rpConfirmPassword" placeholder="Confirm new password" autocomplete="new-password">
+                    <button type="button" class="toggle-pw" onclick="togglePw('rpConfirmPassword', this)">
+                        <i data-lucide="eye"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <button type="submit" class="btn-submit" id="resetBtn">
+            <i data-lucide="check-circle"></i> Verify Code
+        </button>
+        <div class="otp-actions">
+            <button type="button" class="form-link-btn" id="resetResendBtn" onclick="handleResendResetOTP()">Resend OTP</button>
+            <span style="color:var(--text-muted);margin:0 8px;">|</span>
+            <button type="button" class="form-link-btn" onclick="switchTab('signin')">Back to Sign In</button>
+        </div>
     </form>
 
     <p class="auth-footer">Secure multi-tenant authentication</p>
@@ -379,39 +523,80 @@
 
 <script>
     const API = window.location.origin;
+    const FORM_IDS = ['signinForm', 'signupForm', 'otpForm', 'forgotForm', 'resetForm'];
+    const state = {
+        pendingSignup: null,
+        pendingResetEmail: '',
+        signupVerifying: false,
+        resetVerifying: false,
+        resetVerified: false
+    };
 
-    // If session exists, validate it before redirecting — prevents redirect loop
+    // If session exists, validate it before redirecting to dashboard
     (async function checkExistingSession() {
         try {
-            const res = await fetch(API + '/admin/tenant', {
-                credentials: 'include'
-            });
-            if (res.ok) {
-                // Cookie is valid — redirect
-                window.location.href = '/dashboard/';
-            }
-            // Otherwise stay on login page (cookie expired/missing)
+            const res = await fetch(API + '/admin/tenant', { credentials: 'include' });
+            if (res.ok) window.location.href = '/dashboard/';
         } catch {
-            // Network error — don't redirect, let user login fresh
+            // Keep user on auth screen when network check fails.
         }
     })();
 
-    // Init icons
     document.addEventListener('DOMContentLoaded', () => {
-        if (typeof lucide !== 'undefined') lucide.createIcons();
+        refreshIcons();
+        initOtpGroup('signupOtpInputs', async () => {
+            if (!state.signupVerifying) await handleVerifyOTP();
+        });
+        initOtpGroup('resetOtpInputs', async () => {
+            if (!state.resetVerifying && !state.resetVerified) await verifyResetCode();
+        });
+        switchTab('signin');
     });
 
-    // ===== Tab switching =====
-    function switchTab(tab) {
-        document.querySelectorAll('.auth-tab').forEach(t =>
-            t.classList.toggle('active', t.dataset.tab === tab)
-        );
-        document.getElementById('signinForm').classList.toggle('active', tab === 'signin');
-        document.getElementById('signupForm').classList.toggle('active', tab === 'signup');
+    function refreshIcons() {
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function setActiveTab(tab) {
+        document.querySelectorAll('.auth-tab').forEach(t => {
+            t.classList.toggle('active', t.dataset.tab === tab);
+        });
+    }
+
+    function setTabsVisible(visible) {
+        document.querySelector('.auth-tabs').style.display = visible ? 'flex' : 'none';
+    }
+
+    function showForm(formId, options = {}) {
+        FORM_IDS.forEach(id => {
+            const form = document.getElementById(id);
+            const active = id === formId;
+            form.style.display = active ? 'block' : 'none';
+            form.classList.toggle('active', active);
+        });
+
+        if (options.activeTab) setActiveTab(options.activeTab);
+        setTabsVisible(options.showTabs === true);
         hideMessages();
     }
 
-    // ===== Messages =====
+    function switchTab(tab) {
+        if (tab === 'signup') {
+            showForm('signupForm', { showTabs: true, activeTab: 'signup' });
+        } else {
+            showForm('signinForm', { showTabs: true, activeTab: 'signin' });
+            resetForgotFlow(false);
+        }
+    }
+
+    function showForgotPasswordForm() {
+        const signInEmail = document.getElementById('siEmail').value.trim();
+        const forgotEmail = document.getElementById('fpEmail');
+        if (signInEmail && !forgotEmail.value.trim()) forgotEmail.value = signInEmail;
+        showForm('forgotForm', { showTabs: false, activeTab: 'signin' });
+        forgotEmail.focus();
+    }
+
     function showError(msg) {
         hideMessages();
         document.getElementById('errorText').textContent = msg;
@@ -429,7 +614,6 @@
         document.getElementById('successMsg').classList.remove('show');
     }
 
-    // ===== Password toggle =====
     function togglePw(inputId, btn) {
         const input = document.getElementById(inputId);
         const icon = btn.querySelector('i');
@@ -440,33 +624,156 @@
             input.type = 'password';
             icon.setAttribute('data-lucide', 'eye');
         }
-        if (typeof lucide !== 'undefined') lucide.createIcons();
+        refreshIcons();
     }
 
-    // ===== Loading state =====
-    function setLoading(btnId, loading) {
+    function setButtonContent(btn, iconName, text) {
+        btn.innerHTML = `<i data-lucide="${iconName}"></i> ${text}`;
+        refreshIcons();
+    }
+
+    function setLoading(btnId, loading, label = 'Please wait...') {
         const btn = document.getElementById(btnId);
+        if (!btn) return;
+
         if (loading) {
             btn.disabled = true;
             btn.dataset.orig = btn.innerHTML;
-            btn.innerHTML = '<div class="spinner"></div> Please wait\u2026';
+            btn.innerHTML = `<div class="spinner"></div> ${label}`;
         } else {
             btn.disabled = false;
-            btn.innerHTML = btn.dataset.orig || btn.innerHTML;
-            if (typeof lucide !== 'undefined') lucide.createIcons();
+            if (btn.dataset.orig) {
+                btn.innerHTML = btn.dataset.orig;
+                delete btn.dataset.orig;
+            }
+            refreshIcons();
         }
     }
 
-    // ===== Sign In =====
+    function sanitizeOtpDigit(value) {
+        return value.replace(/\D/g, '').slice(0, 1);
+    }
+
+    function getOtpInputs(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return [];
+        return Array.from(container.querySelectorAll('.otp-digit'));
+    }
+
+    function clearOtpInputs(containerId) {
+        getOtpInputs(containerId).forEach(input => {
+            input.value = '';
+        });
+    }
+
+    function focusOtpInput(containerId, index = 0) {
+        const inputs = getOtpInputs(containerId);
+        if (inputs[index]) inputs[index].focus();
+    }
+
+    function setOtpInputsDisabled(containerId, disabled) {
+        getOtpInputs(containerId).forEach(input => {
+            input.disabled = disabled;
+        });
+    }
+
+    function getOtpCode(containerId) {
+        const inputs = getOtpInputs(containerId);
+        if (!inputs.length) return '';
+        const code = inputs.map(input => sanitizeOtpDigit(input.value)).join('');
+        return code.length === inputs.length ? code : '';
+    }
+
+    function fillOtpFromDigits(containerId, digits, startIndex = 0) {
+        const inputs = getOtpInputs(containerId);
+        if (!inputs.length) return;
+
+        let cursor = startIndex;
+        digits.split('').forEach(d => {
+            if (cursor >= inputs.length) return;
+            inputs[cursor].value = sanitizeOtpDigit(d);
+            cursor += 1;
+        });
+
+        const nextEmpty = inputs.findIndex(i => !i.value);
+        if (nextEmpty >= 0) {
+            inputs[nextEmpty].focus();
+        } else {
+            inputs[inputs.length - 1].focus();
+        }
+    }
+
+    function initOtpGroup(containerId, onComplete) {
+        const inputs = getOtpInputs(containerId);
+        if (!inputs.length) return;
+
+        inputs.forEach((input, idx) => {
+            if (input.dataset.otpBound === '1') return;
+            input.dataset.otpBound = '1';
+
+            input.addEventListener('input', async (e) => {
+                const raw = e.target.value || '';
+                const digits = raw.replace(/\D/g, '');
+
+                if (!digits) {
+                    e.target.value = '';
+                    return;
+                }
+
+                if (digits.length > 1) {
+                    fillOtpFromDigits(containerId, digits, idx);
+                } else {
+                    e.target.value = digits;
+                    if (idx < inputs.length - 1) inputs[idx + 1].focus();
+                }
+
+                const code = getOtpCode(containerId);
+                if (code.length === inputs.length) {
+                    await onComplete();
+                }
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !input.value && idx > 0) {
+                    inputs[idx - 1].focus();
+                    inputs[idx - 1].value = '';
+                }
+            });
+
+            input.addEventListener('paste', async (e) => {
+                e.preventDefault();
+                const pasted = (e.clipboardData?.getData('text') || '').replace(/\D/g, '');
+                if (!pasted) return;
+                fillOtpFromDigits(containerId, pasted, idx);
+
+                const code = getOtpCode(containerId);
+                if (code.length === inputs.length) {
+                    await onComplete();
+                }
+            });
+        });
+    }
+
+    function validatePasswordComplexity(password) {
+        if (password.length < 8) return 'Password must be at least 8 characters.';
+        if (!/[A-Z]/.test(password)) return 'Password needs at least one uppercase letter.';
+        if (!/[a-z]/.test(password)) return 'Password needs at least one lowercase letter.';
+        if (!/\d/.test(password)) return 'Password needs at least one number.';
+        return '';
+    }
+
     async function handleSignIn(e) {
         e.preventDefault();
         hideMessages();
+
         const email = document.getElementById('siEmail').value.trim();
         const password = document.getElementById('siPassword').value;
+        if (!email || !password) {
+            showError('Please fill in all fields.');
+            return;
+        }
 
-        if (!email || !password) { showError('Please fill in all fields.'); return; }
-
-        setLoading('signinBtn', true);
+        setLoading('signinBtn', true, 'Signing in...');
         try {
             const res = await fetch(API + '/admin/login', {
                 method: 'POST',
@@ -476,15 +783,17 @@
             });
             const data = await res.json();
 
-            if (res.ok) {
-                // Token is now set as HttpOnly cookie by the server
-                sessionStorage.setItem('tenant_id', String(data.tenant_id));
-                sessionStorage.setItem('tenant_name', data.tenant_name || '');
-                showSuccess('Login successful! Redirecting\u2026');
-                setTimeout(() => { window.location.href = '/dashboard/'; }, 500);
-            } else {
+            if (!res.ok) {
                 showError(data.detail || 'Invalid email or password.');
+                return;
             }
+
+            sessionStorage.setItem('tenant_id', String(data.tenant_id));
+            sessionStorage.setItem('tenant_name', data.tenant_name || '');
+            showSuccess('Login successful! Redirecting...');
+            setTimeout(() => {
+                window.location.href = '/dashboard/';
+            }, 500);
         } catch {
             showError('Network error. Please check your connection.');
         } finally {
@@ -492,23 +801,26 @@
         }
     }
 
-    // ===== Sign Up (Step 1: Send OTP) =====
-    let pendingSignupEmail = '';  // Track email for OTP verification
-
     async function handleSignUp(e) {
         e.preventDefault();
         hideMessages();
+
         const tenant_name = document.getElementById('suOrgName').value.trim();
         const email = document.getElementById('suEmail').value.trim();
         const password = document.getElementById('suPassword').value;
 
-        if (!tenant_name || !email || !password) { showError('Please fill in all fields.'); return; }
-        if (password.length < 8) { showError('Password must be at least 8 characters.'); return; }
-        if (/[A-Z]/.test(password) === false) { showError('Password needs at least one uppercase letter.'); return; }
-        if (/[a-z]/.test(password) === false) { showError('Password needs at least one lowercase letter.'); return; }
-        if (/\d/.test(password) === false)    { showError('Password needs at least one number.'); return; }
+        if (!tenant_name || !email || !password) {
+            showError('Please fill in all fields.');
+            return;
+        }
+        const passwordError = validatePasswordComplexity(password);
+        if (passwordError) {
+            showError(passwordError);
+            return;
+        }
 
-        setLoading('signupBtn', true);
+        state.pendingSignup = { tenant_name, email, password };
+        setLoading('signupBtn', true, 'Creating...');
         try {
             const res = await fetch(API + '/admin/register', {
                 method: 'POST',
@@ -518,19 +830,16 @@
             });
             const data = await res.json();
 
-            if (res.ok) {
-                // OTP sent — show verification form
-                pendingSignupEmail = email;
-                document.getElementById('signupForm').style.display = 'none';
-                document.getElementById('otpForm').style.display = 'block';
-                document.getElementById('otpEmailDisplay').textContent = email;
-                document.getElementById('otpCode').focus();
-                // Hide tabs so user can't switch away
-                document.querySelector('.auth-tabs').style.display = 'none';
-                showSuccess(data.message || 'OTP sent! Check your email.');
-            } else {
+            if (!res.ok) {
                 showError(data.detail || 'Registration failed. Please try again.');
+                return;
             }
+
+            document.getElementById('otpEmailDisplay').textContent = email;
+            clearOtpInputs('signupOtpInputs');
+            showForm('otpForm', { showTabs: false, activeTab: 'signup' });
+            focusOtpInput('signupOtpInputs', 0);
+            showSuccess(data.message || 'OTP sent! Check your email.');
         } catch {
             showError('Network error. Please check your connection.');
         } finally {
@@ -538,69 +847,323 @@
         }
     }
 
-    // ===== Sign Up (Step 2: Verify OTP) =====
+    function resetSignupFlow() {
+        clearOtpInputs('signupOtpInputs');
+        setOtpInputsDisabled('signupOtpInputs', false);
+        document.getElementById('otpEmailDisplay').textContent = '';
+        state.pendingSignup = null;
+    }
+
     async function handleVerifyOTP(e) {
-        e.preventDefault();
+        if (e) e.preventDefault();
         hideMessages();
-        const otp = document.getElementById('otpCode').value.trim();
 
-        if (!otp || otp.length !== 6) { showError('Please enter the 6-digit code.'); return; }
+        if (!state.pendingSignup?.email) {
+            showError('No pending signup found. Please create account again.');
+            switchTab('signup');
+            return;
+        }
 
-        setLoading('verifyOtpBtn', true);
+        const otp = getOtpCode('signupOtpInputs');
+        if (otp.length !== 6) {
+            showError('Please enter the 6-digit code.');
+            return;
+        }
+
+        state.signupVerifying = true;
+        setOtpInputsDisabled('signupOtpInputs', true);
+        setLoading('verifyOtpBtn', true, 'Verifying...');
         try {
             const res = await fetch(API + '/admin/register/verify-otp', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ email: pendingSignupEmail, otp })
+                body: JSON.stringify({ email: state.pendingSignup.email, otp })
             });
             const data = await res.json();
 
-            if (res.ok) {
-                // Token is now set as HttpOnly cookie by the server
-                sessionStorage.setItem('tenant_id', String(data.tenant_id));
-                sessionStorage.setItem('tenant_name', data.tenant_name || '');
-                showSuccess('Account created! Redirecting to dashboard\u2026');
-                setTimeout(() => { window.location.href = '/dashboard/'; }, 800);
-            } else {
+            if (!res.ok) {
                 showError(data.detail || 'Invalid OTP. Please try again.');
+                return;
             }
+
+            const signupEmail = state.pendingSignup.email;
+            resetSignupFlow();
+            switchTab('signin');
+            document.getElementById('siEmail').value = signupEmail;
+            document.getElementById('siPassword').focus();
+            showSuccess('Account created successfully. Please sign in.');
         } catch {
             showError('Network error. Please check your connection.');
         } finally {
+            state.signupVerifying = false;
+            setOtpInputsDisabled('signupOtpInputs', false);
             setLoading('verifyOtpBtn', false);
         }
     }
 
-    // ===== Resend OTP =====
     async function handleResendOTP() {
         hideMessages();
-        if (!pendingSignupEmail) { showError('No pending registration. Please start over.'); return; }
+        if (!state.pendingSignup?.email) {
+            showError('No pending signup found. Please create account again.');
+            return;
+        }
 
-        const tenant_name = document.getElementById('suOrgName').value.trim();
-        const password = document.getElementById('suPassword').value;
-
-        document.getElementById('resendOtpBtn').disabled = true;
-        document.getElementById('resendOtpBtn').textContent = 'Sending\u2026';
+        const btn = document.getElementById('resendOtpBtn');
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
         try {
             const res = await fetch(API + '/admin/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ email: pendingSignupEmail, password, tenant_name })
+                body: JSON.stringify(state.pendingSignup)
             });
             const data = await res.json();
 
-            if (res.ok) {
-                showSuccess('New OTP sent! Check your email.');
-            } else {
+            if (!res.ok) {
                 showError(data.detail || 'Failed to resend OTP.');
+                return;
             }
+
+            clearOtpInputs('signupOtpInputs');
+            focusOtpInput('signupOtpInputs', 0);
+            showSuccess('A new verification code has been sent.');
         } catch {
-            showError('Network error.');
+            showError('Network error. Please check your connection.');
         } finally {
-            document.getElementById('resendOtpBtn').disabled = false;
-            document.getElementById('resendOtpBtn').textContent = 'Resend OTP';
+            btn.disabled = false;
+            btn.textContent = 'Resend OTP';
+        }
+    }
+
+    function setResetStep(step) {
+        const otpStep = document.getElementById('resetOtpStep');
+        const passwordStep = document.getElementById('resetPasswordStep');
+        const resetBtn = document.getElementById('resetBtn');
+        const resendBtn = document.getElementById('resetResendBtn');
+        const newPw = document.getElementById('rpNewPassword');
+        const confirmPw = document.getElementById('rpConfirmPassword');
+
+        if (step === 'password') {
+            state.resetVerified = true;
+            otpStep.style.display = 'none';
+            passwordStep.style.display = 'block';
+            resendBtn.style.display = 'none';
+            resetBtn.dataset.mode = 'password';
+            setButtonContent(resetBtn, 'key-round', 'Reset Password');
+            newPw.required = true;
+            confirmPw.required = true;
+            setTimeout(() => newPw.focus(), 20);
+            return;
+        }
+
+        state.resetVerified = false;
+        otpStep.style.display = 'block';
+        passwordStep.style.display = 'none';
+        resendBtn.style.display = 'inline';
+        resetBtn.dataset.mode = 'verify';
+        setButtonContent(resetBtn, 'check-circle', 'Verify Code');
+        newPw.required = false;
+        confirmPw.required = false;
+    }
+
+    function resetForgotFlow(clearEmail = true) {
+        state.pendingResetEmail = '';
+        state.resetVerifying = false;
+        state.resetVerified = false;
+        document.getElementById('resetEmailDisplay').textContent = '';
+        clearOtpInputs('resetOtpInputs');
+        setOtpInputsDisabled('resetOtpInputs', false);
+        document.getElementById('rpNewPassword').value = '';
+        document.getElementById('rpConfirmPassword').value = '';
+        if (clearEmail) document.getElementById('fpEmail').value = '';
+        setResetStep('otp');
+    }
+
+    function openResetFlow(email) {
+        state.pendingResetEmail = email;
+        document.getElementById('resetEmailDisplay').textContent = email;
+        clearOtpInputs('resetOtpInputs');
+        setOtpInputsDisabled('resetOtpInputs', false);
+        document.getElementById('rpNewPassword').value = '';
+        document.getElementById('rpConfirmPassword').value = '';
+        setResetStep('otp');
+        showForm('resetForm', { showTabs: false, activeTab: 'signin' });
+        focusOtpInput('resetOtpInputs', 0);
+    }
+
+    async function handleForgotPassword(e) {
+        e.preventDefault();
+        hideMessages();
+
+        const email = document.getElementById('fpEmail').value.trim();
+        if (!email) {
+            showError('Please enter your admin email.');
+            return;
+        }
+
+        setLoading('forgotBtn', true, 'Sending code...');
+        try {
+            const res = await fetch(API + '/admin/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ email })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                showError(data.detail || 'Failed to send reset code.');
+                return;
+            }
+
+            openResetFlow(email);
+            showSuccess(data.message || 'Reset code sent. Check your email.');
+        } catch {
+            showError('Network error. Please check your connection.');
+        } finally {
+            setLoading('forgotBtn', false);
+        }
+    }
+
+    async function verifyResetCode() {
+        hideMessages();
+
+        if (!state.pendingResetEmail) {
+            showError('Reset flow expired. Please request a new code.');
+            showForgotPasswordForm();
+            return;
+        }
+
+        const otp = getOtpCode('resetOtpInputs');
+        if (otp.length !== 6) {
+            showError('Please enter the 6-digit code.');
+            return;
+        }
+
+        state.resetVerifying = true;
+        setOtpInputsDisabled('resetOtpInputs', true);
+        setLoading('resetBtn', true, 'Verifying...');
+        try {
+            const res = await fetch(API + '/admin/forgot-password/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ email: state.pendingResetEmail, otp })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                showError(data.detail || 'Invalid or expired code.');
+                return;
+            }
+
+            showSuccess(data.message || 'Code verified. Set your new password.');
+            setResetStep('password');
+        } catch {
+            showError('Network error. Please check your connection.');
+        } finally {
+            state.resetVerifying = false;
+            setOtpInputsDisabled('resetOtpInputs', false);
+            setLoading('resetBtn', false);
+        }
+    }
+
+    async function handleResetPassword(e) {
+        e.preventDefault();
+
+        const resetBtn = document.getElementById('resetBtn');
+        if (resetBtn.dataset.mode !== 'password') {
+            await verifyResetCode();
+            return;
+        }
+
+        hideMessages();
+        if (!state.pendingResetEmail) {
+            showError('Reset flow expired. Please request a new code.');
+            showForgotPasswordForm();
+            return;
+        }
+
+        const new_password = document.getElementById('rpNewPassword').value;
+        const confirm = document.getElementById('rpConfirmPassword').value;
+
+        const passwordError = validatePasswordComplexity(new_password);
+        if (passwordError) {
+            showError(passwordError);
+            return;
+        }
+        if (new_password !== confirm) {
+            showError('Passwords do not match.');
+            return;
+        }
+
+        setLoading('resetBtn', true, 'Updating...');
+        try {
+            const res = await fetch(API + '/admin/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    email: state.pendingResetEmail,
+                    new_password
+                })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                showError(data.detail || 'Failed to reset password.');
+                return;
+            }
+
+            const email = state.pendingResetEmail;
+            resetForgotFlow();
+            switchTab('signin');
+            document.getElementById('siEmail').value = email;
+            document.getElementById('siPassword').focus();
+            showSuccess(data.message || 'Password reset successful. Please sign in.');
+        } catch {
+            showError('Network error. Please check your connection.');
+        } finally {
+            setLoading('resetBtn', false);
+        }
+    }
+
+    async function handleResendResetOTP() {
+        hideMessages();
+        if (!state.pendingResetEmail) {
+            showError('Please request a reset code first.');
+            showForgotPasswordForm();
+            return;
+        }
+
+        const btn = document.getElementById('resetResendBtn');
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
+        try {
+            const res = await fetch(API + '/admin/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ email: state.pendingResetEmail })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                showError(data.detail || 'Failed to resend code.');
+                return;
+            }
+
+            setResetStep('otp');
+            clearOtpInputs('resetOtpInputs');
+            focusOtpInput('resetOtpInputs', 0);
+            showSuccess(data.message || 'A new reset code has been sent.');
+        } catch {
+            showError('Network error. Please check your connection.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Resend OTP';
         }
     }
 </script>

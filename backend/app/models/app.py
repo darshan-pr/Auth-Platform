@@ -12,6 +12,7 @@ class App(Base):
     tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
     name = Column(String, nullable=True)
     description = Column(String, nullable=True)
+    logo_url = Column(String, nullable=True)
     # OTP Settings
     otp_enabled = Column(Boolean, default=True, nullable=False)
     # JWT Session Settings

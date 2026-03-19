@@ -411,6 +411,22 @@ body.modal-open { overflow: hidden; }
 }
 
 .data-table .app-name-cell { font-weight: 600; color: var(--text); }
+.app-name-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+.app-name-logo {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+    background: #fff;
+    flex-shrink: 0;
+}
 .redirect-uris { max-width: 180px; font-size: 0.78rem; color: var(--text-secondary); word-break: break-all; }
 
 /* ====== Badges ====== */
@@ -648,6 +664,98 @@ body.mobile-adaptive .checkbox-label input[type="checkbox"] { margin-top: 2px; f
 
 .form-group textarea { resize: vertical; min-height: 80px; }
 .form-group small { display: block; margin-top: 5px; font-size: 0.78rem; color: var(--text-secondary); }
+
+.app-logo-editor {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 12px;
+    align-items: start;
+}
+
+.app-logo-preview-wrap {
+    width: 72px;
+    height: 72px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: linear-gradient(160deg, #f8faff, #eef2ff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+#appLogoPreview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.app-logo-controls input[type="url"] {
+    margin-bottom: 0;
+}
+
+.app-logo-input-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+}
+
+.app-logo-preview-btn {
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 10px;
+    font-weight: 700;
+}
+
+.redirect-uri-editor {
+    display: grid;
+    gap: 10px;
+}
+
+.redirect-uri-list {
+    display: grid;
+    gap: 8px;
+}
+
+.redirect-uri-item {
+    position: relative;
+}
+
+.redirect-uri-input {
+    width: 100%;
+    padding-right: 44px !important;
+}
+
+.redirect-uri-remove {
+    position: absolute;
+    right: 7px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid #fecaca !important;
+    color: #dc2626 !important;
+    background: #fff1f2 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+    font-weight: 600;
+    padding: 0;
+}
+
+.redirect-uri-remove:hover {
+    background: #fee2e2 !important;
+    border-color: #fca5a5 !important;
+}
+
+.redirect-uri-remove:active {
+    transform: translateY(-50%) scale(0.97);
+}
 
 .form-section {
     margin: 18px 0 0;
@@ -1174,6 +1282,12 @@ body.mobile-adaptive .checkbox-label input[type="checkbox"] { margin-top: 2px; f
 
     .card { border-radius: var(--radius-sm); }
     .form-row { grid-template-columns: 1fr; }
+    .app-logo-editor { grid-template-columns: 60px 1fr; }
+    .app-logo-preview-wrap { width: 60px; height: 60px; border-radius: 12px; }
+    .app-logo-input-row { grid-template-columns: 1fr auto; gap: 6px; }
+    .app-logo-preview-btn { height: 36px; padding: 0 10px; font-size: 0.78rem; }
+    .redirect-uri-input { padding-right: 40px !important; }
+    .redirect-uri-remove { width: 26px; height: 26px; right: 7px; border-radius: 8px; font-size: 16px; }
 
     /* Bottom-sheet modals */
     .modal { align-items: flex-end; padding: 0 8px env(safe-area-inset-bottom); }

@@ -4,13 +4,16 @@
 #  Auth Platform — Service Runner
 # ============================================================
 
-set -e
+# NOTE: intentionally NO "set -e" — we do our own error handling
+#       so one failed sub-command never kills the whole script.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Ports
 BACKEND_PORT=8000
-ADMIN_CONSOLE_PORT=3000
+
+# Temp files used to pass cloudflare URLs between functions
+CF_BACKEND_URL_FILE="/tmp/.cf_backend_url"
 
 # -------------------- Helpers --------------------
 
@@ -24,7 +27,6 @@ usage() {
     echo "  Commands:"
     echo "    start        Start all services (default)"
     echo "    backend      Start only the backend API"
-    echo "    admin        Start only the admin console"
     echo "    stop         Stop all running services"
     echo "    status       Show running service status"
     echo "    help         Show this help message"
@@ -32,7 +34,6 @@ usage() {
     echo "  Service URLs:"
     echo "    Backend API      http://localhost:$BACKEND_PORT"
     echo "    API Docs         http://localhost:$BACKEND_PORT/docs"
-    echo "    Admin Console    http://localhost:$ADMIN_CONSOLE_PORT"
     echo ""
 }
 
@@ -73,6 +74,50 @@ free_port() {
     fi
 }
 
+# -------------------- Cloudflare Tunnel --------------------
+
+# start_cloudflare_tunnel <port> <label> <pidfile> <url_outfile>
+#   Spawns cloudflared, polls its combined log for the public URL,
+#   and writes that URL to <url_outfile> (plain temp file — no bash namerefs
+#   which require bash 4.3+ and crash on macOS default bash 3.x).
+start_cloudflare_tunnel() {
+    local port="$1"
+    local label="$2"
+    local pidfile="$3"
+    local url_outfile="$4"
+
+    local logfile="/tmp/cf_tunnel_${label}.log"
+    rm -f "$logfile" "$url_outfile"
+
+    echo "[*] Starting Cloudflare tunnel for $label (port $port) ..."
+
+    # cloudflared writes the URL to stderr — redirect both streams to logfile
+    cloudflared tunnel --url "http://localhost:$port" --no-autoupdate \
+        > "$logfile" 2>&1 &
+    local pid=$!
+    echo "$pid" > "$pidfile"
+
+    # Poll up to 30 s for the trycloudflare URL
+    local waited=0
+    local found_url=""
+    while [ "$waited" -lt 30 ]; do
+        found_url=$(grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare\.com' "$logfile" 2>/dev/null | head -1 || true)
+        if [ -n "$found_url" ]; then
+            echo "$found_url" > "$url_outfile"
+            echo "    -> $found_url  [$label tunnel ready]"
+            break
+        fi
+        sleep 1
+        waited=$((waited + 1))   # plain arithmetic — safe with or without set -e
+    done
+
+    if [ -z "$found_url" ]; then
+        echo "[!] Cloudflare URL not found for $label after 30s."
+        echo "    Check log: $logfile"
+        echo "" > "$url_outfile"
+    fi
+}
+
 # -------------------- Service Control --------------------
 
 start_backend() {
@@ -93,25 +138,41 @@ start_backend() {
     echo "    -> http://localhost:$BACKEND_PORT/docs  (Swagger)"
 }
 
-start_admin() {
-    echo "[*] Starting Admin Console on port $ADMIN_CONSOLE_PORT ..."
-    free_port "$ADMIN_CONSOLE_PORT"
-    cd "$SCRIPT_DIR/frontend/admin-console"
-    python3 -m http.server $ADMIN_CONSOLE_PORT &
+# Production backend: Gunicorn + UvicornWorker (replaces uvicorn dev server)
+start_backend_prod() {
+    echo "[*] Starting Backend API (Gunicorn + Uvicorn) on port $BACKEND_PORT ..."
+    free_port "$BACKEND_PORT"
+    activate_venv
+    load_env
+    cd "$SCRIPT_DIR/backend"
+
+    # macOS blocks Objective-C runtime calls after fork() by default.
+    # Gunicorn's pre-fork worker model triggers this — setting this env var disables the guard.
+    export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+
+    gunicorn app.main:app \
+        --worker-class uvicorn.workers.UvicornWorker \
+        --workers "${GUNICORN_WORKERS:-2}" \
+        --bind "0.0.0.0:$BACKEND_PORT" \
+        --log-level info \
+        --access-logfile "/tmp/gunicorn_access.log" \
+        --error-logfile  "/tmp/gunicorn_error.log" &
     local pid=$!
-    sleep 1
+    sleep 3
     if ! kill -0 "$pid" 2>/dev/null; then
-        echo "[!] Admin console failed to start on port $ADMIN_CONSOLE_PORT"
+        echo "[!] Gunicorn failed to start. Check /tmp/gunicorn_error.log"
         return 1
     fi
-    echo "$pid" > "$SCRIPT_DIR/.admin.pid"
-    echo "    -> http://localhost:$ADMIN_CONSOLE_PORT"
+    echo "$pid" > "$SCRIPT_DIR/.backend.pid"
+    echo "    -> http://localhost:$BACKEND_PORT  (Gunicorn + Uvicorn)"
+    echo "    -> Logs: /tmp/gunicorn_access.log | /tmp/gunicorn_error.log"
 }
+
 
 stop_services() {
     echo "[*] Stopping services ..."
 
-    for svc in backend admin; do
+    for svc in backend cf_backend; do
         pidfile="$SCRIPT_DIR/.${svc}.pid"
         if [ -f "$pidfile" ]; then
             pid=$(cat "$pidfile")
@@ -124,8 +185,12 @@ stop_services() {
     done
 
     # Clean up orphans
-    pkill -f "uvicorn app.main:app" 2>/dev/null || true
-    pkill -f "python3 -m http.server $ADMIN_CONSOLE_PORT" 2>/dev/null || true
+    pkill -f "uvicorn app.main:app"  2>/dev/null || true
+    pkill -f "gunicorn app.main:app" 2>/dev/null || true
+    pkill -f "cloudflared tunnel"    2>/dev/null || true
+
+    # Clean up temp URL files
+    rm -f "$CF_BACKEND_URL_FILE"
 
     echo "[*] All services stopped."
 }
@@ -135,7 +200,7 @@ show_status() {
     echo "  Service Status"
     echo "  ────────────────────────────────────────"
 
-    for svc in backend admin; do
+    for svc in backend cf_backend; do
         pidfile="$SCRIPT_DIR/.${svc}.pid"
         if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
             echo "    $svc : running  (pid $(cat "$pidfile"))"
@@ -154,23 +219,66 @@ start_all() {
     echo "  ============================================"
     echo ""
 
+    # ---- Prompt: new deployment server? ----
+    local deploy_mode="no"
+    read -r -p "  Is this a new deployment server? [y/N]: " deploy_answer
+    case "$deploy_answer" in
+        [Yy]|[Yy][Ee][Ss]) deploy_mode="yes" ;;
+        *) deploy_mode="no" ;;
+    esac
+    echo ""
+
     # Stop any existing services first
     stop_services 2>/dev/null || true
     echo ""
 
-    start_backend
-    sleep 2
-    start_admin
+    if [ "$deploy_mode" = "yes" ]; then
+        # ---- Production mode: Gunicorn + Uvicorn + Cloudflare ----
+        echo "  [Deployment Mode] Using Gunicorn + Cloudflare tunnels"
+        echo ""
 
-    echo ""
-    echo "  ============================================"
-    echo "   All services running."
-    echo "  ============================================"
-    echo ""
-    echo "  Backend API      http://localhost:$BACKEND_PORT"
-    echo "  API Docs         http://localhost:$BACKEND_PORT/docs"
-    echo "  Admin Console    http://localhost:$ADMIN_CONSOLE_PORT"
-    echo ""
+        start_backend_prod
+        sleep 2
+
+        # Start Cloudflare tunnels — URLs written to temp files (not namerefs)
+        start_cloudflare_tunnel \
+            "$BACKEND_PORT"       "backend" \
+            "$SCRIPT_DIR/.cf_backend.pid" "$CF_BACKEND_URL_FILE"
+
+
+        # Read URLs from temp files
+        local backend_url
+        backend_url=$(cat "$CF_BACKEND_URL_FILE" 2>/dev/null || true)
+
+        echo ""
+        echo "  ============================================"
+        echo "   All services running  [Deployment Mode]"
+        echo "  ============================================"
+        echo ""
+        echo "  Local"
+        echo "    Backend API    http://localhost:$BACKEND_PORT"
+        echo "    API Docs       http://localhost:$BACKEND_PORT/docs"
+        echo ""
+        echo "  Public (Cloudflare)"
+        echo "    Server URL   ${backend_url:-<not ready — check /tmp/cf_tunnel_backend.log>}"
+        echo ""
+        echo ""
+
+    else
+        # ---- Dev mode (original behaviour) ----
+        start_backend
+        sleep 2
+
+        echo ""
+        echo "  ============================================"
+        echo "   All services running."
+        echo "  ============================================"
+        echo ""
+        echo "  Backend API      http://localhost:$BACKEND_PORT"
+        echo "  API Docs         http://localhost:$BACKEND_PORT/docs"
+              echo ""
+    fi
+
     echo "  Press Ctrl+C to stop all services ..."
     echo ""
 
@@ -188,13 +296,6 @@ case "${1:-start}" in
         activate_venv
         load_env
         start_backend
-        echo ""
-        echo "  Press Ctrl+C to stop ..."
-        trap "stop_services; exit 0" INT TERM
-        wait
-        ;;
-    admin)
-        start_admin
         echo ""
         echo "  Press Ctrl+C to stop ..."
         trap "stop_services; exit 0" INT TERM

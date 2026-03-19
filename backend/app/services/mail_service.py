@@ -13,9 +13,19 @@ DEV_MODE = False
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 
-def _get_logo_url() -> str:
-    """Return a public logo URL that email clients can always load."""
-    return "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRrugJcpnwgDvPDr6Gr41KzsEcfImRD9kpn45FCA-InPo42p8ht"
+def _get_logo_url(app_logo_url: str = None) -> str:
+    """Return a public logo URL that email clients can load.
+    If app_logo_url is a relative path, convert it to an absolute URL.
+    """
+    if app_logo_url:
+        candidate = app_logo_url.strip()
+        if candidate.startswith("http://") or candidate.startswith("https://"):
+            return candidate
+        if candidate.startswith("/"):
+            base = (settings.AUTH_SERVER_URL or "").rstrip("/")
+            return f"{base}{candidate}" if base else candidate
+    default_base = (settings.AUTH_SERVER_URL or settings.AUTH_PLATFORM_URL or "").rstrip("/")
+    return f"{default_base}/assets/logo.png" if default_base else "/assets/logo.png"
 
 
 def _load_template(template_name: str, **kwargs) -> str:
@@ -77,7 +87,7 @@ def _send_email(to: str, subject: str, body_text: str, body_html: str = None) ->
 
     return True
 
-def send_otp_email(to: str, otp: str, app_name: str = "Auth Platform") -> bool:
+def send_otp_email(to: str, otp: str, app_name: str = "Auth Platform", app_logo_url: str = None) -> bool:
     """Send OTP email to the specified address"""
     
     if DEV_MODE:
@@ -95,7 +105,7 @@ def send_otp_email(to: str, otp: str, app_name: str = "Auth Platform") -> bool:
             f"If you didn't request this code, please ignore this email.\n\n"
             f"Best regards,\n{app_name} Team\n\nSecured by Auth Platform !"
         )
-        html = _load_template("otp.html", app_name=app_name, otp=otp, logo_url=_get_logo_url())
+        html = _load_template("otp.html", app_name=app_name, otp=otp, logo_url=_get_logo_url(app_logo_url))
 
         _send_email(to, f"Your OTP Code - {app_name}", plain, html)
         logger.info(f"OTP email sent to {to}")
@@ -105,7 +115,7 @@ def send_otp_email(to: str, otp: str, app_name: str = "Auth Platform") -> bool:
         raise
 
 
-def send_password_reset_email(to: str, otp: str, app_name: str = "Auth Platform") -> bool:
+def send_password_reset_email(to: str, otp: str, app_name: str = "Auth Platform", app_logo_url: str = None) -> bool:
     """Send password reset OTP email with HTML template"""
     
     if DEV_MODE:
@@ -128,7 +138,7 @@ def send_password_reset_email(to: str, otp: str, app_name: str = "Auth Platform"
             "forgot_password_otp.html",
             app_name=app_name,
             otp=otp,
-            logo_url=_get_logo_url(),
+            logo_url=_get_logo_url(app_logo_url),
         )
 
         _send_email(to, f"Password Reset Request - {app_name}", plain, html)
@@ -139,7 +149,7 @@ def send_password_reset_email(to: str, otp: str, app_name: str = "Auth Platform"
         raise
 
 
-def send_password_reset_token_email(to: str, token: str, app_name: str = "Auth Platform") -> bool:
+def send_password_reset_token_email(to: str, token: str, app_name: str = "Auth Platform", app_logo_url: str = None) -> bool:
     """Send password reset token/link email with HTML template (when OTP is disabled)"""
     
     if DEV_MODE:
@@ -162,7 +172,7 @@ def send_password_reset_token_email(to: str, token: str, app_name: str = "Auth P
             "forgot_password_token.html",
             app_name=app_name,
             token=token,
-            logo_url=_get_logo_url(),
+            logo_url=_get_logo_url(app_logo_url),
         )
 
         _send_email(to, f"Password Reset Request - {app_name}", plain, html)
@@ -179,6 +189,7 @@ def send_login_notification_email(
     access_token_expiry_minutes: int = 30,
     refresh_token_expiry_days: int = 7,
     location: str = "Unavailable",
+    app_logo_url: str = None,
 ) -> bool:
     """Send login notification email with session expiry details"""
     
@@ -216,7 +227,7 @@ def send_login_notification_email(
             session_expiry=session_expiry,
             access_token_expiry_minutes=str(access_token_expiry_minutes),
             refresh_token_expiry_days=str(refresh_token_expiry_days),
-            logo_url=_get_logo_url(),
+            logo_url=_get_logo_url(app_logo_url),
         )
 
         _send_email(to, f"New Login Detected - {app_name}", plain, html)
@@ -228,7 +239,7 @@ def send_login_notification_email(
         return False
 
 
-def send_admin_welcome_email(to: str, tenant_name: str, app_name: str = "Auth Platform") -> bool:
+def send_admin_welcome_email(to: str, tenant_name: str, app_name: str = "Auth Platform", app_logo_url: str = None) -> bool:
     """Send welcome email after first-time admin signup."""
 
     if DEV_MODE:
@@ -256,7 +267,7 @@ def send_admin_welcome_email(to: str, tenant_name: str, app_name: str = "Auth Pl
             app_name=app_name,
             tenant_name=tenant_name,
             admin_email=to,
-            logo_url=_get_logo_url(),
+            logo_url=_get_logo_url(app_logo_url),
         )
 
         _send_email(to, f"Welcome to {app_name}", plain, html)
@@ -267,7 +278,7 @@ def send_admin_welcome_email(to: str, tenant_name: str, app_name: str = "Auth Pl
         return False
 
 
-def send_set_password_email(to: str, reset_link: str, app_name: str = "Auth Platform") -> bool:
+def send_set_password_email(to: str, reset_link: str, app_name: str = "Auth Platform", app_logo_url: str = None) -> bool:
     """Send a 'set your password' invitation email when an admin creates a user"""
     
     if DEV_MODE:
@@ -291,7 +302,7 @@ def send_set_password_email(to: str, reset_link: str, app_name: str = "Auth Plat
             "set_password.html",
             app_name=app_name,
             reset_link=reset_link,
-            logo_url=_get_logo_url(),
+            logo_url=_get_logo_url(app_logo_url),
         )
 
         _send_email(to, f"Set Your Password - {app_name}", plain, html)
@@ -302,7 +313,7 @@ def send_set_password_email(to: str, reset_link: str, app_name: str = "Auth Plat
         raise
 
 
-def send_force_logout_email(to: str, app_name: str = "Auth Platform") -> bool:
+def send_force_logout_email(to: str, app_name: str = "Auth Platform", app_logo_url: str = None) -> bool:
     """Send a notification email when an admin force-logouts a user"""
 
     if DEV_MODE:
@@ -332,7 +343,7 @@ def send_force_logout_email(to: str, app_name: str = "Auth Platform") -> bool:
             app_name=app_name,
             email=to,
             revoked_at=revoked_at,
-            logo_url=_get_logo_url(),
+            logo_url=_get_logo_url(app_logo_url),
         )
 
         _send_email(to, f"Session Revoked - {app_name}", plain, html)

@@ -16,6 +16,10 @@ import secrets
 import hashlib
 import hmac
 import logging
+import re
+import base64
+import binascii
+from pathlib import Path
 
 from app.services.jwt_service import create_access_token, verify_token
 from app.services.jwt_service import is_user_online, force_user_offline
@@ -23,6 +27,7 @@ from app.services.password_service import hash_password, verify_password, genera
 from app.services.tenant_service import create_tenant
 from app.services.mail_service import send_set_password_email, send_force_logout_email
 from app.services.mail_service import send_admin_welcome_email
+from app.services.mail_service import send_password_reset_email
 from app.services.rate_limiter import create_rate_limit_dependency
 from app.config import settings as app_settings
 from app.redis import redis_client
@@ -35,6 +40,10 @@ security = HTTPBearer(auto_error=False)
 # Rate limit dependencies
 _rl_admin_login = create_rate_limit_dependency("admin_login", max_requests=app_settings.RATE_LIMIT_LOGIN)
 _rl_admin_register = create_rate_limit_dependency("admin_register", max_requests=app_settings.RATE_LIMIT_SIGNUP)
+_rl_admin_forgot = create_rate_limit_dependency("admin_forgot_password", max_requests=app_settings.RATE_LIMIT_OTP)
+_rl_admin_otp = create_rate_limit_dependency("admin_otp", max_requests=app_settings.RATE_LIMIT_OTP)
+
+ADMIN_RESET_SCOPE = "admin_portal"
 
 # ============== Pydantic Schemas ==============
 
@@ -47,12 +56,28 @@ class AdminLoginRequest(BaseModel):
     email: str
     password: str
 
+
+class AdminForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class AdminForgotPasswordVerifyOTPRequest(BaseModel):
+    email: EmailStr
+    otp: str
+
+
+class AdminResetPasswordRequest(BaseModel):
+    email: EmailStr
+    new_password: str
+
 class TenantUpdateRequest(BaseModel):
     name: Optional[str] = None
 
 class AppCreateRequest(BaseModel):
     name: str
     description: Optional[str] = None
+    logo_url: Optional[str] = None
+    logo_data_url: Optional[str] = None
     otp_enabled: bool = True
     login_notification_enabled: bool = False
     force_logout_notification_enabled: bool = False
@@ -64,6 +89,8 @@ class AppCreateRequest(BaseModel):
 class AppUpdateRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    logo_url: Optional[str] = None
+    logo_data_url: Optional[str] = None
     otp_enabled: Optional[bool] = None
     login_notification_enabled: Optional[bool] = None
     force_logout_notification_enabled: Optional[bool] = None
@@ -77,6 +104,7 @@ class AppResponse(BaseModel):
     app_id: str
     name: Optional[str]
     description: Optional[str]
+    logo_url: Optional[str]
     created_at: Optional[datetime]
     
     class Config:
@@ -202,6 +230,62 @@ def _verify_app_secret(provided: str, stored_hash: str) -> bool:
     )
 
 
+_APP_LOGO_DIR = Path(__file__).resolve().parent.parent / "assets" / "app-logos"
+_APP_LOGO_DIR.mkdir(parents=True, exist_ok=True)
+_DATA_URL_RE = re.compile(r"^data:image/(png|jpeg|jpg|webp|gif);base64,(.+)$", re.IGNORECASE | re.DOTALL)
+_MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2MB
+
+
+def _sanitize_logo_url(raw_url: Optional[str], allow_empty: bool = False) -> Optional[str]:
+    if raw_url is None:
+        return None
+    cleaned = raw_url.strip()
+    if not cleaned:
+        return "" if allow_empty else None
+    if cleaned.startswith("/assets/") or cleaned.startswith("https://") or cleaned.startswith("http://"):
+        return cleaned
+    raise HTTPException(status_code=400, detail="logo_url must start with http://, https://, or /assets/")
+
+
+def _store_logo_data_url(logo_data_url: str, app_id: str) -> str:
+    if not logo_data_url:
+        raise HTTPException(status_code=400, detail="logo_data_url is empty")
+
+    match = _DATA_URL_RE.match(logo_data_url.strip())
+    if not match:
+        raise HTTPException(status_code=400, detail="Invalid logo_data_url format")
+
+    ext = match.group(1).lower()
+    ext = "jpg" if ext == "jpeg" else ext
+    b64_payload = re.sub(r"\s+", "", match.group(2))
+    try:
+        raw_bytes = base64.b64decode(b64_payload, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid base64 image data")
+
+    if len(raw_bytes) > _MAX_LOGO_BYTES:
+        raise HTTPException(status_code=400, detail="Logo image is too large (max 2MB)")
+
+    filename = f"{app_id}-{secrets.token_hex(6)}.{ext}"
+    file_path = _APP_LOGO_DIR / filename
+    file_path.write_bytes(raw_bytes)
+    return f"/assets/app-logos/{filename}"
+
+
+def _cleanup_local_logo(logo_url: Optional[str]) -> None:
+    if not logo_url or not logo_url.startswith("/assets/app-logos/"):
+        return
+    filename = Path(logo_url).name
+    if not filename:
+        return
+    target = _APP_LOGO_DIR / filename
+    try:
+        if target.exists():
+            target.unlink()
+    except Exception as e:
+        logger.warning(f"Failed to delete old app logo {target}: {e}")
+
+
 @router.post("/register", response_model=dict, dependencies=[Depends(_rl_admin_register)])
 def admin_register(request: AdminRegisterRequest, db: Session = Depends(get_db)):
     """Step 1: Validate input and send OTP to admin email for verification"""
@@ -239,7 +323,7 @@ class AdminVerifyOTPRequest(BaseModel):
 
 @router.post("/register/verify-otp", response_model=dict)
 def admin_register_verify_otp(request: AdminVerifyOTPRequest, db: Session = Depends(get_db)):
-    """Step 2: Verify OTP and complete admin registration"""
+    """Step 2: Verify OTP and complete admin registration (no auto-login)."""
     from app.services.otp_service import verify_otp
     import json
     
@@ -284,31 +368,13 @@ def admin_register_verify_otp(request: AdminVerifyOTPRequest, db: Session = Depe
     db.refresh(admin)
     db.refresh(tenant)
     
-    # Generate admin JWT
-    token_data = {
-        "admin_id": admin.id,
-        "tenant_id": tenant.id,
-        "sub": admin.email,
-        "type": "admin_access"
-    }
-    access_token = create_access_token(token_data, timedelta(hours=24))
-    
-    # Set token as HttpOnly cookie
-    response = JSONResponse(content={
+    # Return registration completion response only.
+    response = {
         "admin_id": admin.id,
         "tenant_id": tenant.id,
         "tenant_name": tenant.name,
-        "token_type": "bearer",
         "message": "Admin registered successfully"
-    })
-    response.set_cookie(
-        key="admin_token",
-        value=access_token,
-        httponly=True,
-        samesite="lax",
-        max_age=86400,  # 24 hours
-        path="/"
-    )
+    }
 
     # Non-blocking welcome email for new admin signup
     send_admin_welcome_email(to=admin.email, tenant_name=tenant.name, app_name="Auth Platform")
@@ -368,6 +434,80 @@ def admin_logout():
     return response
 
 
+@router.post("/forgot-password", response_model=dict, dependencies=[Depends(_rl_admin_forgot)])
+def admin_forgot_password(request: AdminForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Request admin password reset OTP (generic response to prevent email enumeration)."""
+    admin = db.query(Admin).filter(Admin.email == request.email).first()
+
+    if admin:
+        from app.services.otp_service import generate_password_reset_otp
+        try:
+            otp = generate_password_reset_otp(request.email, ADMIN_RESET_SCOPE)
+            send_password_reset_email(request.email, otp, "Auth Platform Admin")
+        except Exception as e:
+            logger.warning(f"Failed sending admin password reset OTP to {request.email}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send reset code. Please try again."
+            )
+
+    return {
+        "message": "If an account with this email exists, a password reset code has been sent.",
+        "email": request.email
+    }
+
+
+@router.post("/forgot-password/verify-otp", response_model=dict, dependencies=[Depends(_rl_admin_otp)])
+def admin_verify_forgot_password_otp(request: AdminForgotPasswordVerifyOTPRequest, db: Session = Depends(get_db)):
+    """Verify admin forgot-password OTP and mark reset flow as verified."""
+    from app.services.otp_service import verify_password_reset_otp, mark_password_reset_otp_verified
+
+    if not verify_password_reset_otp(request.email, ADMIN_RESET_SCOPE, request.otp):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OTP"
+        )
+
+    admin = db.query(Admin).filter(Admin.email == request.email).first()
+    if not admin:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin not found")
+
+    mark_password_reset_otp_verified(request.email, ADMIN_RESET_SCOPE)
+    return {"message": "Code verified. You can now set a new password.", "email": request.email}
+
+
+@router.post("/reset-password", response_model=dict)
+def admin_reset_password(request: AdminResetPasswordRequest, db: Session = Depends(get_db)):
+    """Reset admin password after OTP verification."""
+    from app.services.otp_service import is_password_reset_otp_verified, clear_password_reset_otp_verified
+
+    if len(request.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    if not any(c.isupper() for c in request.new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+    if not any(c.islower() for c in request.new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter")
+    if not any(c.isdigit() for c in request.new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one digit")
+
+    if not is_password_reset_otp_verified(request.email, ADMIN_RESET_SCOPE):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please verify your reset code first."
+        )
+
+    admin = db.query(Admin).filter(Admin.email == request.email).first()
+    if not admin:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin not found")
+
+    admin.password_hash = hash_password(request.new_password)
+    db.commit()
+    clear_password_reset_otp_verified(request.email, ADMIN_RESET_SCOPE)
+    _clear_admin_login_attempts(request.email)
+
+    return {"message": "Password reset successful. Please sign in.", "email": request.email}
+
+
 # ============== Tenant Management ==============
 
 @router.get("/tenant", response_model=dict)
@@ -418,10 +558,15 @@ def create_app(
     db: Session = Depends(get_db)
 ):
     """Create a new application under the admin's tenant"""
+    created_logo_url: Optional[str] = None
     try:
         app_id = secrets.token_hex(8)
         app_secret = secrets.token_hex(16)
         app_secret_hash = _hash_app_secret(app_secret)
+        logo_url = _sanitize_logo_url(request.logo_url)
+        if request.logo_data_url and request.logo_data_url.strip():
+            logo_url = _store_logo_data_url(request.logo_data_url, app_id)
+            created_logo_url = logo_url
 
         app = App(
             app_id=app_id, 
@@ -429,6 +574,7 @@ def create_app(
             tenant_id=admin.tenant_id,
             name=request.name,
             description=request.description,
+            logo_url=logo_url,
             otp_enabled=request.otp_enabled,
             login_notification_enabled=request.login_notification_enabled,
             force_logout_notification_enabled=request.force_logout_notification_enabled,
@@ -446,6 +592,7 @@ def create_app(
             "app_id": app_id, 
             "app_secret": app_secret,  # Plaintext shown ONLY on creation
             "name": app.name,
+            "logo_url": app.logo_url,
             "tenant_id": app.tenant_id,
             "otp_enabled": app.otp_enabled,
             "login_notification_enabled": app.login_notification_enabled,
@@ -456,8 +603,15 @@ def create_app(
             "redirect_uris": app.redirect_uris,
             "message": "App created successfully"
         }
+    except HTTPException:
+        db.rollback()
+        if created_logo_url:
+            _cleanup_local_logo(created_logo_url)
+        raise
     except Exception as e:
         db.rollback()
+        if created_logo_url:
+            _cleanup_local_logo(created_logo_url)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create app: {str(e)}"
@@ -497,6 +651,7 @@ def list_apps(
         "app_id": app.app_id,
         "name": app.name,
         "description": app.description,
+        "logo_url": app.logo_url,
         "tenant_id": app.tenant_id,
         "is_active": True,  # All apps are active by default
         "otp_enabled": app.otp_enabled,
@@ -528,6 +683,7 @@ def get_app(
         "app_id": app.app_id,
         "name": app.name,
         "description": app.description,
+        "logo_url": app.logo_url,
         "tenant_id": app.tenant_id,
         "otp_enabled": app.otp_enabled,
         "login_notification_enabled": app.login_notification_enabled,
@@ -555,33 +711,52 @@ def update_app(
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
     
-    if request.name is not None:
-        app.name = request.name
-    if request.description is not None:
-        app.description = request.description
-    if request.otp_enabled is not None:
-        app.otp_enabled = request.otp_enabled
-    if request.login_notification_enabled is not None:
-        app.login_notification_enabled = request.login_notification_enabled
-    if request.force_logout_notification_enabled is not None:
-        app.force_logout_notification_enabled = request.force_logout_notification_enabled
-    if request.passkey_enabled is not None:
-        app.passkey_enabled = request.passkey_enabled
-    if request.access_token_expiry_minutes is not None:
-        app.access_token_expiry_minutes = request.access_token_expiry_minutes
-    if request.refresh_token_expiry_days is not None:
-        app.refresh_token_expiry_days = request.refresh_token_expiry_days
-    if request.redirect_uris is not None:
-        app.redirect_uris = request.redirect_uris
-    
-    db.commit()
-    db.refresh(app)
+    previous_logo = app.logo_url
+    uploaded_logo_url: Optional[str] = None
+    try:
+        if request.name is not None:
+            app.name = request.name
+        if request.description is not None:
+            app.description = request.description
+        if request.otp_enabled is not None:
+            app.otp_enabled = request.otp_enabled
+        if request.login_notification_enabled is not None:
+            app.login_notification_enabled = request.login_notification_enabled
+        if request.force_logout_notification_enabled is not None:
+            app.force_logout_notification_enabled = request.force_logout_notification_enabled
+        if request.passkey_enabled is not None:
+            app.passkey_enabled = request.passkey_enabled
+        if request.access_token_expiry_minutes is not None:
+            app.access_token_expiry_minutes = request.access_token_expiry_minutes
+        if request.refresh_token_expiry_days is not None:
+            app.refresh_token_expiry_days = request.refresh_token_expiry_days
+        if request.redirect_uris is not None:
+            app.redirect_uris = request.redirect_uris
+
+        if request.logo_data_url and request.logo_data_url.strip():
+            uploaded_logo_url = _store_logo_data_url(request.logo_data_url, app.app_id)
+            app.logo_url = uploaded_logo_url
+        elif request.logo_url is not None:
+            cleaned_logo = _sanitize_logo_url(request.logo_url, allow_empty=True)
+            app.logo_url = cleaned_logo or None
+
+        db.commit()
+        db.refresh(app)
+    except Exception:
+        db.rollback()
+        if uploaded_logo_url and uploaded_logo_url != previous_logo:
+            _cleanup_local_logo(uploaded_logo_url)
+        raise
+
+    if previous_logo != app.logo_url:
+        _cleanup_local_logo(previous_logo)
     
     return {
         "id": app.id,
         "app_id": app.app_id,
         "name": app.name,
         "description": app.description,
+        "logo_url": app.logo_url,
         "tenant_id": app.tenant_id,
         "otp_enabled": app.otp_enabled,
         "login_notification_enabled": app.login_notification_enabled,
@@ -617,6 +792,7 @@ def delete_app(
         User.app_id == app_id,
         User.tenant_id == admin.tenant_id
     ).delete()
+    _cleanup_local_logo(app.logo_url)
     db.delete(app)
     db.commit()
     
@@ -743,7 +919,7 @@ def create_user(
         base_url = str(http_request.base_url).rstrip("/") if http_request else ""
         reset_link = f"{base_url}/reset-password?token={token}&email={user.email}&app_id={request.app_id}"
         app_name = app.name or "Application"
-        send_set_password_email(user.email, reset_link, app_name)
+        send_set_password_email(user.email, reset_link, app_name, app.logo_url)
         invite_sent = True
     except Exception as e:
         logger.warning(f"Failed to send set-password email to {user.email}: {e}")
@@ -808,15 +984,17 @@ def bulk_user_action(
             # Send notification email if enabled
             try:
                 app_name = "Auth Platform"
+                app_logo_url = None
                 send_email = False
                 if user.app_id:
                     app_obj = db.query(App).filter(App.app_id == user.app_id).first()
                     if app_obj:
                         if app_obj.name:
                             app_name = app_obj.name
+                        app_logo_url = app_obj.logo_url
                         send_email = app_obj.force_logout_notification_enabled
                 if send_email:
-                    if send_force_logout_email(user.email, app_name):
+                    if send_force_logout_email(user.email, app_name, app_logo_url):
                         results["emails_sent"] += 1
             except Exception:
                 pass
@@ -948,15 +1126,17 @@ def force_logout_user(
     email_sent = False
     try:
         app_name = "Auth Platform"
+        app_logo_url = None
         send_email = False
         if user.app_id:
             app_obj = db.query(App).filter(App.app_id == user.app_id).first()
             if app_obj:
                 if app_obj.name:
                     app_name = app_obj.name
+                app_logo_url = app_obj.logo_url
                 send_email = app_obj.force_logout_notification_enabled
         if send_email:
-            email_sent = send_force_logout_email(user.email, app_name)
+            email_sent = send_force_logout_email(user.email, app_name, app_logo_url)
     except Exception as e:
         logger.warning(f"Failed to send force-logout email to {user.email}: {e}")
     

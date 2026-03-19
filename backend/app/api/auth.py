@@ -19,7 +19,9 @@ from app.models.user import User
 from app.models.app import App
 from app.redis import redis_client
 from pydantic import BaseModel
+from typing import Optional
 import logging
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -255,7 +257,7 @@ def login(request: LoginRequest, http_request: Request = None, db: Session = Dep
         # Generate and send OTP
         try:
             otp = generate_otp(request.email)
-            send_otp_email(request.email, otp, app.name or "Auth Platform")
+            send_otp_email(request.email, otp, app.name or "Auth Platform", app.logo_url)
             return LoginResponse(
                 message="Password verified. OTP sent to your email.",
                 email=request.email,
@@ -283,6 +285,7 @@ def login(request: LoginRequest, http_request: Request = None, db: Session = Dep
                 access_token_expiry_minutes=app.access_token_expiry_minutes,
                 refresh_token_expiry_days=app.refresh_token_expiry_days,
                 location=location_str,
+                app_logo_url=app.logo_url,
             )
         # Record login event
         if http_request:
@@ -347,6 +350,7 @@ def login_verify_otp(request: LoginOTPVerifyRequest, http_request: Request = Non
             access_token_expiry_minutes=app.access_token_expiry_minutes,
             refresh_token_expiry_days=app.refresh_token_expiry_days,
             location=location_str,
+            app_logo_url=app.logo_url,
         )
     
     return AuthResponse(
@@ -402,7 +406,7 @@ def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db
         if app.otp_enabled:
             # Generate and send OTP
             otp = generate_password_reset_otp(request.email, request.app_id)
-            send_password_reset_email(request.email, otp, app.name or "Auth Platform")
+            send_password_reset_email(request.email, otp, app.name or "Auth Platform", app.logo_url)
             return ForgotPasswordResponse(
                 message="Password reset OTP sent to your email",
                 email=request.email,
@@ -411,7 +415,7 @@ def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db
         else:
             # Generate and send reset token
             token = generate_reset_token(request.email, request.app_id)
-            send_password_reset_token_email(request.email, token, app.name or "Auth Platform")
+            send_password_reset_token_email(request.email, token, app.name or "Auth Platform", app.logo_url)
             return ForgotPasswordResponse(
                 message="Password reset token sent to your email",
                 email=request.email,
@@ -490,6 +494,35 @@ class SetPasswordRequest(BaseModel):
     app_id: str
     new_password: str
 
+
+def _infer_app_signin_url_from_redirects(redirect_uris: Optional[str]) -> Optional[str]:
+    if not redirect_uris:
+        return None
+
+    valid_urls = []
+    for raw in redirect_uris.split(","):
+        candidate = raw.strip()
+        if not candidate:
+            continue
+        parsed = urlparse(candidate)
+        if parsed.scheme in ("http", "https") and parsed.netloc:
+            valid_urls.append((candidate, parsed))
+
+    if not valid_urls:
+        return None
+
+    # Prefer an explicitly configured login path.
+    for candidate, parsed in valid_urls:
+        path = (parsed.path or "").lower()
+        if "signin" in path or "sign-in" in path or "login" in path:
+            return candidate
+
+    first_candidate, first_parsed = valid_urls[0]
+    first_path = (first_parsed.path or "").lower()
+    if "callback" in first_path or "oauth" in first_path:
+        return f"{first_parsed.scheme}://{first_parsed.netloc}/login"
+    return first_candidate
+
 @router.post("/set-password")
 def set_password(request: SetPasswordRequest, db: Session = Depends(get_db)):
     """
@@ -539,7 +572,8 @@ def set_password(request: SetPasswordRequest, db: Session = Depends(get_db)):
 
     return {
         "message": "Password set successfully. You can now sign in.",
-        "email": user.email
+        "email": user.email,
+        "app_signin_url": _infer_app_signin_url_from_redirects(app.redirect_uris),
     }
 
 # ============== OTP-only Auth (legacy) ==============
@@ -555,7 +589,7 @@ def request_otp(request: OTPRequest, db: Session = Depends(get_db)):
     try:
         otp = generate_otp(request.email)
         app_name = app.name if app else "Auth Platform"
-        send_otp_email(request.email, otp, app_name)
+        send_otp_email(request.email, otp, app_name, app.logo_url if app else None)
         return {"message": "OTP sent successfully", "email": request.email}
     except Exception as e:
         raise HTTPException(

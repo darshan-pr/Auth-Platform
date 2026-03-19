@@ -29,7 +29,15 @@ from app.services.oauth_service import (
     validate_authorization_code,
 )
 from app.services.password_service import hash_password, verify_password
-from app.services.otp_service import generate_otp, verify_otp, generate_password_reset_otp, verify_password_reset_otp
+from app.services.otp_service import (
+    generate_otp,
+    verify_otp,
+    generate_password_reset_otp,
+    verify_password_reset_otp,
+    mark_password_reset_otp_verified,
+    is_password_reset_otp_verified,
+    clear_password_reset_otp_verified,
+)
 from app.services.mail_service import send_otp_email, send_login_notification_email, send_password_reset_email
 from app.services.passkey_service import (
     generate_passkey_registration_challenge,
@@ -107,7 +115,16 @@ def authorize(
     
     Client apps redirect here; they never see user credentials.
     """
-    error_ctx = {"request": request, "error": None, "session_id": None, "app_name": "", "app_id": "", "otp_enabled": False}
+    error_ctx = {
+        "request": request,
+        "error": None,
+        "session_id": None,
+        "app_name": "",
+        "app_logo_url": "/assets/logo.png",
+        "app_id": "",
+        "otp_enabled": False,
+        "auth_platform_url": settings.AUTH_PLATFORM_URL,
+    }
 
     # Validate response_type
     if response_type != "code":
@@ -148,9 +165,11 @@ def authorize(
         "request": request,
         "session_id": session_id,
         "app_name": app.name or "Application",
+        "app_logo_url": app.logo_url or "/assets/logo.png",
         "app_id": client_id,
         "otp_enabled": app.otp_enabled,
         "passkey_enabled": app.passkey_enabled,
+        "auth_platform_url": settings.AUTH_PLATFORM_URL,
         "error": None,
     })
 
@@ -159,7 +178,7 @@ def authorize(
 
 class AuthenticateRequest(BaseModel):
     session_id: str
-    action: str  # "login", "signup", "verify_otp", "forgot_password", "reset_password", "passkey_register_begin", "passkey_register_verify_otp", "passkey_register_complete", "passkey_auth_begin", "passkey_auth_complete"
+    action: str  # "login", "signup", "verify_otp", "verify_signup_otp", "forgot_password", "verify_reset_otp", "reset_password", "passkey_register_begin", "passkey_register_verify_otp", "passkey_register_complete", "passkey_auth_begin", "passkey_auth_complete"
     email: Optional[str] = None
     password: Optional[str] = None
     otp: Optional[str] = None
@@ -175,9 +194,11 @@ def authenticate(req: AuthenticateRequest, request: Request = None, db: Session 
     Internal API called by the hosted login page.
     
     Handles three actions:
-      - signup:     Create account → ask user to login
+      - signup:     Create account → always require email OTP verification
       - login:      Verify credentials → return auth code (or ask for OTP)
       - verify_otp: Verify OTP → return auth code
+      - verify_signup_otp: Verify OTP → complete signup only (no sign-in)
+      - verify_reset_otp: Verify reset OTP only (before showing password form)
     
     On successful auth, returns { action: "redirect", redirect_url: "..." }
     The login page JavaScript then navigates to that URL.
@@ -200,8 +221,12 @@ def authenticate(req: AuthenticateRequest, request: Request = None, db: Session 
         return _handle_login(req, session, app, db, request)
     elif req.action == "verify_otp":
         return _handle_verify_otp(req, session, app, db, request)
+    elif req.action == "verify_signup_otp":
+        return _handle_verify_signup_otp(req, session, app, db)
     elif req.action == "forgot_password":
         return _handle_forgot_password(req, session, app, db)
+    elif req.action == "verify_reset_otp":
+        return _handle_verify_reset_otp(req, session, app, db)
     elif req.action == "reset_password":
         return _handle_reset_password(req, session, app, db)
     elif req.action == "passkey_register_begin":
@@ -221,7 +246,7 @@ def authenticate(req: AuthenticateRequest, request: Request = None, db: Session 
 
 
 def _handle_signup(req: AuthenticateRequest, session: dict, app: App, db: Session):
-    """Create a new user account"""
+    """Create a new user account and require signup OTP verification."""
     # Check if user exists for this specific app within tenant
     existing = db.query(User).filter(
         User.email == req.email,
@@ -256,10 +281,22 @@ def _handle_signup(req: AuthenticateRequest, session: dict, app: App, db: Sessio
     db.commit()
     db.refresh(user)
 
-    return {
-        "action": "show_login",
-        "message": "Account created successfully! Please sign in."
-    }
+    try:
+        otp = generate_otp(req.email)
+        send_otp_email(req.email, otp, app.name or "Auth Platform", app.logo_url)
+        return {
+            "action": "show_signup_otp",
+            "message": "Account created. A verification code has been sent to your email."
+        }
+    except Exception:
+        logger.exception("Failed to send signup verification code for %s", req.email)
+        # Signup email verification is mandatory; remove the just-created account on failure.
+        db.delete(user)
+        db.commit()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to send verification code. Please try again."
+        )
 
 
 def _handle_login(req: AuthenticateRequest, session: dict, app: App, db: Session, http_request: Request = None):
@@ -293,7 +330,7 @@ def _handle_login(req: AuthenticateRequest, session: dict, app: App, db: Session
     if app.otp_enabled:
         try:
             otp = generate_otp(req.email)
-            send_otp_email(req.email, otp, app.name or "Auth Platform")
+            send_otp_email(req.email, otp, app.name or "Auth Platform", app.logo_url)
             return {
                 "action": "show_otp",
                 "message": "A verification code has been sent to your email."
@@ -327,6 +364,28 @@ def _handle_verify_otp(req: AuthenticateRequest, session: dict, app: App, db: Se
     return _complete_auth(session, user, req.session_id, app, db=db, http_request=http_request)
 
 
+def _handle_verify_signup_otp(req: AuthenticateRequest, session: dict, app: App, db: Session):
+    """Verify OTP for signup completion only (no automatic sign-in)."""
+    if not req.otp:
+        raise HTTPException(status_code=400, detail="Verification code is required")
+
+    if not verify_otp(req.email, req.otp):
+        raise HTTPException(status_code=401, detail="Invalid or expired verification code")
+
+    user = db.query(User).filter(
+        User.email == req.email,
+        User.tenant_id == app.tenant_id,
+        User.app_id == session["client_id"]
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "action": "show_login",
+        "message": "Email verified. Sign up complete. Please sign in."
+    }
+
+
 def _handle_forgot_password(req: AuthenticateRequest, session: dict, app: App, db: Session):
     """Send password reset OTP to user's email (no email enumeration)"""
     user = db.query(User).filter(
@@ -345,7 +404,7 @@ def _handle_forgot_password(req: AuthenticateRequest, session: dict, app: App, d
 
     try:
         otp = generate_password_reset_otp(req.email, session["client_id"])
-        send_password_reset_email(req.email, otp, app.name or "Auth Platform")
+        send_password_reset_email(req.email, otp, app.name or "Auth Platform", app.logo_url)
         return {
             "action": "show_reset_otp",
             "message": "A password reset code has been sent to your email."
@@ -357,12 +416,10 @@ def _handle_forgot_password(req: AuthenticateRequest, session: dict, app: App, d
         )
 
 
-def _handle_reset_password(req: AuthenticateRequest, session: dict, app: App, db: Session):
-    """Verify OTP and reset the user's password"""
+def _handle_verify_reset_otp(req: AuthenticateRequest, session: dict, app: App, db: Session):
+    """Verify reset OTP and mark reset flow as verified for a short period."""
     if not req.otp:
         raise HTTPException(status_code=400, detail="Verification code is required")
-    if not req.new_password or len(req.new_password) < 8:
-        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
 
     if not verify_password_reset_otp(req.email, session["client_id"], req.otp):
         raise HTTPException(status_code=401, detail="Invalid or expired verification code")
@@ -375,8 +432,35 @@ def _handle_reset_password(req: AuthenticateRequest, session: dict, app: App, db
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    mark_password_reset_otp_verified(req.email, session["client_id"])
+    return {
+        "action": "show_reset_password_form",
+        "message": "Code verified. You can now set a new password."
+    }
+
+
+def _handle_reset_password(req: AuthenticateRequest, session: dict, app: App, db: Session):
+    """Verify OTP and reset the user's password"""
+    if not req.new_password or len(req.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+
+    if req.otp:
+        if not verify_password_reset_otp(req.email, session["client_id"], req.otp):
+            raise HTTPException(status_code=401, detail="Invalid or expired verification code")
+    elif not is_password_reset_otp_verified(req.email, session["client_id"]):
+        raise HTTPException(status_code=400, detail="Please verify your reset code first")
+
+    user = db.query(User).filter(
+        User.email == req.email,
+        User.tenant_id == app.tenant_id,
+        User.app_id == session["client_id"]
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     user.password_hash = hash_password(req.new_password)
     db.commit()
+    clear_password_reset_otp_verified(req.email, session["client_id"])
 
     return {
         "action": "password_reset_success",
@@ -406,7 +490,7 @@ def _handle_passkey_register_begin(req: AuthenticateRequest, session: dict, app:
     # Send OTP to verify email ownership before allowing passkey registration
     try:
         otp = generate_passkey_registration_otp(req.email, session["client_id"])
-        send_otp_email(req.email, otp, app.name or "Auth Platform")
+        send_otp_email(req.email, otp, app.name or "Auth Platform", app.logo_url)
         return {
             "action": "passkey_register_otp",
             "message": "A verification code has been sent to your email. Please enter it to proceed with passkey registration."
@@ -678,6 +762,7 @@ def _complete_auth(session: dict, user: User, session_id: str, app: App = None, 
             access_token_expiry_minutes=app.access_token_expiry_minutes,
             refresh_token_expiry_days=app.refresh_token_expiry_days,
             location=location_str,
+            app_logo_url=app.logo_url,
         )
 
     # Record login event with IP/location

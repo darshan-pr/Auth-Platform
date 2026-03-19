@@ -50,6 +50,13 @@ class Settings:
     # Falls back to AUTH_SERVER_URL if not set.
     DOCS_AUTH_SERVER_URL: str = os.getenv("DOCS_AUTH_SERVER_URL", "")
 
+    # Public platform link used in hosted auth footers.
+    # Supports both AUTH_PLATFORM_URL and legacy Auth_platform_URL keys.
+    AUTH_PLATFORM_URL: str = os.getenv(
+        "AUTH_PLATFORM_URL",
+        os.getenv("Auth_platform_URL", os.getenv("AUTH_PLATFORM_URL"))
+    )
+
     # Rate Limiting (requests per minute)
     RATE_LIMIT_LOGIN: int = int(os.getenv("RATE_LIMIT_LOGIN", "5"))
     RATE_LIMIT_OTP: int = int(os.getenv("RATE_LIMIT_OTP", "3"))

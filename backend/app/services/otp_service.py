@@ -146,3 +146,26 @@ def verify_password_reset_otp(email: str, app_id: str, otp: str) -> bool:
 
     logger.warning(f"Invalid password reset OTP attempt for {email} (app: {app_id})")
     return False
+
+
+def _get_password_reset_verified_key(email: str, app_id: str) -> str:
+    return f"password_reset_verified:{email}:{app_id}"
+
+
+def mark_password_reset_otp_verified(email: str, app_id: str) -> None:
+    """Mark a password reset OTP as verified for a short window."""
+    key = _get_password_reset_verified_key(email, app_id)
+    redis_client.setex(key, PASSWORD_RESET_OTP_EXPIRY_SECONDS, "1")
+
+
+def is_password_reset_otp_verified(email: str, app_id: str) -> bool:
+    """Check whether password reset OTP was verified recently."""
+    key = _get_password_reset_verified_key(email, app_id)
+    value = redis_client.get(key)
+    return value == "1" or value == b"1"
+
+
+def clear_password_reset_otp_verified(email: str, app_id: str) -> None:
+    """Clear the password reset OTP verification marker."""
+    key = _get_password_reset_verified_key(email, app_id)
+    redis_client.delete(key)
