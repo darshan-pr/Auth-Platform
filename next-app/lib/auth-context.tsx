@@ -39,21 +39,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { AUTH_CONFIG } = await import('@/lib/config');
         const { default: AuthClient } = await import('@/lib/auth-sdk.js');
         
-        const client = new AuthClient(AUTH_CONFIG);
+        const client: any = new AuthClient(AUTH_CONFIG);
         setAuthClient(client);
 
         // Handle OAuth callback if present
         const handled = await client.handleCallback();
-        
-        // Check authentication state
-        const authenticated = client.isAuthenticated();
+
+        // Cookie-backed restore on normal page loads (no callback params).
+        let authenticated = client.isAuthenticated();
+        if (!authenticated && !handled) {
+          authenticated = await client.restoreSession();
+        }
         setIsAuthenticated(authenticated);
         
         if (authenticated) {
           setUser(client.getUser());
-          // Start polling the server for session validity
-          // This is what catches admin-revoked sessions
-          client.startAutoRefresh();
+          if (!handled) {
+            // Start polling the server for session validity.
+            // This catches admin-revoked sessions in near real time.
+            client.startAutoRefresh();
+          }
         }
 
         // Register auth change callback — receives (isAuth, reason?)

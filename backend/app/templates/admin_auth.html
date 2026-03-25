@@ -1,0 +1,16 @@
+{% extends "base_auth.html" %}
+
+{% block title %}Admin Portal - Auth Platform{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/auth/admin_auth.css?v=20260325a">
+{% endblock %}
+
+{% block content %}
+{% include "partials/admin_auth_content.html" %}
+{% endblock %}
+
+{% block scripts %}
+{% include "partials/admin_auth_runtime_config.html" %}
+<script src="/static/auth/admin_auth.js?v=20260325a"></script>
+{% endblock %}

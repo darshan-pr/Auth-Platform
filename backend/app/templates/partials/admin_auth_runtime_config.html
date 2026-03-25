@@ -1,0 +1,7 @@
+<script>
+window.ADMIN_AUTH_UI_CONFIG = {
+    API_BASE: window.location.origin,
+    REDIRECT_URL: {{ (redirect_url or '/admin/dashboard') | tojson }},
+    INITIAL_WARNING: {{ (initial_warning or '') | tojson }},
+};
+</script>

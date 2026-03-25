@@ -65,6 +65,21 @@ def delete_oauth_session(session_id: str):
     redis_client.delete(f"oauth:session:{session_id}")
 
 
+def update_oauth_session(session_id: str, updates: dict) -> dict | None:
+    """Patch an OAuth session payload while preserving its expiration."""
+    key = f"oauth:session:{session_id}"
+    data = redis_client.get(key)
+    if not data:
+        return None
+
+    session = json.loads(data)
+    session.update(updates or {})
+    ttl = redis_client.ttl(key)
+    ttl_to_use = ttl if ttl and ttl > 0 else OAUTH_SESSION_EXPIRY
+    redis_client.setex(key, ttl_to_use, json.dumps(session))
+    return session
+
+
 # ==================== Authorization Code Management ====================
 
 def generate_authorization_code(

@@ -1,0 +1,269 @@
+    {% if error %}
+    <!-- Error State -->
+    <div class="error-page">
+        <svg class="error-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 9v4m0 4h.01M4.93 19h14.14c1.34 0 2.18-1.46 1.5-2.63L13.5 4.01c-.67-1.17-2.33-1.17-3 0L3.43 16.37C2.75 17.54 3.59 19 4.93 19z" stroke="#c0392b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h1>Authorization Error</h1>
+        <p>{{ error }}</p>
+        <p class="hint">Please go back to the application and try again, or contact the app developer.</p>
+    </div>
+    {% else %}
+    <!-- Auth Card -->
+    <div class="auth-container">
+        <div class="auth-card">
+            <!-- Left: Form Panel -->
+            <div class="form-panel">
+
+                <div class="form-header">
+                    <div class="form-title-row">
+                        <img
+                            class="app-brand-logo"
+                            src="{{ app_logo_url or '/assets/logo.png' }}"
+                            alt="{{ app_name }} logo"
+                            onerror="this.onerror=null;this.src='/assets/logo.png';"
+                        >
+                        <div class="form-title-stack">
+                            <h1 id="formTitle">{{ app_name }}</h1>
+                            <p class="subtitle" id="formSubtitle">Access your account</p>
+                        </div>
+                    </div>
+                    <div class="app-name-inline" id="inlineModeTitle">Sign In</div>
+                </div>
+
+                <!-- Messages -->
+                <div id="errorMsg" class="msg"></div>
+                <div id="successMsg" class="msg"></div>
+
+                <div class="form-body">
+                <!-- ========== LOGIN FORM ========== -->
+                <div id="loginSection" class="form-section active">
+                    <form onsubmit="handleLogin(event)">
+                        <div class="form-group">
+                            <label for="loginEmail">Email</label>
+                            <input type="email" class="input-field" id="loginEmail" placeholder="Email" required autocomplete="email" onblur="checkPasskeyStatus()">
+                        </div>
+
+                        <!-- Password group (hidden when OTP is showing) -->
+                        <div id="loginPasswordGroup">
+                            <div class="form-group">
+                                <label for="loginPassword">Password</label>
+                                <input type="password" class="input-field" id="loginPassword" placeholder="Password" required autocomplete="current-password">
+                            </div>
+                            <div class="password-row">
+                                <button type="button" class="forgot-link" onclick="showSection('forgot')">Forgot password?</button>
+                            </div>
+                        </div>
+
+                        <!-- OTP inline (shown after password verify when OTP enabled) -->
+                        <div id="loginOtpInline" class="otp-inline">
+                            <p class="otp-info">
+                                Enter the 6-digit verification code sent to<br>
+                                <strong id="otpEmailDisplay"></strong>
+                            </p>
+                            <div class="otp-inputs" id="loginOtpInputs">
+                                <input type="text" maxlength="1" class="otp-input" data-index="0" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="1" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="2" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="3" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="4" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="5" inputmode="numeric">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-primary" id="loginBtn">
+                            <span class="btn-label">Login</span>
+                            <span class="spinner"></span>
+                        </button>
+                    </form>
+
+                    <!-- Passkey sign-in (only if passkey is enabled) -->
+                    {% if passkey_enabled %}
+                    <div class="divider"><span>or</span></div>
+                    <button type="button" class="btn-passkey" id="passkeyLoginBtn" onclick="handlePasskeyLogin()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/>
+                            <circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>
+                        </svg>
+                        Sign in with passkey
+                    </button>
+                    <div class="passkey-register-row" id="passkeyRegisterRow" style="display:none">
+                        <button type="button" class="passkey-register-link" id="passkeyRegisterBtn" onclick="handlePasskeyRegister()">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+                            Set up a passkey for faster sign-in
+                        </button>
+                    </div>
+                    <!-- Passkey OTP inline verification form -->
+                    <div class="passkey-otp-inline" id="passkeyOtpInline">
+                        <div class="pk-steps">
+                            <span class="pk-step active" id="pkStepVerify">Step 1: Verify</span>
+                            <span class="pk-step-dash"></span>
+                            <span class="pk-step" id="pkStepSetup">Step 2: Set Up</span>
+                        </div>
+                        <div class="pk-otp-info" id="pkOtpInfo">Enter the 6-digit code sent to your email</div>
+                        <div class="pk-otp-sub" id="pkOtpSub">Complete verification first, then set up your passkey.</div>
+                        <div class="pk-otp-inputs" id="pkOtpInputs">
+                            <input type="text" maxlength="1" class="pk-otp-input" data-index="0" inputmode="numeric">
+                            <input type="text" maxlength="1" class="pk-otp-input" data-index="1" inputmode="numeric">
+                            <input type="text" maxlength="1" class="pk-otp-input" data-index="2" inputmode="numeric">
+                            <input type="text" maxlength="1" class="pk-otp-input" data-index="3" inputmode="numeric">
+                            <input type="text" maxlength="1" class="pk-otp-input" data-index="4" inputmode="numeric">
+                            <input type="text" maxlength="1" class="pk-otp-input" data-index="5" inputmode="numeric">
+                        </div>
+                        <button type="button" class="pk-otp-btn" id="pkOtpVerifyBtn" onclick="handlePasskeyOtpVerify()">Step 1: Verify Code</button>
+                        <button type="button" class="pk-otp-resend" id="pkOtpResendBtn" onclick="handlePasskeyOtpResend()">Resend code</button>
+                        <button type="button" class="pk-otp-cancel" onclick="cancelPasskeyOtp()">Cancel</button>
+                    </div>
+                    {% endif %}
+
+                    <div class="bottom-row">
+                        <span class="info-text">Don't have an account?</span>
+                        <button class="switch-link" onclick="showSection('signup')">Create account</button>
+                    </div>
+                </div>
+
+                <!-- ========== SIGNUP FORM ========== -->
+                <div id="signupSection" class="form-section">
+                    <form onsubmit="handleSignup(event)">
+                        <div class="form-group">
+                            <label for="signupEmail">Email</label>
+                            <input type="email" class="input-field" id="signupEmail" placeholder="Email" required autocomplete="email">
+                        </div>
+                        <div class="form-group" id="signupPasswordGroup">
+                            <label for="signupPassword">Password</label>
+                            <input type="password" class="input-field" id="signupPassword" placeholder="Password" required minlength="8" autocomplete="new-password">
+                            <div class="hint">Min 8 chars with uppercase, lowercase, and number</div>
+                        </div>
+                        <div class="form-group" id="signupConfirmGroup">
+                            <label for="signupConfirmPassword">Confirm Password</label>
+                            <div class="input-toggle-wrap">
+                                <input type="password" class="input-field" id="signupConfirmPassword" placeholder="Confirm Password" required autocomplete="new-password">
+                                <button type="button" class="input-toggle-btn" id="signupConfirmToggle" onclick="toggleSignupConfirmPasswordVisibility()" aria-label="Show confirm password">
+                                    <svg id="signupConfirmEyeOpen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                    <svg id="signupConfirmEyeClosed" style="display:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="m3 3 18 18"/>
+                                        <path d="M10.6 10.6a2 2 0 1 0 2.8 2.8"/>
+                                        <path d="M9.9 4.2A10.9 10.9 0 0 1 12 4c6.5 0 10 8 10 8a16.6 16.6 0 0 1-4.1 5.1"/>
+                                        <path d="M6.6 6.6A16.8 16.8 0 0 0 2 12s3.5 8 10 8a10.7 10.7 0 0 0 5.2-1.3"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="signupOtpInline" class="otp-inline">
+                            <p class="otp-info">
+                                Enter the 6-digit verification code sent to<br>
+                                <strong id="signupOtpEmailDisplay"></strong>
+                            </p>
+                            <div class="otp-inputs" id="signupOtpInputs">
+                                <input type="text" maxlength="1" class="otp-input" data-index="0" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="1" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="2" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="3" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="4" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="5" inputmode="numeric">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary" id="signupBtn">
+                            <span class="btn-label">Create Account</span>
+                            <span class="spinner"></span>
+                        </button>
+                    </form>
+                    <div class="bottom-row">
+                        <span class="info-text">Already have an account?</span>
+                        <button class="switch-link" onclick="showSection('login')">Sign in</button>
+                    </div>
+                </div>
+
+                <!-- ========== FORGOT PASSWORD FORM ========== -->
+                <div id="forgotSection" class="form-section">
+                    <form onsubmit="handleForgotPassword(event)">
+                        <p class="otp-info" style="text-align:left; margin-bottom:14px; color:#555; font-size:14px;">
+                            Enter the email address associated with your account and we will send you a verification code to reset your password.
+                        </p>
+                        <div class="form-group">
+                            <label for="forgotEmail">Email</label>
+                            <input type="email" class="input-field" id="forgotEmail" placeholder="Email" required autocomplete="email">
+                        </div>
+                        <button type="submit" class="btn-primary" id="forgotBtn">
+                            <span class="btn-label">Send Reset Code</span>
+                            <span class="spinner"></span>
+                        </button>
+                        <div class="bottom-row">
+                            <span class="info-text">Remembered your password?</span>
+                            <button type="button" class="switch-link" onclick="showSection('login')">Back to sign in</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- ========== RESET PASSWORD OTP + NEW PASSWORD ========== -->
+                <div id="resetOtpSection" class="form-section">
+                    <form onsubmit="handleResetPassword(event)">
+                        <div id="resetOtpCodeBlock">
+                            <p class="otp-info" id="resetOtpPrompt" style="text-align:center; margin-bottom:10px; color:#555; font-size:14px;">
+                                Enter the 6-digit code sent to<br>
+                                <strong id="resetOtpEmailDisplay"></strong>
+                            </p>
+                            <div class="otp-inputs" id="resetOtpInputs">
+                                <input type="text" maxlength="1" class="otp-input" data-index="0" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="1" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="2" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="3" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="4" inputmode="numeric">
+                                <input type="text" maxlength="1" class="otp-input" data-index="5" inputmode="numeric">
+                            </div>
+                        </div>
+                        <p id="resetVerifiedInfo" class="otp-info" style="display:none; text-align:left; margin-bottom:10px; color:#2f5dd0; font-size:13px;">
+                            Code verified. Set your new password.
+                        </p>
+                        <div id="resetPasswordFields" style="display:none;">
+                            <div class="form-group">
+                                <label for="resetNewPassword">New Password</label>
+                                <input type="password" class="input-field" id="resetNewPassword" placeholder="New Password" minlength="8" autocomplete="new-password">
+                                <div class="hint">Min 8 chars with uppercase, lowercase, and number</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="resetConfirmPassword">Confirm New Password</label>
+                                <input type="password" class="input-field" id="resetConfirmPassword" placeholder="Confirm New Password" autocomplete="new-password">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary" id="resetBtn">
+                            <span class="btn-label">Verify Code</span>
+                            <span class="spinner"></span>
+                        </button>
+                        <button type="button" class="btn-link" onclick="showSection('forgot')">Back</button>
+                    </form>
+                </div>
+                </div><!-- end form-body -->
+
+                <!-- Passkey Auth Overlay -->
+                {% if passkey_enabled %}
+                <div class="passkey-overlay" id="passkeyOverlay">
+                    <div class="pk-icon waiting" id="pkIcon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/>
+                            <circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>
+                        </svg>
+                        <div class="pk-ring" id="pkRing"></div>
+                    </div>
+                    <div class="pk-status" id="pkStatus">Waiting for passkey...</div>
+                    <div class="pk-hint" id="pkHint">Follow your browser or device prompt</div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Right: Illustration Panel -->
+            <div class="illustration-panel">
+                <div class="illust active" id="illustLogin"><img src="/assets/login.png" alt="Login"></div>
+                <div class="illust" id="illustSignup"><img src="/assets/signup.png" alt="Sign Up"></div>
+                <div class="illust" id="illustForgot"><img src="/assets/reset-password.png" alt="Reset Password"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Secured by <a href="{{ auth_platform_url }}">Auth Platform</a>
+        </div>
+    </div>
+    {% endif %}

@@ -9,7 +9,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Auth Platform — Admin Console</title>
-    <link rel="stylesheet" href="./style.css?v=20260301e">
+    <link rel="stylesheet" href="./style.css?v=20260325b">
     <!-- ====== MOBILE OVERRIDES (inline = cache-proof) ====== -->
     <style>
         @keyframes _mobileModalUp {
@@ -86,6 +86,51 @@
             .data-table td[colspan]::before { display: none !important; }
             .data-table td.loading { border-radius: 12px; background: #fff; border: 1px solid #e2e8f0; }
             .data-table td.loading::before { display: none !important; }
+
+            /* Activity tables: keep details attached visually on mobile */
+            #activityPage #adminSessionsTableBody tr.session-detail-row,
+            #activityPage #adminHistoryTableBody tr.history-detail-row {
+                border: none !important;
+                box-shadow: none !important;
+                background: transparent !important;
+                border-radius: 0 !important;
+                margin: -8px 0 10px !important;
+                padding: 0 !important;
+            }
+            #activityPage #adminSessionsTableBody tr.session-detail-row td[colspan],
+            #activityPage #adminHistoryTableBody tr.history-detail-row td[colspan] {
+                display: block !important;
+                justify-content: flex-start !important;
+                text-align: left !important;
+                border: none !important;
+                padding: 0 !important;
+            }
+            #activityPage #adminSessionsTableBody tr.session-detail-row td[colspan]::before,
+            #activityPage #adminHistoryTableBody tr.history-detail-row td[colspan]::before {
+                display: none !important;
+                content: none !important;
+            }
+            #activityPage #adminSessionsTableBody tr.session-detail-row .session-more-body,
+            #activityPage #adminHistoryTableBody tr.history-detail-row .session-more-body {
+                max-width: none !important;
+                margin-top: 0 !important;
+            }
+            #activityPage #adminSessionsTableBody tr.session-detail-row[hidden],
+            #activityPage #adminHistoryTableBody tr.history-detail-row[hidden] {
+                display: none !important;
+            }
+            #activityPage #adminSessionsTableBody td.session-action-cell .action-btns {
+                justify-content: center !important;
+            }
+            #activityPage #adminSessionsTableBody td.session-more-cell {
+                display: block !important;
+                text-align: right !important;
+                border-bottom: none !important;
+                padding-top: 8px !important;
+            }
+            #activityPage #adminSessionsTableBody td.session-more-cell::before {
+                display: none !important;
+            }
 
             .data-table code {
                 font-size: 0.72rem;
@@ -211,6 +256,14 @@
                     <i data-lucide="users"></i>
                     <span>Users</span>
                 </a>
+                <a href="#" class="nav-item" data-page="activity">
+                    <i data-lucide="monitor-smartphone"></i>
+                    <span>My Auth Activity</span>
+                </a>
+                <a href="#" class="nav-item" data-page="settings">
+                    <i data-lucide="settings"></i>
+                    <span>Settings</span>
+                </a>
             </nav>
             <div class="sidebar-footer">
                 <div class="api-status">
@@ -219,6 +272,10 @@
                 </div>
                 <button class="btn" onclick="window.open(window.location.origin + '/', '_blank')">
                     <i data-lucide="home"></i> Homepage
+                </button>
+                <button class="btn-logout" onclick="navigateTo('settings')">
+                    <i data-lucide="settings"></i>
+                    <span>Settings</span>
                 </button>
                 <button class="btn-logout" onclick="adminLogout()">
                     <i data-lucide="log-out"></i>
@@ -424,6 +481,156 @@
                     </table>
                 </div>
             </section>
+
+            <!-- ========== My Auth Activity ========== -->
+            <section id="activityPage" class="page">
+                <header class="page-header">
+                    <div>
+                        <h2>My Auth Activity</h2>
+                        <p class="page-desc">Global login activity for your identity across admin and client apps</p>
+                    </div>
+                    <div class="page-actions">
+                        <button class="btn btn-danger-outline" onclick="confirmRevokeAllAdminSessions()">
+                            <i data-lucide="shield-off"></i> Revoke All Sessions
+                        </button>
+                        <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage()" title="Refresh">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
+                    </div>
+                </header>
+
+                <div class="activity-metrics">
+                    <div class="activity-metric">
+                        <span>Active Sessions</span>
+                        <strong id="adminSessionCount">-</strong>
+                    </div>
+                    <div class="activity-metric">
+                        <span>History Records</span>
+                        <strong id="adminHistoryCount">-</strong>
+                    </div>
+                </div>
+
+                <div class="activity-grid">
+                    <div class="card activity-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="laptop"></i> Active Sessions</h3>
+                        </div>
+                        <div class="card-body activity-card-body">
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Device</th>
+                                            <th>Browser</th>
+                                            <th>IP</th>
+                                            <th>Location</th>
+                                            <th>Actions</th>
+                                            <th class="session-more-header"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminSessionsTableBody">
+                                        <tr><td colspan="6" class="loading">Loading active sessions...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card activity-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="history"></i> Global Login & OAuth History</h3>
+                        </div>
+                        <div class="card-body activity-card-body">
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Action</th>
+                                            <th>Source / App</th>
+                                            <th>More</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminHistoryTableBody">
+                                        <tr><td colspan="4" class="loading">Loading activity history...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========== Settings ========== -->
+            <section id="settingsPage" class="page">
+                <header class="page-header">
+                    <div>
+                        <h2>Settings</h2>
+                        <p class="page-desc">Manage your admin profile, passkeys, and MFA.</p>
+                    </div>
+                    <div class="page-actions">
+                        <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage()" title="Refresh">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
+                    </div>
+                </header>
+
+                <div id="settingsMsg" class="settings-msg"></div>
+
+                <div class="settings-grid">
+                    <div class="card settings-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="user-cog"></i> Profile</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="settings-help">Admin identity fields are locked here to protect the root account.</p>
+                            <div class="form-group">
+                                <label for="settingsProfileEmail">Admin Email</label>
+                                <input type="email" id="settingsProfileEmail" autocomplete="email" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label for="settingsTenantName">Tenant</label>
+                                <input type="text" id="settingsTenantName" disabled>
+                            </div>
+                            <p class="settings-lock-note"><i data-lucide="lock"></i> Email editing is disabled in dashboard settings.</p>
+                        </div>
+                    </div>
+
+                    <div class="card settings-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="key-round"></i> Passkey Setup</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="settings-help">After setup, passkey sign-in is available on the admin login page.</p>
+                            <p class="settings-summary" id="settingsPasskeySummary">Loading passkey status...</p>
+                            <div class="settings-row">
+                                <button type="button" class="btn btn-primary" id="settingsSetupPasskeyBtn" onclick="setupAdminSettingsPasskey()">Set Up Passkey</button>
+                            </div>
+                            <div class="settings-passkey-list" id="settingsPasskeyList"></div>
+                        </div>
+                    </div>
+
+                    <div class="card settings-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="shield-check"></i> MFA</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="settings-help">Enable or disable an email OTP step for password-based admin sign-in.</p>
+                            <div id="settingsMfaStatusChip" class="settings-chip disabled">MFA Disabled</div>
+                            <div class="settings-row">
+                                <button type="button" class="btn btn-secondary" id="settingsToggleMfaBtn" onclick="requestAdminSettingsMfaOtp()">Enable MFA</button>
+                            </div>
+                            <div class="form-group" id="settingsMfaOtpBlock" style="display:none;">
+                                <label for="settingsMfaOtp">Verification Code</label>
+                                <input id="settingsMfaOtp" type="text" maxlength="6" inputmode="numeric" placeholder="Enter 6-digit code">
+                                <div class="settings-row">
+                                    <button type="button" class="btn btn-primary" id="settingsVerifyMfaBtn" onclick="verifyAdminSettingsMfaOtp()">Verify</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
 
@@ -477,6 +684,13 @@
 
                     <div class="form-section">
                         <h4><i data-lucide="shield"></i> Security</h4>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="appOAuthEnabled" checked>
+                                <span>Enable OAuth SSO</span>
+                            </label>
+                            <small>Allow this app to use Auth Platform as its OAuth/SSO identity provider</small>
+                        </div>
                         <div class="form-group checkbox-group">
                             <label class="checkbox-label">
                                 <input type="checkbox" id="appOtpEnabled" checked>
@@ -723,7 +937,13 @@
     <!-- Toast Container -->
     <div id="toastContainer"></div>
 
-    <script src="./app.js?v=20260318a"></script>
+    <script src="./js/api-client.js?v=20260325a"></script>
+    <script src="./js/state.js?v=20260325a"></script>
+    <script src="./js/views.js?v=20260325a"></script>
+    <script src="./js/charts.js?v=20260325a"></script>
+    <script src="./js/activity.js?v=20260325a"></script>
+    <script src="./js/apps.js?v=20260325a"></script>
+    <script src="./js/users.js?v=20260325a"></script>
     <!-- Inject data-label attributes so CSS card layout can show field names -->
     <script>
     (function mobileCardLabels() {

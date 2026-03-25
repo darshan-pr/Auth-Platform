@@ -1,0 +1,8 @@
+<script>
+window.AUTH_UI_CONFIG = {
+    SESSION_ID: {{ session_id | tojson }},
+    API_BASE: window.location.origin,
+    OTP_ENABLED: {{ otp_enabled | tojson }},
+    PASSKEY_ENABLED: {{ passkey_enabled | tojson }},
+};
+</script>

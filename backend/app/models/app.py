@@ -24,6 +24,7 @@ class App(Base):
     # Passkey (WebAuthn) Settings
     passkey_enabled = Column(Boolean, default=False, nullable=False)
     # OAuth Settings
+    oauth_enabled = Column(Boolean, default=True, nullable=False)
     redirect_uris = Column(String, nullable=True)  # Comma-separated allowed redirect URIs
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

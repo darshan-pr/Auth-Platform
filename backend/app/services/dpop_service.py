@@ -55,6 +55,67 @@ def _compute_jwk_thumbprint(jwk: dict) -> str:
     return _base64url_encode(digest)
 
 
+def _public_key_from_jwk(jwk: dict):
+    """
+    Reconstruct a cryptography public key object from a JWK dict.
+    Supports RSA and EC keys (the most common for DPoP).
+    Returns a key object usable by PyJWT for signature verification.
+    """
+    kty = jwk.get("kty", "")
+
+    if kty == "RSA":
+        from cryptography.hazmat.primitives.asymmetric.rsa import (
+            RSAPublicNumbers,
+        )
+        from cryptography.hazmat.backends import default_backend
+
+        def _b64_to_int(b64: str) -> int:
+            data = _base64url_decode(b64)
+            return int.from_bytes(data, "big")
+
+        n = _b64_to_int(jwk["n"])
+        e = _b64_to_int(jwk["e"])
+        pub_numbers = RSAPublicNumbers(e, n)
+        return pub_numbers.public_key(default_backend())
+
+    elif kty == "EC":
+        from cryptography.hazmat.primitives.asymmetric.ec import (
+            EllipticCurvePublicNumbers,
+            SECP256R1,
+            SECP384R1,
+            SECP521R1,
+        )
+        from cryptography.hazmat.backends import default_backend
+
+        crv_map = {
+            "P-256": SECP256R1(),
+            "P-384": SECP384R1(),
+            "P-521": SECP521R1(),
+        }
+        crv_name = jwk.get("crv", "P-256")
+        curve = crv_map.get(crv_name)
+        if not curve:
+            raise ValueError(f"Unsupported EC curve: {crv_name}")
+
+        def _b64_to_int(b64: str) -> int:
+            data = _base64url_decode(b64)
+            return int.from_bytes(data, "big")
+
+        x = _b64_to_int(jwk["x"])
+        y = _b64_to_int(jwk["y"])
+        pub_numbers = EllipticCurvePublicNumbers(x, y, curve)
+        return pub_numbers.public_key(default_backend())
+
+    elif kty == "OKP":
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+        x_bytes = _base64url_decode(jwk["x"])
+        return Ed25519PublicKey.from_public_bytes(x_bytes)
+
+    else:
+        raise ValueError(f"Unsupported key type for DPoP: {kty}")
+
+
 def validate_dpop_proof(
     dpop_header: str,
     http_method: str,
@@ -62,19 +123,20 @@ def validate_dpop_proof(
     access_token: Optional[str] = None,
 ) -> Optional[dict]:
     """
-    Validate a DPoP proof JWT.
+    Validate a DPoP proof JWT (RFC 9449).
 
     Returns the proof payload containing the JWK and thumbprint, or None on failure.
 
     Checks:
     - JWS has exactly 3 parts (header.payload.signature)
     - Header typ == "dpop+jwt"
-    - Header alg is supported
+    - Header alg is asymmetric and supported (no 'none', no symmetric)
     - Header jwk is present and contains no private key material
+    - **Cryptographic signature verification** using the public key in `jwk`
     - Payload htm matches http_method
     - Payload htu matches http_uri
     - Payload iat is recent (within 5 minutes)
-    - Payload jti is present (unique nonce)
+    - Payload jti is present (unique nonce, replay-protected via Redis)
     - If access_token provided, payload ath matches SHA-256 of the token
     """
     try:
@@ -83,18 +145,20 @@ def validate_dpop_proof(
             logger.warning("DPoP proof: invalid JWS format")
             return None
 
-        # Decode header
+        # Decode header (without signature verification first — to extract alg/jwk)
         header = json.loads(_base64url_decode(parts[0]))
-        payload = json.loads(_base64url_decode(parts[1]))
+        payload_dict = json.loads(_base64url_decode(parts[1]))
 
-        # Check header
+        # --- Header checks ---
         if header.get("typ") != "dpop+jwt":
             logger.warning("DPoP proof: invalid typ")
             return None
 
         alg = header.get("alg", "")
-        if alg in ("none", ""):
-            logger.warning("DPoP proof: alg=none is not allowed")
+        # Reject symmetric algorithms and 'none' — DPoP must use asymmetric keys
+        _DISALLOWED_ALGS = {"none", "", "HS256", "HS384", "HS512"}
+        if alg in _DISALLOWED_ALGS:
+            logger.warning(f"DPoP proof: disallowed alg={alg!r}")
             return None
 
         jwk = header.get("jwk")
@@ -102,56 +166,79 @@ def validate_dpop_proof(
             logger.warning("DPoP proof: missing jwk")
             return None
 
-        # Ensure no private key material in JWK
+        # Reject private key material in the JWK
         if "d" in jwk:
             logger.warning("DPoP proof: private key material in jwk")
             return None
 
-        # Check payload claims
-        htm = payload.get("htm", "")
+        # --- Cryptographic signature verification (THE CRITICAL STEP) ---
+        # Reconstruct the public key from the JWK and verify the JWT signature.
+        # Without this, the proof is not authenticated at all.
+        try:
+            import jwt as pyjwt
+
+            public_key = _public_key_from_jwk(jwk)
+            # Verify signature and decode — options disable exp/iat enforcement
+            # (we do those checks manually below with stricter logic)
+            pyjwt.decode(
+                dpop_header,
+                public_key,
+                algorithms=[alg],
+                options={
+                    "verify_exp": False,
+                    "verify_iat": False,
+                    "verify_aud": False,
+                    "verify_iss": False,
+                },
+            )
+        except Exception as sig_err:
+            logger.warning(f"DPoP proof: signature verification failed: {sig_err}")
+            return None
+
+        # --- Payload claim checks ---
+        htm = payload_dict.get("htm", "")
         if htm.upper() != http_method.upper():
             logger.warning(f"DPoP proof: htm mismatch, expected={http_method}, got={htm}")
             return None
 
-        htu = payload.get("htu", "")
+        htu = payload_dict.get("htu", "")
         if htu != http_uri:
             logger.warning(f"DPoP proof: htu mismatch, expected={http_uri}, got={htu}")
             return None
 
         # Check iat (issued at) — must be within 5 minutes
-        iat = payload.get("iat", 0)
+        iat = payload_dict.get("iat", 0)
         now = time.time()
         if abs(now - iat) > 300:
             logger.warning("DPoP proof: iat too old or in the future")
             return None
 
-        # Check jti (nonce)
-        jti = payload.get("jti")
+        # Check jti (nonce) presence and replay protection via Redis
+        jti = payload_dict.get("jti")
         if not jti:
             logger.warning("DPoP proof: missing jti")
             return None
 
-        # Check jti uniqueness via Redis (prevent replay)
         try:
             from app.redis import redis_client
             jti_key = f"dpop:jti:{jti}"
             if redis_client.exists(jti_key):
                 logger.warning("DPoP proof: jti replay detected")
                 return None
-            redis_client.setex(jti_key, 300, "1")  # 5 min TTL
+            redis_client.setex(jti_key, 300, "1")  # 5 min TTL matches iat window
         except Exception:
-            pass  # If Redis is down, skip replay check
+            pass  # If Redis is down, skip replay check (fail open for availability)
 
-        # If access_token provided, verify ath claim
+        # If access_token provided, verify ath claim (token binding)
         if access_token:
             expected_ath = _base64url_encode(
                 hashlib.sha256(access_token.encode("ascii")).digest()
             )
-            if payload.get("ath") != expected_ath:
+            if payload_dict.get("ath") != expected_ath:
                 logger.warning("DPoP proof: ath mismatch")
                 return None
 
-        # Compute JWK thumbprint
+        # Compute JWK thumbprint for cnf binding
         thumbprint = _compute_jwk_thumbprint(jwk)
 
         return {

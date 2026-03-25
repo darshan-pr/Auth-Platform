@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authorize {{ app_name }}</title>
+    <link rel="icon" type="image/png" href="{{ app_logo_url or '/assets/logo.png' }}">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5ede8;
+            color: #1f2937;
+            padding: 20px;
+        }
+        .card {
+            width: 100%;
+            max-width: 720px;
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        .top {
+            padding: 28px 30px 16px;
+            border-bottom: 1px solid #efe7e2;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        .brand img {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            object-fit: cover;
+            background: #f7f7f7;
+        }
+        h1 {
+            margin: 0;
+            font-size: 26px;
+            line-height: 1.2;
+        }
+        .subtitle {
+            margin: 0;
+            color: #6b7280;
+            font-size: 15px;
+        }
+        .content {
+            padding: 24px 30px 28px;
+        }
+        .panel {
+            background: #fff7f2;
+            border: 1px solid #f7d8c8;
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .panel h2 {
+            margin: 0 0 8px;
+            font-size: 17px;
+        }
+        .meta {
+            margin: 0;
+            color: #374151;
+            font-size: 14px;
+        }
+        ul {
+            margin: 8px 0 0;
+            padding-left: 18px;
+            color: #4b5563;
+            font-size: 14px;
+        }
+        .error {
+            margin-bottom: 14px;
+            padding: 11px 12px;
+            border-radius: 10px;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            font-size: 14px;
+        }
+        .error-help {
+            margin-top: 10px;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid #f7d8c8;
+            background: #fff7f2;
+        }
+        .error-help p {
+            margin: 0;
+            color: #374151;
+            font-size: 14px;
+            line-height: 1.45;
+        }
+        .error-help .actions {
+            margin-top: 12px;
+        }
+        .error-help .btn {
+            flex: 0 0 auto;
+            min-width: 220px;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+        .btn {
+            border: none;
+            border-radius: 10px;
+            padding: 12px 18px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity .2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        .btn:disabled { opacity: .65; cursor: not-allowed; }
+        .btn-primary {
+            background: #e8583e;
+            color: #fff;
+            flex: 1 1 230px;
+        }
+        .btn-primary .btn-spinner {
+            display: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            animation: spin .65s linear infinite;
+        }
+        .btn-primary.loading .btn-spinner { display: inline-block; }
+        .btn-primary.loading .btn-label { opacity: .8; }
+        .btn-secondary {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            color: #1f2937;
+            flex: 1 1 180px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .foot {
+            text-align: center;
+            color: #9ca3af;
+            padding: 0 20px 20px;
+            font-size: 13px;
+        }
+        .foot a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="top">
+        <div class="brand">
+            <img src="{{ app_logo_url or '/assets/logo.png' }}" alt="App logo">
+            <div>
+                <h1>Authorize {{ app_name }}</h1>
+                <p class="subtitle">Review what this app will access</p>
+            </div>
+        </div>
+    </div>
+    <div class="content">
+        {% if error %}
+            <div class="error">{{ error }}</div>
+            {% if auth_platform_login_url %}
+                <div class="error-help">
+                    <p>Create an account or sign in on Auth Platform first, then return to your app and try OAuth again.</p>
+                    <div class="actions">
+                        <a class="btn btn-primary" href="{{ auth_platform_login_url }}">Open Auth Platform</a>
+                    </div>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="panel">
+                <h2>{{ app_name }} is requesting access</h2>
+                <p class="meta">Signed in as <strong>{{ user_email }}</strong></p>
+                <ul>
+                    <li>Read your verified email address</li>
+                    <li>Receive a short-lived access token proving platform verification</li>
+                    <li>No password is shared with the client app</li>
+                </ul>
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary" id="approveBtn" onclick="submitDecision('approve')">
+                    <span class="btn-spinner"></span>
+                    <span class="btn-label">Allow & Continue</span>
+                </button>
+                <button class="btn btn-secondary" id="denyBtn" onclick="submitDecision('deny')">Cancel</button>
+            </div>
+        {% endif %}
+    </div>
+    <div class="foot">Secured by <a href="{{ auth_platform_url }}">Auth Platform</a></div>
+</div>
+
+{% if not error and session_id %}
+<script>
+    const SESSION_ID = "{{ session_id }}";
+    const CLIENT_ID = "{{ client_id }}";
+
+    async function submitDecision(decision) {
+        const approveBtn = document.getElementById('approveBtn');
+        const denyBtn = document.getElementById('denyBtn');
+        approveBtn.disabled = true;
+        approveBtn.classList.add('loading');
+        denyBtn.disabled = true;
+
+        try {
+            const res = await fetch('/oauth/consent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: SESSION_ID, client_id: CLIENT_ID, decision })
+            });
+            const data = await res.json();
+
+            if (res.ok && data.action === 'redirect' && data.redirect_url) {
+                window.location.href = data.redirect_url;
+                return;
+            }
+
+            alert(data.detail || 'Unable to complete authorization.');
+        } catch (err) {
+            alert('Connection error. Please try again.');
+        } finally {
+            approveBtn.disabled = false;
+            approveBtn.classList.remove('loading');
+            denyBtn.disabled = false;
+        }
+    }
+</script>
+{% endif %}
+</body>
+</html>

@@ -125,7 +125,7 @@ def mock_redis_client():
     mock_pipeline.expire.return_value = mock_pipeline
     mock_pipeline.execute.return_value = [0, 0, 1, True]
     mock_redis.pipeline.return_value = mock_pipeline
-    mock_redis.exists.return_value = False
+    mock_redis.exists.side_effect = mock_redis_exists
 
     with patch("app.services.otp_service.redis_client", mock_redis), \
          patch("app.services.password_service.redis_client", mock_redis), \

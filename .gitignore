@@ -10,3 +10,10 @@ instance
 .admin.pid
 .backend.pid
 .sample-app.pid
+.cf_backend.pid
+.cf_frontend.pid
+CONTEXT.md
+.DS_Store
+*.tmp.db
+.pytest_cache/
+.tmp-test.db

@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Settings - Auth Platform</title>
+    <link rel="icon" type="image/png" href="/assets/logo.png">
+    <style>
+        :root {
+            --bg: #f5f7fb;
+            --text: #0f172a;
+            --muted: #64748b;
+            --surface: #ffffff;
+            --border: #dbe3ef;
+            --primary: #2563eb;
+            --primary-soft: #eff6ff;
+            --danger: #dc2626;
+            --success: #16a34a;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .container {
+            width: min(980px, 94vw);
+            margin: 28px auto 50px;
+        }
+
+        .topbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .title-wrap h1 {
+            margin: 0;
+            font-size: 1.6rem;
+            line-height: 1.2;
+        }
+
+        .title-wrap p {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .top-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            border: 1px solid transparent;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            background: #fff;
+            color: var(--text);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+        .btn-secondary { border-color: var(--border); }
+        .btn-secondary:hover:not(:disabled) { background: #f8fafc; }
+        .btn-danger {
+            border-color: #fecaca;
+            background: #fff1f2;
+            color: var(--danger);
+        }
+        .btn-danger:hover:not(:disabled) { background: #ffe4e6; }
+
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            border-top-color: #fff;
+            border-radius: 50%;
+            display: none;
+            animation: spin 0.7s linear infinite;
+        }
+
+        .btn-secondary .spinner,
+        .btn-danger .spinner {
+            border-color: rgba(15, 23, 42, 0.2);
+            border-top-color: currentColor;
+        }
+
+        .btn.loading .spinner { display: inline-block; }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .msg {
+            display: none;
+            border-radius: 10px;
+            padding: 11px 12px;
+            margin-bottom: 14px;
+            font-size: 0.9rem;
+        }
+
+        .msg.show { display: block; }
+        .msg.error {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+        .msg.success {
+            background: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 14px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+            box-shadow: 0 5px 14px rgba(15, 23, 42, 0.05);
+        }
+
+        .card h2 {
+            margin: 0 0 6px;
+            font-size: 1.05rem;
+        }
+
+        .card p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .row {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .field {
+            margin-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        input {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.92rem;
+            color: var(--text);
+            background: #fff;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #93c5fd;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-top: 10px;
+            letter-spacing: 0.03em;
+        }
+
+        .status-chip.enabled {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-chip.disabled {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .passkey-list {
+            margin-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .passkey-item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .passkey-meta {
+            font-size: 0.82rem;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        .small {
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        @media (max-width: 640px) {
+            .container { width: 94vw; }
+            .topbar { flex-direction: column; align-items: stretch; }
+            .top-actions { width: 100%; }
+            .top-actions .btn { flex: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="topbar">
+            <div class="title-wrap">
+                <h1>Admin Settings</h1>
+                <p>Manage your admin profile, passkey sign-in, and MFA.</p>
+            </div>
+            <div class="top-actions">
+                <button class="btn btn-secondary" onclick="window.location.href='/dashboard/'">Back To Dashboard</button>
+                <button class="btn btn-danger" id="logoutBtn" onclick="logoutAdmin()">
+                    <span class="spinner"></span>
+                    <span class="label">Sign Out</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="msgBox" class="msg"></div>
+
+        <div class="grid">
+            <section class="card">
+                <h2>Profile</h2>
+                <p>Update your admin identity details for this workspace.</p>
+
+                <div class="field">
+                    <label for="profileEmail">Admin Email</label>
+                    <input id="profileEmail" type="email" autocomplete="email" required>
+                </div>
+
+                <div class="field">
+                    <label for="profileTenant">Tenant</label>
+                    <input id="profileTenant" type="text" disabled>
+                </div>
+
+                <div class="row">
+                    <button class="btn btn-primary" id="saveProfileBtn" onclick="saveProfile()">
+                        <span class="spinner"></span>
+                        <span class="label">Save Profile</span>
+                    </button>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>Passkey Setup</h2>
+                <p>After setup, passkey sign-in becomes available on admin login.</p>
+
+                <div class="small" id="passkeySummary">Loading passkey status...</div>
+
+                <div class="row">
+                    <button class="btn btn-primary" id="setupPasskeyBtn" onclick="setupPasskey()">
+                        <span class="spinner"></span>
+                        <span class="label">Set Up Passkey</span>
+                    </button>
+                </div>
+
+                <div class="passkey-list" id="passkeyList"></div>
+            </section>
+
+            <section class="card">
+                <h2>MFA</h2>
+                <p>Enable or disable an email OTP step for password-based admin sign-in.</p>
+
+                <div id="mfaStatusChip" class="status-chip disabled">MFA Disabled</div>
+
+                <div class="row">
+                    <button class="btn btn-secondary" id="toggleMfaBtn" onclick="requestMfaOtp()">
+                        <span class="spinner"></span>
+                        <span class="label">Enable MFA</span>
+                    </button>
+                </div>
+
+                <div class="field" id="mfaOtpBlock" style="display:none;">
+                    <label for="mfaOtp">Verification Code</label>
+                    <input id="mfaOtp" type="text" maxlength="6" inputmode="numeric" placeholder="Enter 6-digit code">
+                    <div class="row">
+                        <button class="btn btn-primary" id="verifyMfaBtn" onclick="verifyMfaOtp()">
+                            <span class="spinner"></span>
+                            <span class="label">Verify</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let profileState = null;
+        let securityState = null;
+        let pendingMfaAction = "enable";
+
+        document.addEventListener("DOMContentLoaded", () => {
+            loadAll();
+        });
+
+        function showMessage(type, text) {
+            const box = document.getElementById("msgBox");
+            if (!box) return;
+            box.className = `msg show ${type}`;
+            box.textContent = text;
+        }
+
+        function clearMessage() {
+            const box = document.getElementById("msgBox");
+            if (!box) return;
+            box.className = "msg";
+            box.textContent = "";
+        }
+
+        function setButtonLoading(id, loading, loadingLabel = "Working...") {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            const label = btn.querySelector(".label");
+            if (loading) {
+                btn.classList.add("loading");
+                btn.disabled = true;
+                if (label) {
+                    btn.dataset.defaultLabel = btn.dataset.defaultLabel || label.textContent;
+                    label.textContent = loadingLabel;
+                }
+                return;
+            }
+            btn.classList.remove("loading");
+            btn.disabled = false;
+            if (label && btn.dataset.defaultLabel) {
+                label.textContent = btn.dataset.defaultLabel;
+            }
+        }
+
+        async function apiRequest(path, options = {}) {
+            const config = {
+                credentials: "include",
+                headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+                ...options,
+            };
+            const res = await fetch(`${API_BASE}${path}`, config);
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.detail || data.message || "Request failed");
+            }
+            return data;
+        }
+
+        async function loadAll() {
+            clearMessage();
+            try {
+                const [profile, security] = await Promise.all([
+                    apiRequest("/admin/settings/profile"),
+                    apiRequest("/admin/settings/security"),
+                ]);
+                profileState = profile;
+                securityState = security;
+                renderProfile();
+                renderSecurity();
+            } catch (err) {
+                showMessage("error", err.message || "Failed to load settings");
+                if (/Authentication required|Invalid or expired admin token|Session revoked/i.test(String(err.message || ""))) {
+                    window.location.href = "/login";
+                }
+            }
+        }
+
+        function renderProfile() {
+            if (!profileState) return;
+            document.getElementById("profileEmail").value = profileState.email || "";
+            document.getElementById("profileTenant").value = profileState.tenant_name || "";
+        }
+
+        function renderSecurity() {
+            if (!securityState) return;
+
+            const chip = document.getElementById("mfaStatusChip");
+            const toggleBtn = document.getElementById("toggleMfaBtn");
+            const toggleLabel = toggleBtn ? toggleBtn.querySelector(".label") : null;
+
+            if (securityState.mfa_enabled) {
+                chip.className = "status-chip enabled";
+                chip.textContent = "MFA Enabled";
+                pendingMfaAction = "disable";
+                if (toggleLabel) {
+                    toggleLabel.textContent = "Disable MFA";
+                    toggleBtn.dataset.defaultLabel = "Disable MFA";
+                }
+            } else {
+                chip.className = "status-chip disabled";
+                chip.textContent = "MFA Disabled";
+                pendingMfaAction = "enable";
+                if (toggleLabel) {
+                    toggleLabel.textContent = "Enable MFA";
+                    toggleBtn.dataset.defaultLabel = "Enable MFA";
+                }
+            }
+
+            const count = Number(securityState.passkey_count || 0);
+            const summary = document.getElementById("passkeySummary");
+            summary.textContent = count > 0
+                ? `${count} passkey${count > 1 ? "s" : ""} registered`
+                : "No passkeys registered yet";
+
+            const list = document.getElementById("passkeyList");
+            list.innerHTML = "";
+
+            if (!Array.isArray(securityState.passkeys) || securityState.passkeys.length === 0) {
+                const empty = document.createElement("div");
+                empty.className = "small";
+                empty.textContent = "Register one passkey to unlock passkey sign-in on /login.";
+                list.appendChild(empty);
+                return;
+            }
+
+            securityState.passkeys.forEach((item) => {
+                const row = document.createElement("div");
+                row.className = "passkey-item";
+                row.innerHTML = `
+                    <div>
+                        <div><strong>${escapeHtml(item.device_name || "Admin Device")}</strong></div>
+                        <div class="passkey-meta">Created: ${formatDate(item.created_at)}<br>Last used: ${formatDate(item.last_used_at)}</div>
+                    </div>
+                    <button class="btn btn-danger" onclick="removePasskey(${Number(item.id)})">Remove</button>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        async function saveProfile() {
+            clearMessage();
+            const email = document.getElementById("profileEmail").value.trim();
+            if (!email) {
+                showMessage("error", "Email is required");
+                return;
+            }
+
+            setButtonLoading("saveProfileBtn", true, "Saving...");
+            try {
+                const data = await apiRequest("/admin/settings/profile", {
+                    method: "PUT",
+                    body: JSON.stringify({ email }),
+                });
+                profileState = { ...(profileState || {}), ...data };
+                showMessage("success", data.message || "Profile updated successfully");
+            } catch (err) {
+                showMessage("error", err.message || "Failed to save profile");
+            } finally {
+                setButtonLoading("saveProfileBtn", false);
+            }
+        }
+
+        async function requestMfaOtp() {
+            clearMessage();
+            setButtonLoading("toggleMfaBtn", true, pendingMfaAction === "enable" ? "Sending code..." : "Confirming...");
+            try {
+                const data = await apiRequest("/admin/settings/mfa/request-otp", {
+                    method: "POST",
+                    body: JSON.stringify({ action: pendingMfaAction }),
+                });
+                pendingMfaAction = data.action || pendingMfaAction;
+                document.getElementById("mfaOtpBlock").style.display = "flex";
+                document.getElementById("mfaOtp").value = "";
+                document.getElementById("mfaOtp").focus();
+                showMessage("success", data.message || "Verification code sent.");
+            } catch (err) {
+                showMessage("error", err.message || "Failed to send code");
+            } finally {
+                setButtonLoading("toggleMfaBtn", false);
+            }
+        }
+
+        async function verifyMfaOtp() {
+            clearMessage();
+            const otp = document.getElementById("mfaOtp").value.trim();
+            if (otp.length !== 6) {
+                showMessage("error", "Please enter the 6-digit verification code");
+                return;
+            }
+
+            setButtonLoading("verifyMfaBtn", true, "Verifying...");
+            try {
+                const data = await apiRequest("/admin/settings/mfa/verify", {
+                    method: "POST",
+                    body: JSON.stringify({ otp }),
+                });
+                showMessage("success", data.message || "MFA updated");
+                document.getElementById("mfaOtpBlock").style.display = "none";
+                document.getElementById("mfaOtp").value = "";
+                await loadAll();
+            } catch (err) {
+                showMessage("error", err.message || "OTP verification failed");
+            } finally {
+                setButtonLoading("verifyMfaBtn", false);
+            }
+        }
+
+        function base64urlToBuffer(base64url) {
+            const padding = "=".repeat((4 - (base64url.length % 4)) % 4);
+            const base64 = (base64url + padding).replace(/-/g, "+").replace(/_/g, "/");
+            const raw = atob(base64);
+            const buffer = new ArrayBuffer(raw.length);
+            const view = new Uint8Array(buffer);
+            for (let i = 0; i < raw.length; i++) view[i] = raw.charCodeAt(i);
+            return buffer;
+        }
+
+        function bufferToBase64url(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = "";
+            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+            return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        }
+
+        function normalizeCreationOptions(options) {
+            options.challenge = base64urlToBuffer(options.challenge);
+            options.user.id = base64urlToBuffer(options.user.id);
+            if (Array.isArray(options.excludeCredentials)) {
+                options.excludeCredentials = options.excludeCredentials.map((cred) => ({
+                    ...cred,
+                    id: base64urlToBuffer(cred.id),
+                }));
+            }
+            return options;
+        }
+
+        function defaultDeviceName() {
+            const platform = navigator.platform || "device";
+            return `Admin ${platform}`;
+        }
+
+        async function setupPasskey() {
+            clearMessage();
+            if (!window.PublicKeyCredential || !navigator.credentials || !navigator.credentials.create) {
+                showMessage("error", "Passkeys are not supported in this browser/device.");
+                return;
+            }
+
+            setButtonLoading("setupPasskeyBtn", true, "Preparing...");
+            try {
+                const begin = await apiRequest("/admin/settings/passkeys/register/begin", {
+                    method: "POST",
+                    body: JSON.stringify({}),
+                });
+
+                const publicKey = normalizeCreationOptions(begin.options || {});
+                const credential = await navigator.credentials.create({ publicKey });
+                if (!credential || !credential.response) {
+                    throw new Error("No passkey credential returned by browser");
+                }
+
+                await apiRequest("/admin/settings/passkeys/register/complete", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        credential: {
+                            id: credential.id,
+                            clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+                            attestationObject: bufferToBase64url(credential.response.attestationObject),
+                            deviceName: defaultDeviceName(),
+                        },
+                    }),
+                });
+
+                showMessage("success", "Passkey setup complete. You can now use passkey sign-in.");
+                await loadAll();
+            } catch (err) {
+                const msg = String(err.message || "");
+                if (msg.includes("NotAllowedError")) {
+                    showMessage("error", "Passkey setup was cancelled.");
+                } else {
+                    showMessage("error", msg || "Failed to set up passkey");
+                }
+            } finally {
+                setButtonLoading("setupPasskeyBtn", false);
+            }
+        }
+
+        async function removePasskey(id) {
+            clearMessage();
+            if (!Number.isFinite(Number(id))) return;
+            if (!confirm("Remove this passkey?")) return;
+
+            try {
+                await apiRequest(`/admin/settings/passkeys/${id}`, { method: "DELETE" });
+                showMessage("success", "Passkey removed successfully.");
+                await loadAll();
+            } catch (err) {
+                showMessage("error", err.message || "Failed to remove passkey");
+            }
+        }
+
+        async function logoutAdmin() {
+            setButtonLoading("logoutBtn", true, "Signing out...");
+            try {
+                await apiRequest("/admin/logout", {
+                    method: "POST",
+                    body: JSON.stringify({}),
+                });
+            } catch (err) {
+                // no-op
+            }
+            window.location.href = "/login";
+        }
+
+        function formatDate(value) {
+            if (!value) return "Never";
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return "Unknown";
+            return d.toLocaleString();
+        }
+
+        function escapeHtml(value) {
+            return String(value || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/\"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+    </script>
+</body>
+</html>

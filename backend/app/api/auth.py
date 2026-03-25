@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Request
 from sqlalchemy.orm import Session
-from datetime import timedelta
+from sqlalchemy.exc import IntegrityError
 from app.schemas.auth import (
     OTPRequest, OTPVerifyRequest, AuthResponse,
     SignupRequest, LoginRequest, LoginResponse, LoginOTPVerifyRequest,
@@ -8,8 +8,15 @@ from app.schemas.auth import (
 )
 from app.services.otp_service import generate_otp, verify_otp, generate_password_reset_otp, verify_password_reset_otp
 from app.services.mail_service import send_otp_email, send_password_reset_email, send_password_reset_token_email, send_login_notification_email
-from app.services.jwt_service import create_access_token, create_refresh_token, mark_user_online, clear_user_blacklist
-from app.services.password_service import hash_password, verify_password, generate_reset_token, verify_reset_token
+from app.services.password_service import (
+    enforce_password_strength,
+    generate_reset_token,
+    hash_password,
+    verify_password,
+    verify_reset_token,
+)
+from app.services.redirect_url_service import build_server_signin_url, infer_app_signin_url
+from app.services.token_service import generate_tokens_for_user
 from app.services.tenant_service import get_or_create_default_tenant
 from app.services.rate_limiter import create_rate_limit_dependency
 from app.services.geo_service import record_login_event, get_client_ip, get_location
@@ -21,7 +28,6 @@ from app.redis import redis_client
 from pydantic import BaseModel
 from typing import Optional
 import logging
-from urllib.parse import urlparse, urlencode
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +92,51 @@ _rl_signup = create_rate_limit_dependency("signup", max_requests=settings.RATE_L
 _rl_otp = create_rate_limit_dependency("otp", max_requests=settings.RATE_LIMIT_OTP)
 _rl_forgot = create_rate_limit_dependency("forgot_password", max_requests=settings.RATE_LIMIT_OTP)
 
+
+def _find_or_provision_user_for_app_login(
+    db: Session,
+    app: App,
+    email: str,
+    app_id: str,
+) -> Optional[User]:
+    user = db.query(User).filter(
+        User.email == email,
+        User.tenant_id == app.tenant_id,
+        User.app_id == app_id,
+    ).first()
+    if user:
+        return user
+
+    # Support same-tenant multi-app login by provisioning a per-app identity
+    # from an existing tenant-level identity record.
+    tenant_user = db.query(User).filter(
+        User.email == email,
+        User.tenant_id == app.tenant_id,
+    ).order_by(User.created_at.asc()).first()
+    if not tenant_user or not tenant_user.password_hash:
+        return None
+
+    clone = User(
+        email=tenant_user.email,
+        password_hash=tenant_user.password_hash,
+        app_id=app_id,
+        tenant_id=app.tenant_id,
+        is_active=tenant_user.is_active,
+    )
+    db.add(clone)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return db.query(User).filter(
+            User.email == email,
+            User.tenant_id == app.tenant_id,
+            User.app_id == app_id,
+        ).first()
+
+    db.refresh(clone)
+    return clone
+
 def validate_app_credentials(db: Session, app_id: str, app_secret: str) -> App:
     """Validate app credentials and return the app if valid.
     Supports both hashed (SHA-256) and legacy plaintext secrets for backward compatibility.
@@ -119,34 +170,6 @@ def validate_app_credentials(db: Session, app_id: str, app_secret: str) -> App:
                 detail="Invalid app credentials"
             )
     return app
-
-def generate_tokens_for_user(user: User, app: App, cnf: dict = None):
-    """Generate access and refresh tokens for a user with app-specific expiry settings"""
-    token_data = {"sub": user.email, "user_id": user.id}
-    if cnf:
-        token_data["cnf"] = cnf
-    if app:
-        token_data["app_id"] = app.app_id
-        token_data["tenant_id"] = app.tenant_id
-    
-    # Use app-specific expiry settings
-    if app:
-        access_expires = timedelta(minutes=app.access_token_expiry_minutes)
-        refresh_expires = timedelta(days=app.refresh_token_expiry_days)
-    else:
-        access_expires = None
-        refresh_expires = None
-    
-    access_token = create_access_token(token_data, access_expires)
-    refresh_token = create_refresh_token(token_data, refresh_expires)
-    
-    # Mark user as online in Redis
-    if app:
-        ttl = int(app.access_token_expiry_minutes * 60) + 60  # add 1 min buffer
-        mark_user_online(user.id, app.tenant_id, ttl_seconds=ttl)
-        clear_user_blacklist(user.id, app.tenant_id)
-    
-    return access_token, refresh_token
 
 # ============== Password-based Auth ==============
 
@@ -210,16 +233,17 @@ def login(request: LoginRequest, http_request: Request = None, db: Session = Dep
             detail="App credentials are required for login"
         )
     
-    # Find user for this app within tenant
-    user = db.query(User).filter(
-        User.email == request.email,
-        User.tenant_id == app.tenant_id,
-        User.app_id == request.app_id
-    ).first()
+    # Find (or provision) user for this app within tenant.
+    user = _find_or_provision_user_for_app_login(
+        db=db,
+        app=app,
+        email=request.email,
+        app_id=request.app_id,
+    )
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
         )
     
     # Check if user has a password set
@@ -494,64 +518,6 @@ class SetPasswordRequest(BaseModel):
     app_id: str
     new_password: str
 
-
-def _normalize_redirect_uri(raw: str):
-    candidate = (raw or "").strip().strip("\"'")
-    if not candidate:
-        return None
-
-    parsed = urlparse(candidate)
-    if not parsed.scheme and "://" not in candidate:
-        candidate = f"https://{candidate.lstrip('/')}"
-        parsed = urlparse(candidate)
-
-    if parsed.scheme in ("http", "https") and parsed.netloc:
-        return candidate, parsed
-    return None
-
-
-def _is_localhost_target(parsed) -> bool:
-    host = (parsed.hostname or "").lower()
-    return host in {"localhost", "127.0.0.1", "0.0.0.0", "::1"} or host.endswith(".localhost")
-
-
-def _infer_app_signin_url_from_redirects(
-    redirect_uris: Optional[str],
-    allow_localhost_fallback: bool = False,
-) -> Optional[str]:
-    if not redirect_uris:
-        return None
-
-    valid_urls = []
-    for raw in redirect_uris.split(","):
-        normalized = _normalize_redirect_uri(raw)
-        if normalized:
-            valid_urls.append(normalized)
-
-    if not valid_urls:
-        return None
-
-    public_urls = [(candidate, parsed) for candidate, parsed in valid_urls if not _is_localhost_target(parsed)]
-    pool = public_urls if public_urls else (valid_urls if allow_localhost_fallback else [])
-    if not pool:
-        return None
-
-    # Prefer an explicitly configured login path.
-    for candidate, parsed in pool:
-        path = (parsed.path or "").lower()
-        if "signin" in path or "sign-in" in path or "login" in path:
-            return candidate
-
-    first_candidate, first_parsed = pool[0]
-    first_path = (first_parsed.path or "").lower()
-    if "callback" in first_path or "oauth" in first_path:
-        return f"{first_parsed.scheme}://{first_parsed.netloc}/login"
-    return first_candidate
-
-
-def _build_server_signin_url(client_id: str, source: str = "password_reset") -> str:
-    return f"/signin?{urlencode({'client_id': client_id, 'from': source})}"
-
 @router.post("/set-password")
 def set_password(request: SetPasswordRequest, db: Session = Depends(get_db)):
     """
@@ -585,15 +551,10 @@ def set_password(request: SetPasswordRequest, db: Session = Depends(get_db)):
             detail="User not found"
         )
 
-    # Validate password strength
-    if len(request.new_password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-    if not any(c.isupper() for c in request.new_password):
-        raise HTTPException(status_code=400, detail="Password must contain an uppercase letter")
-    if not any(c.islower() for c in request.new_password):
-        raise HTTPException(status_code=400, detail="Password must contain a lowercase letter")
-    if not any(c.isdigit() for c in request.new_password):
-        raise HTTPException(status_code=400, detail="Password must contain a digit")
+    try:
+        enforce_password_strength(request.new_password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     # Set the password
     user.password_hash = hash_password(request.new_password)
@@ -602,8 +563,8 @@ def set_password(request: SetPasswordRequest, db: Session = Depends(get_db)):
     return {
         "message": "Password set successfully. You can now sign in.",
         "email": user.email,
-        "server_signin_url": _build_server_signin_url(request.app_id),
-        "app_signin_url": _infer_app_signin_url_from_redirects(app.redirect_uris),
+        "server_signin_url": build_server_signin_url(request.app_id),
+        "app_signin_url": infer_app_signin_url(app.redirect_uris),
     }
 
 # ============== OTP-only Auth (legacy) ==============

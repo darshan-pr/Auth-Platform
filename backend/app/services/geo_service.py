@@ -17,6 +17,40 @@ logger = logging.getLogger(__name__)
 GEO_CACHE_TTL = 86400
 
 
+def _parse_user_agent(user_agent: Optional[str]) -> tuple[str, str]:
+    ua = (user_agent or "").lower()
+
+    if "edg/" in ua:
+        browser = "Edge"
+    elif "opr/" in ua or "opera" in ua:
+        browser = "Opera"
+    elif "chrome/" in ua and "safari/" in ua:
+        browser = "Chrome"
+    elif "safari/" in ua and "chrome/" not in ua:
+        browser = "Safari"
+    elif "firefox/" in ua:
+        browser = "Firefox"
+    else:
+        browser = "Unknown"
+
+    if "iphone" in ua:
+        device = "iPhone"
+    elif "ipad" in ua:
+        device = "iPad"
+    elif "android" in ua:
+        device = "Android"
+    elif "windows" in ua:
+        device = "Windows"
+    elif "mac os x" in ua or "macintosh" in ua:
+        device = "Mac"
+    elif "linux" in ua:
+        device = "Linux"
+    else:
+        device = "Unknown"
+
+    return browser, device
+
+
 def _normalize_ip(raw_ip: str) -> str:
     """Normalize common proxy IP formats (including host:port and [ipv6]:port)."""
     if not raw_ip:
@@ -171,12 +205,17 @@ def record_login_event(
 
         ip = get_client_ip(request)
         geo = get_location(ip)
+        user_agent = request.headers.get("user-agent", "") if request else None
+        browser, device = _parse_user_agent(user_agent)
 
         event = LoginEvent(
             user_id=user_id,
             app_id=app_id,
             tenant_id=tenant_id,
             event_type=event_type,
+            user_agent=user_agent,
+            browser=browser,
+            device=device,
             ip_address=ip,
             city=geo.get("city"),
             region=geo.get("region"),

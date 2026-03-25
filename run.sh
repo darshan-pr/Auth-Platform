@@ -82,6 +82,7 @@ run_backend_migrations() {
     local rc=$?
     if [ "$rc" -ne 0 ]; then
         echo "[!] Migration runner failed. Check $migrations_log"
+        tail -n 25 "$migrations_log" 2>/dev/null | sed 's/^/    /'
         return 1
     fi
     echo "    -> Migration check complete. Log: $migrations_log"
@@ -260,7 +261,14 @@ start_all() {
         echo "  [Deployment Mode] Using Gunicorn + Cloudflare tunnels"
         echo ""
 
-        start_backend_prod
+        if ! start_backend_prod; then
+            echo ""
+            echo "  ============================================"
+            echo "   Startup failed."
+            echo "  ============================================"
+            echo ""
+            return 1
+        fi
         sleep 2
 
         # Start Cloudflare tunnels — URLs written to temp files (not namerefs)
@@ -289,7 +297,14 @@ start_all() {
 
     else
         # ---- Dev mode (original behaviour) ----
-        start_backend
+        if ! start_backend; then
+            echo ""
+            echo "  ============================================"
+            echo "   Startup failed."
+            echo "  ============================================"
+            echo ""
+            return 1
+        fi
         sleep 2
 
         echo ""
@@ -313,12 +328,12 @@ start_all() {
 
 case "${1:-start}" in
     start|all)
-        start_all
+        start_all || exit 1
         ;;
     backend)
         activate_venv
         load_env
-        start_backend
+        start_backend || exit 1
         echo ""
         echo "  Press Ctrl+C to stop ..."
         trap "stop_services; exit 0" INT TERM

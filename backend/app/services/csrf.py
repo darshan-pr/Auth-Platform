@@ -10,11 +10,13 @@ CSRF Protection Middleware — Double-Submit Cookie Pattern.
     • Non-state-changing methods (GET, HEAD, OPTIONS)
 """
 
+import hmac
 import secrets
 import logging
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +52,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     value=token,
                     httponly=False,  # JS must read this to send in header
                     samesite="lax",
-                    secure=False,  # Set True in production behind HTTPS
+                    secure=settings.CSRF_COOKIE_SECURE,
                     path="/",
                 )
             return response
@@ -65,7 +67,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         # Skip for JSON API requests — CSRF only applies to form submissions
         # Browsers cannot cross-origin POST application/json without CORS preflight
         content_type = request.headers.get("content-type", "")
-        if "application/json" in content_type:
+        if settings.CSRF_SKIP_JSON and "application/json" in content_type:
             return await call_next(request)
 
         # Skip exempt paths
@@ -80,7 +82,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         cookie_token = request.cookies.get("csrf_token")
         header_token = request.headers.get("x-csrf-token")
 
-        if not cookie_token or not header_token or cookie_token != header_token:
+        if not cookie_token or not header_token or not hmac.compare_digest(cookie_token, header_token):
             logger.warning(f"CSRF validation failed for {method} {path}")
             return JSONResponse(
                 status_code=403,

@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
+from app.services.password_service import enforce_password_strength
 
 class OTPRequest(BaseModel):
     email: str
@@ -28,14 +29,7 @@ class SignupRequest(BaseModel):
     @field_validator('password')
     @classmethod
     def password_strength(cls, v):
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters long')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain at least one uppercase letter')
-        if not any(c.islower() for c in v):
-            raise ValueError('Password must contain at least one lowercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain at least one digit')
+        enforce_password_strength(v)
         return v
 
 class LoginRequest(BaseModel):
@@ -81,12 +75,5 @@ class ResetPasswordRequest(BaseModel):
     @field_validator('new_password')
     @classmethod
     def password_strength(cls, v):
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters long')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain at least one uppercase letter')
-        if not any(c.islower() for c in v):
-            raise ValueError('Password must contain at least one lowercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain at least one digit')
+        enforce_password_strength(v)
         return v

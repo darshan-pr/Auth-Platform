@@ -54,9 +54,10 @@ class AuthClient {
      *  Developers cannot read or mutate tokens, streams, etc.
      * ────────────────────────────────────────────── */
     #authServer;
+    #authProxyPath;
     #clientId;
     #redirectUri;
-    #tokens = null;
+    #sessionPayload = null;
     #onAuthChangeCb = null;
     #sessionInterval = null;
     #eventSource = null;
@@ -70,18 +71,34 @@ class AuthClient {
      * @param {string} config.REDIRECT_URI - Callback URL (must match Admin Console)
      */
     constructor(config = {}) {
-        if (!config.AUTH_SERVER) {
+        const authServer = AuthClient.#clean(config.AUTH_SERVER).replace(/\/+$/, '');
+        if (!authServer) {
             throw new Error(
                 '[AuthClient] AUTH_SERVER is required.\n' +
                 'Set it via environment variable (e.g. NEXT_PUBLIC_AUTH_SERVER).'
             );
         }
-        this.#authServer  = config.AUTH_SERVER.replace(/\/+$/, '');
-        this.#clientId    = config.CLIENT_ID || '';
-        this.#redirectUri = config.REDIRECT_URI || '';
+        this.#authServer = authServer;
+        this.#authProxyPath = AuthClient.#clean(config.AUTH_PROXY_PATH).replace(/\/+$/, '');
+        this.#clientId = AuthClient.#clean(config.CLIENT_ID);
+        this.#redirectUri = AuthClient.#clean(config.REDIRECT_URI);
 
-        // Restore any existing session from storage
-        this.#loadSession();
+        // Helpful diagnostics for common local tunnel drift issues.
+        if (typeof window !== 'undefined') {
+            try {
+                const authHost = new URL(this.#authServer).hostname;
+                const browserHost = window.location.hostname;
+                const isLocalBrowser = browserHost === 'localhost' || browserHost === '127.0.0.1';
+                if (isLocalBrowser && /\.trycloudflare\.com$/i.test(authHost)) {
+                    console.warn(
+                        '[AuthClient] AUTH_SERVER points to a trycloudflare host while app runs locally. ' +
+                        'If tunnel URL changed, update env and restart your app.'
+                    );
+                }
+            } catch {
+                // Ignore URL parsing diagnostics.
+            }
+        }
     }
 
 
@@ -94,21 +111,49 @@ class AuthClient {
      * Redirect to the hosted login page (OAuth 2.0 + PKCE).
      * Like "Sign in with Google" — your app never sees the password.
      */
-    login() {
+    login(options = {}) {
         if (!this.#clientId) {
             throw new Error(
                 '[AuthClient] CLIENT_ID is not configured.\n' +
                 'Get one from the Admin Console and set it via environment variable.'
             );
         }
-        this.#startOAuthFlow();
+        if (!this.#redirectUri) {
+            throw new Error(
+                '[AuthClient] REDIRECT_URI is not configured.\n' +
+                'Set NEXT_PUBLIC_REDIRECT_URI (or framework equivalent) to a registered callback URL.'
+            );
+        }
+        this.#startOAuthFlow(options);
     }
 
     /**
      * Clear session and notify listeners.
+     * Also calls GET /oauth/logout on the auth server to clear the platform_sso
+     * HttpOnly cookie — without this, the next login() would silently re-authenticate
+     * the user via the persisted SSO cookie without showing the login form.
      * @param {string} [reason] - Optional reason: 'revoked_by_admin' | 'session_expired' | null
      */
     logout(reason) {
+        const postLogoutRedirect = encodeURIComponent(window.location.origin);
+
+        // Fire-and-forget through proxy first so HttpOnly auth cookies are cleared.
+        // Proxy is same-origin, so this call includes cookies automatically.
+        try {
+            this.#fetchAuth(`/oauth/logout?post_logout_redirect_uri=${postLogoutRedirect}`, {
+                method: 'GET',
+            }).catch(() => {});
+        } catch { /* ignore */ }
+
+        // Fire-and-forget: clear the server-side SSO cookie in the background.
+        // Use an image/beacon rather than fetch to avoid CORS preflight issues.
+        try {
+            const logoutUrl = this.#authServer + '/oauth/logout?post_logout_redirect_uri=' + postLogoutRedirect;
+            // Create a hidden iframe to trigger the cookie-clearing redirect
+            const img = new Image();
+            img.src = logoutUrl;
+        } catch { /* ignore — server-side cookie clears on next login attempt anyway */ }
+
         this.#clearSession();
         if (this.#onAuthChangeCb) this.#onAuthChangeCb(false, reason || null);
     }
@@ -118,13 +163,7 @@ class AuthClient {
      * @returns {boolean}
      */
     isAuthenticated() {
-        if (!this.#tokens?.access_token) return false;
-        try {
-            const payload = AuthClient.#decodeJWT(this.#tokens.access_token);
-            return payload.exp * 1000 > Date.now();
-        } catch {
-            return false;
-        }
+        return Boolean(this.#sessionPayload?.exp && this.#sessionPayload.exp * 1000 > Date.now());
     }
 
     /**
@@ -133,9 +172,9 @@ class AuthClient {
      * @returns {{ email: string, user_id: number, app_id: string, issuer: string, expires_at: Date, issued_at: Date } | null}
      */
     getUser() {
-        if (!this.#tokens?.access_token) return null;
+        const p = this.#sessionPayload;
+        if (!p) return null;
         try {
-            const p = AuthClient.#decodeJWT(this.#tokens.access_token);
             return Object.freeze({
                 email:      p.sub,
                 user_id:    p.user_id,
@@ -155,7 +194,8 @@ class AuthClient {
      * @returns {string | null}
      */
     getAccessToken() {
-        return this.#tokens?.access_token || null;
+        // Access token is intentionally HttpOnly cookie scoped by the auth proxy.
+        return null;
     }
 
     /**
@@ -164,22 +204,20 @@ class AuthClient {
      * @returns {Promise<boolean>} true if refresh succeeded
      */
     async refreshAccessToken() {
-        if (!this.#tokens?.refresh_token) return false;
         try {
-            const res = await fetch(this.#authServer + '/token/refresh', {
+            const res = await this.#fetchAuth('/token/refresh', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refresh_token: this.#tokens.refresh_token }),
+                body: JSON.stringify({}),
             });
             if (res.ok) {
-                const data = await res.json();
-                this.#tokens.access_token = data.access_token;
-                this.#saveSession();
-                return true;
+                const payload = await this.verifyToken();
+                return Boolean(payload);
             }
         } catch (err) {
             console.error('[AuthClient] Token refresh failed:', err.message);
         }
+        this.#clearSession();
         return false;
     }
 
@@ -188,18 +226,38 @@ class AuthClient {
      * @returns {Promise<Object | null>} decoded payload or null
      */
     async verifyToken() {
-        if (!this.#tokens?.access_token) return null;
         try {
-            const res = await fetch(this.#authServer + '/token/verify', {
+            const res = await this.#fetchAuth('/token/verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: this.#tokens.access_token }),
+                body: JSON.stringify({}),
             });
-            return await res.json();
+            if (!res.ok) return null;
+            const data = await res.json();
+            const payload = (data && typeof data === 'object' && data.payload) ? data.payload : data;
+            if (!payload || typeof payload !== 'object') return null;
+            this.#sessionPayload = payload;
+            return payload;
         } catch (err) {
             console.error('[AuthClient] Token verify failed:', err.message);
+            this.#sessionPayload = null;
             return null;
         }
+    }
+
+    /**
+     * Restore session state from HttpOnly cookies via server-side token verification.
+     * @returns {Promise<boolean>} true when an authenticated session exists
+     */
+    async restoreSession() {
+        const payload = await this.verifyToken();
+        if (payload) {
+            this.#startSessionMonitor();
+            this.#startSessionStream();
+            return true;
+        }
+        this.#clearSession();
+        return false;
     }
 
     /**
@@ -254,9 +312,9 @@ class AuthClient {
         window.history.replaceState({}, document.title, window.location.pathname);
         this.#cleanupOAuthParams();
 
-        // Exchange authorization code for tokens
+        // Exchange authorization code for server-side cookie session.
         try {
-            const res = await fetch(this.#authServer + '/oauth/token', {
+            const res = await this.#fetchAuth('/oauth/token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -268,23 +326,31 @@ class AuthClient {
                 }),
             });
 
-            const data = await res.json();
+            let data = {};
+            const rawBody = await res.text();
+            try {
+                data = rawBody ? JSON.parse(rawBody) : {};
+            } catch {
+                data = { detail: rawBody || `HTTP ${res.status}` };
+            }
+
             if (!res.ok) {
                 console.error('[AuthClient] Token exchange failed:', data.detail);
                 return false;
             }
 
-            this.#tokens = {
-                access_token:  data.access_token,
-                refresh_token: data.refresh_token,
-            };
-            this.#saveSession();
-            this.#startSessionMonitor();
-            this.#startSessionStream();
-            if (this.#onAuthChangeCb) this.#onAuthChangeCb(true);
-            return true;
+            const restored = await this.restoreSession();
+            if (restored && this.#onAuthChangeCb) this.#onAuthChangeCb(true);
+            return restored;
         } catch (err) {
-            console.error('[AuthClient] Token exchange error:', err.message);
+            const from = window.location.origin;
+            console.error('[AuthClient] Token exchange error:', err.message, {
+                authServer: this.#authServer,
+                proxyPath: this.#authProxyPath || null,
+                redirectUri: this.#redirectUri,
+                browserOrigin: from,
+                hint: 'If using trycloudflare, ensure tunnel URLs are current and restart your app after env changes.',
+            });
             return false;
         }
     }
@@ -306,13 +372,8 @@ class AuthClient {
      * @returns {number}
      */
     getTimeUntilExpiry() {
-        if (!this.#tokens?.access_token) return 0;
-        try {
-            const p = AuthClient.#decodeJWT(this.#tokens.access_token);
-            return Math.max(0, Math.floor((p.exp * 1000 - Date.now()) / 1000));
-        } catch {
-            return 0;
-        }
+        if (!this.#sessionPayload?.exp) return 0;
+        return Math.max(0, Math.floor((this.#sessionPayload.exp * 1000 - Date.now()) / 1000));
     }
 
 
@@ -320,7 +381,7 @@ class AuthClient {
      *  PRIVATE — OAuth Flow
      * ===================================================== */
 
-    async #startOAuthFlow() {
+    async #startOAuthFlow(options = {}) {
         const codeVerifier  = AuthClient.#generateRandom(32);
         const codeChallenge = await AuthClient.#sha256Base64Url(codeVerifier);
         const state         = AuthClient.#generateRandom(16);
@@ -335,30 +396,22 @@ class AuthClient {
             state,
             code_challenge:        codeChallenge,
             code_challenge_method: 'S256',
+            // NOTE: We do NOT pass prompt=login here — silent SSO should work
+            // when the user already has a valid platform_sso cookie.
+            // Logout clears the cookie via GET /oauth/logout, which ensures
+            // the NEXT login after sign-out will show the login form.
         });
+        const prompt = AuthClient.#clean(options.prompt);
+        if (prompt) qs.set('prompt', prompt);
+        const loginHint = AuthClient.#clean(options.login_hint || options.loginHint);
+        if (loginHint) qs.set('login_hint', loginHint);
 
         window.location.href = this.#authServer + '/oauth/authorize?' + qs;
     }
 
 
-    /* =====================================================
-     *  PRIVATE — Session Storage
-     * ===================================================== */
-
-    #loadSession() {
-        try {
-            const raw = sessionStorage.getItem('_auth_tokens');
-            if (raw) this.#tokens = JSON.parse(raw);
-        } catch { /* corrupted — ignore */ }
-    }
-
-    #saveSession() {
-        sessionStorage.setItem('_auth_tokens', JSON.stringify(this.#tokens));
-    }
-
     #clearSession() {
-        this.#tokens = null;
-        sessionStorage.removeItem('_auth_tokens');
+        this.#sessionPayload = null;
         this.#stopSessionMonitor();
         this.#stopSessionStream();
     }
@@ -402,11 +455,11 @@ class AuthClient {
 
     #startSessionStream() {
         this.#stopSessionStream();
-        if (!this.#tokens?.access_token) return;
+        if (!this.isAuthenticated()) return;
         if (typeof EventSource === 'undefined') return;
 
-        const url = this.#authServer + '/token/session-stream?token=' + encodeURIComponent(this.#tokens.access_token);
-        this.#eventSource = new EventSource(url);
+        const streamUrl = this.#resolveApiUrl('/token/session-stream');
+        this.#eventSource = new EventSource(streamUrl);
 
         this.#eventSource.addEventListener('revoked', () => {
             this.#stopSessionStream();
@@ -442,6 +495,11 @@ class AuthClient {
         return AuthClient.#base64Url(arr);
     }
 
+    static #clean(value) {
+        if (value == null) return '';
+        return String(value).trim().replace(/^['"]|['"]$/g, '');
+    }
+
     static async #sha256Base64Url(plain) {
         const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(plain));
         return AuthClient.#base64Url(new Uint8Array(digest));
@@ -460,11 +518,52 @@ class AuthClient {
         );
         return JSON.parse(json);
     }
+
+    #resolveApiUrl(path) {
+        const normalized = String(path || '').startsWith('/') ? String(path) : `/${String(path || '')}`;
+        if (this.#authProxyPath) return `${this.#authProxyPath}${normalized}`;
+        return this.#authServer + normalized;
+    }
+
+    async #fetchAuth(path, init) {
+        const normalized = String(path || '').startsWith('/') ? String(path) : `/${String(path || '')}`;
+        const primaryUrl = this.#resolveApiUrl(normalized);
+        const fallbackUrl = this.#authProxyPath ? (this.#authServer + normalized) : '';
+        const shouldFallbackByStatus = (status) => [404, 405, 501, 502, 503].includes(status);
+        const requestInit = {
+            credentials: 'include',
+            ...(init || {}),
+        };
+
+        try {
+            const primaryRes = await fetch(primaryUrl, requestInit);
+            if (fallbackUrl && primaryUrl !== fallbackUrl && shouldFallbackByStatus(primaryRes.status)) {
+                try {
+                    return await fetch(fallbackUrl, requestInit);
+                } catch {
+                    return primaryRes;
+                }
+            }
+            return primaryRes;
+        } catch (primaryErr) {
+            if (fallbackUrl && primaryUrl !== fallbackUrl) {
+                try {
+                    return await fetch(fallbackUrl, requestInit);
+                } catch (fallbackErr) {
+                    const primaryMsg = primaryErr?.message || 'Primary fetch failed';
+                    const fallbackMsg = fallbackErr?.message || 'Fallback fetch failed';
+                    throw new Error(
+                        `${primaryMsg} (primary: ${primaryUrl}); ${fallbackMsg} (fallback: ${fallbackUrl})`
+                    );
+                }
+            }
+            throw primaryErr;
+        }
+    }
 }
 
 
 /* =====================================================
  *  Export for ES modules (Next.js / Vite / etc.)
-
  * ===================================================== */
 export default AuthClient;

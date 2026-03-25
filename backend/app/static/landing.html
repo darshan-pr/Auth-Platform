@@ -668,8 +668,8 @@
       <div class="hero-copy">
         <h1>Build auth once.<br><span>Keep control forever.</span></h1>
         <p class="hero-text">
-          Auth Platform gives your team a practical identity layer: hosted login, OAuth 2.0 with PKCE,
-          RS256 JWT sessions, OTP verification, and app-level isolation managed from one dashboard.
+          Auth Platform gives your team a complete identity layer: hosted OAuth login, consent screens,
+          OAuth 2.0 + PKCE, passkeys (WebAuthn), admin MFA, RS256 JWT sessions, and real-time session revocation from one self-hosted control plane.
         </p>
         <div class="hero-actions">
           <a href="/login" class="btn btn-primary">Open Dashboard</a>
@@ -677,7 +677,9 @@
         </div>
         <div class="hero-meta">
           <span>OAuth 2.0 + PKCE</span>
-          <span>RS256 tokens</span>
+          <span>Passkeys + MFA</span>
+          <span>RS256 + DPoP-ready</span>
+          <span>Real-time revocation</span>
           <span>Multi-tenant apps</span>
         </div>
       </div>
@@ -688,21 +690,21 @@
             <span class="step-num">1</span>
             <div>
               <strong>Create an application</strong>
-              <p>Generate a client ID and define allowed redirect URIs.</p>
+              <p>Generate client credentials, set redirect URI allowlists, and keep each app isolated by tenant.</p>
             </div>
           </li>
           <li>
             <span class="step-num">2</span>
             <div>
               <strong>Set auth policy</strong>
-              <p>Configure OTP, passkeys, login notifications, and token expiry.</p>
+              <p>Enable OAuth SSO, OTP, passkeys, login alerts, force-logout alerts, and token/session lifetimes.</p>
             </div>
           </li>
           <li>
             <span class="step-num">3</span>
             <div>
               <strong>Integrate in frontend</strong>
-              <p>Drop in the SDK and redirect users to the hosted login flow.</p>
+              <p>Drop in the SDK, handle callback, and get automatic refresh plus instant revocation handling.</p>
             </div>
           </li>
         </ol>
@@ -713,13 +715,13 @@
   <!-- FLOW TAGLINE — hidden on mobile via CSS -->
   <div class="flow-arc-wrap">
     <div class="flow-arc-row">
-      <div class="flow-step"><span class="num">1</span><span class="step-label">Register</span></div>
+      <div class="flow-step"><span class="num">1</span><span class="step-label">Create App</span></div>
       <span class="flow-arrow">→</span>
-      <div class="flow-step"><span class="num">2</span><span class="step-label">Download SDK</span></div>
+      <div class="flow-step"><span class="num">2</span><span class="step-label">Set Security Policy</span></div>
       <span class="flow-arrow">→</span>
-      <div class="flow-step"><span class="num">3</span><span class="step-label">Paste Prompt</span></div>
+      <div class="flow-step"><span class="num">3</span><span class="step-label">Integrate SDK</span></div>
       <span class="flow-arrow">→</span>
-      <div class="flow-step"><span class="num">4</span><span class="step-label">Done</span></div>
+      <div class="flow-step"><span class="num">4</span><span class="step-label">Monitor Activity</span></div>
     </div>
   </div>
 
@@ -730,24 +732,24 @@
       <div class="trust-inner">
         <div class="reveal">
           <p class="section-label">Built for teams</p>
-          <p class="section-sub">Designed for product teams, platform engineers, and security-conscious startups that need control without rebuilding auth from scratch. Own your stack completely.</p>
+          <p class="section-sub">Designed for product teams, platform engineers, and security-conscious startups that want modern identity controls without outsourcing core auth. Own the stack, policy, and user data.</p>
         </div>
         <div class="trust-stats reveal reveal-d1">
           <div class="stat-card">
-            <div class="stat-num">OAuth 2.0</div>
-            <div class="stat-label">with PKCE by default</div>
+            <div class="stat-num">OAuth + PKCE</div>
+            <div class="stat-label">secure code flow by default</div>
           </div>
           <div class="stat-card">
             <div class="stat-num">RS256</div>
-            <div class="stat-label">signed JWT sessions</div>
+            <div class="stat-label">JWTs with optional DPoP support</div>
           </div>
           <div class="stat-card">
-            <div class="stat-num">Multi</div>
-            <div class="stat-label">tenant app isolation</div>
+            <div class="stat-num">WebAuthn</div>
+            <div class="stat-label">passkeys plus admin MFA</div>
           </div>
           <div class="stat-card">
-            <div class="stat-num">Self</div>
-            <div class="stat-label">hosted, your infra</div>
+            <div class="stat-num">SSE</div>
+            <div class="stat-label">instant force-logout revocation</div>
           </div>
         </div>
       </div>
@@ -758,23 +760,38 @@
       <div class="features-inner">
         <div class="features-header reveal">
           <p class="section-label">Capabilities</p>
-          <h2 class="section-title">Everything identity.<br>Nothing you don't need.</h2>
+          <h2 class="section-title">Modern auth surface.<br>Operational security built in.</h2>
         </div>
         <div class="features-grid">
           <article class="feat reveal">
             <div class="feat-icon">🔒</div>
-            <h3>Hosted login that your app can trust</h3>
-            <p>Users sign in through a dedicated flow while your frontend receives standards-based authorization codes and secure tokens.</p>
+            <h3>Hosted OAuth login + consent</h3>
+            <p>Ship a dedicated sign-in and consent flow where your app receives standards-based authorization codes and secure tokens.</p>
           </article>
           <article class="feat reveal reveal-d1">
             <div class="feat-icon">🌐</div>
-            <h3>Per-app tenancy and policy boundaries</h3>
-            <p>Each application keeps separate users, redirect URIs, and session settings so teams can ship safely across environments.</p>
+            <h3>Per-app policy controls</h3>
+            <p>Configure OAuth SSO toggle, OTP, passkeys, redirect URI allowlists, login notifications, and token/session TTL per app.</p>
           </article>
           <article class="feat reveal reveal-d2">
             <div class="feat-icon">⚙️</div>
-            <h3>Operational dashboard for real workflows</h3>
-            <p>Create apps, onboard users, rotate credentials, and inspect health without leaving your own infrastructure.</p>
+            <h3>Defense-in-depth defaults</h3>
+            <p>Use rate limits, brute-force protections, HttpOnly cookies, CSRF protection, and sender-constrained token support.</p>
+          </article>
+          <article class="feat reveal reveal-d1">
+            <div class="feat-icon">🛡️</div>
+            <h3>Passkeys and admin MFA</h3>
+            <p>Enable WebAuthn passkeys for stronger sign-in and manage admin MFA from settings with OTP verification workflows.</p>
+          </article>
+          <article class="feat reveal reveal-d2">
+            <div class="feat-icon">⚡</div>
+            <h3>Real-time session control</h3>
+            <p>Force-logout users instantly with SSE revocation signals, plus optional user email notifications for security transparency.</p>
+          </article>
+          <article class="feat reveal reveal-d3">
+            <div class="feat-icon">📊</div>
+            <h3>Auditability and activity visibility</h3>
+            <p>Track active sessions, login history, OAuth events, and app-level activity from a single operational dashboard.</p>
           </article>
         </div>
       </div>
@@ -785,29 +802,29 @@
       <div class="details-inner">
         <div class="details-header reveal">
           <p class="section-label">Clear handoff</p>
-          <h2 class="section-title">Built for every layer of your team.</h2>
-          <p class="section-sub">Product teams get smoother sign-in. Security teams keep policy control. Developers keep a simple integration surface.</p>
+          <h2 class="section-title">Built for product velocity and security rigor.</h2>
+          <p class="section-sub">Product teams get smoother onboarding, security teams keep enforcement controls, and developers integrate with a small, stable SDK surface.</p>
         </div>
         <div class="detail-grid">
           <div class="detail-card reveal">
             <div class="tag">Layer 1</div>
             <h4>Authentication</h4>
-            <p>Hosted login, OTP, passkey-ready model — all configurable per app.</p>
+            <p>Hosted login with email/password, OTP, and passkeys (WebAuthn), including per-application OAuth SSO enablement.</p>
           </div>
           <div class="detail-card reveal reveal-d1">
             <div class="tag">Layer 2</div>
-            <h4>Token lifecycle</h4>
-            <p>RS256 JWTs, refresh tokens, configurable TTL — sensible defaults.</p>
+            <h4>Authorization + consent</h4>
+            <p>OAuth 2.0 Authorization Code with PKCE, redirect URI validation, and consent flows you can present, approve, and revoke safely.</p>
           </div>
           <div class="detail-card reveal reveal-d2">
             <div class="tag">Layer 3</div>
-            <h4>Integration</h4>
-            <p>JavaScript SDK, callback handling, session helpers. Works in &lt;5 lines.</p>
+            <h4>Token and session security</h4>
+            <p>RS256 JWT lifecycle, refresh handling, session stream revocation, force logout controls, and optional DPoP sender constraints.</p>
           </div>
           <div class="detail-card reveal reveal-d3">
             <div class="tag">Layer 4</div>
-            <h4>Control plane</h4>
-            <p>Admin dashboard for apps, users, and policies from one interface.</p>
+            <h4>Control plane and visibility</h4>
+            <p>Manage apps, users, passkeys, MFA, and security settings while monitoring active sessions and global login activity.</p>
           </div>
         </div>
       </div>
@@ -830,9 +847,9 @@
     <section class="prompt-section">
       <div class="prompt-inner">
         <div class="reveal">
-          <p class="section-label" style="display:block; margin-bottom:12px;">Zero dependencies · Drop-in · OAuth 2.0 PKCE</p>
+          <p class="section-label" style="display:block; margin-bottom:12px;">Zero dependencies · OAuth 2.0 PKCE · Revocation-aware sessions</p>
           <h2 class="section-title">Auth in &lt;5 lines.<br><em>Your users deserve it.</em></h2>
-          <p class="section-sub">One tiny JS file. No npm, no bundler, no backend changes. Paste the prompt below into your AI editor of choice.</p>
+          <p class="section-sub">One tiny JS file. No npm, no bundler, no backend rewrites. Paste the prompt below into your AI editor and wire up secure login quickly.</p>
         </div>
         <div class="prompt-box reveal reveal-d1" id="ai-prompt-box" onclick="copyPrompt()">
           <div class="prompt-bar">
@@ -852,6 +869,7 @@ I have <span class="c-fn">auth-sdk.js</span> from Auth Platform (self-hosted OAu
 <span class="prompt-point"><span class="c-kw">3.</span> Call <span class="c-fn">auth.handleCallback</span>() on page load</span>
 <span class="prompt-point"><span class="c-kw">4.</span> Show protected content if <span class="c-fn">auth.isAuthenticated</span>(), else call <span class="c-fn">auth.login</span>()</span>
 <span class="prompt-point"><span class="c-kw">5.</span> Add Logout → <span class="c-fn">auth.logout</span>() &amp; auto-refresh → <span class="c-fn">auth.startAutoRefresh</span>()</span><br>
+<span class="prompt-point"><span class="c-kw">6.</span> On auth change, handle <span class="c-str">'revoked_by_admin'</span> to force a clean re-login UX</span><br>
 <span class="c-comment"># Docs: https://your-auth-server.com/api/docs</span>
           </div>
         </div>
@@ -865,7 +883,7 @@ I have <span class="c-fn">auth-sdk.js</span> from Auth Platform (self-hosted OAu
         <div class="reveal">
           <p class="section-label">Get started</p>
           <h2 class="section-title">Start from the dashboard.<br>Scale with confidence.</h2>
-          <p class="section-sub">Use your own infrastructure, keep your own data, and iterate without identity becoming a bottleneck.</p>
+          <p class="section-sub">Use your own infrastructure, keep your own data, and ship identity with stronger defaults: consent, passkeys, MFA, revocation, and operational visibility.</p>
           <div class="cta-actions">
             <a href="/login" class="btn btn-primary">Go to Dashboard</a>
             <a href="/api/docs" class="btn btn-light">Read the Docs</a>
@@ -877,29 +895,29 @@ I have <span class="c-fn">auth-sdk.js</span> from Auth Platform (self-hosted OAu
             <div class="cta-step">
               <div class="cta-step-num">1</div>
               <div class="cta-step-text">
-                <strong>Register</strong>
-                <span>Create your admin account and set up the platform.</span>
+                <strong>Create tenant</strong>
+                <span>Set up your admin account and bootstrap your identity workspace.</span>
               </div>
             </div>
             <div class="cta-step">
               <div class="cta-step-num">2</div>
               <div class="cta-step-text">
-                <strong>Download SDK</strong>
-                <span>Grab auth-sdk.js — no build step needed.</span>
+                <strong>Register app</strong>
+                <span>Add redirect URIs and generate OAuth credentials for your client.</span>
               </div>
             </div>
             <div class="cta-step">
               <div class="cta-step-num">3</div>
               <div class="cta-step-text">
-                <strong>Paste Prompt</strong>
-                <span>Drop the AI prompt into Copilot, Cursor, or Claude.</span>
+                <strong>Set security policy</strong>
+                <span>Configure OTP, passkeys, notifications, and token/session settings per app.</span>
               </div>
             </div>
             <div class="cta-step">
               <div class="cta-step-num">4</div>
               <div class="cta-step-text">
-                <strong>Done</strong>
-                <span>Your users can sign in. You own the whole stack.</span>
+                <strong>Integrate and launch</strong>
+                <span>Wire the SDK, handle callback/revocation events, and ship with confidence.</span>
               </div>
             </div>
           </div>

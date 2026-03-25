@@ -11,6 +11,9 @@ class LoginEvent(Base):
     app_id = Column(String, nullable=True, index=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True, index=True)
     event_type = Column(String, nullable=False, index=True)  # "login", "signup", "oauth_login", "admin_login", "failed_login"
+    user_agent = Column(String, nullable=True)
+    browser = Column(String, nullable=True)
+    device = Column(String, nullable=True)
 
     # IP & Location
     ip_address = Column(String, nullable=True)

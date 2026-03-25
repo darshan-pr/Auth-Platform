@@ -2,10 +2,31 @@ import bcrypt
 import secrets
 from app.redis import redis_client
 import logging
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 RESET_TOKEN_EXPIRY_SECONDS = 600  # 10 minutes
+
+
+def validate_password_strength(password: str) -> Optional[str]:
+    """Return a validation error message if password is weak, else None."""
+    if len(password) < 8:
+        return "Password must be at least 8 characters long"
+    if not any(c.isupper() for c in password):
+        return "Password must contain at least one uppercase letter"
+    if not any(c.islower() for c in password):
+        return "Password must contain at least one lowercase letter"
+    if not any(c.isdigit() for c in password):
+        return "Password must contain at least one digit"
+    return None
+
+
+def enforce_password_strength(password: str) -> None:
+    """Raise ValueError when password does not meet policy."""
+    error = validate_password_strength(password)
+    if error:
+        raise ValueError(error)
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt"""

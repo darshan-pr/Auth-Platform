@@ -224,24 +224,51 @@ class TestDPoPService:
         assert result is None  # Should be rejected
 
     def test_validate_dpop_proof_accepts_valid_structure(self):
-        """DPoP proof with valid structure should return proof data"""
+        """DPoP proof with a real cryptographic signature should return proof data"""
         from app.services.dpop_service import validate_dpop_proof
+        import jwt as pyjwt
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.backends import default_backend
+        from cryptography.hazmat.primitives import serialization
+        import uuid
 
-        header = base64.urlsafe_b64encode(json.dumps({
+        # Generate a real RSA keypair
+        private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+            backend=default_backend(),
+        )
+        public_key = private_key.public_key()
+
+        # Export public key numbers to build the JWK
+        pub_numbers = public_key.public_numbers()
+
+        def int_to_base64url(n: int) -> str:
+            length = (n.bit_length() + 7) // 8
+            return base64.urlsafe_b64encode(n.to_bytes(length, 'big')).rstrip(b'=').decode()
+
+        jwk = {
+            "kty": "RSA",
+            "alg": "RS256",
+            "n": int_to_base64url(pub_numbers.n),
+            "e": int_to_base64url(pub_numbers.e),
+        }
+
+        # Build the DPoP header and payload, then sign with PyJWT
+        headers = {
             "typ": "dpop+jwt",
             "alg": "RS256",
-            "jwk": {"kty": "RSA", "n": "abc", "e": "AQAB"}
-        }).encode()).rstrip(b"=").decode()
-        payload = base64.urlsafe_b64encode(json.dumps({
+            "jwk": jwk,
+        }
+        claims = {
             "htm": "POST",
             "htu": "http://localhost/oauth/token",
             "iat": int(time.time()),
-            "jti": "unique-id-789",
-        }).encode()).rstrip(b"=").decode()
-        signature = base64.urlsafe_b64encode(b"fakesig").rstrip(b"=").decode()
+            "jti": str(uuid.uuid4()),
+        }
+        dpop_token = pyjwt.encode(claims, private_key, algorithm="RS256", headers=headers)
 
-        dpop = f"{header}.{payload}.{signature}"
-        result = validate_dpop_proof(dpop, "POST", "http://localhost/oauth/token")
+        result = validate_dpop_proof(dpop_token, "POST", "http://localhost/oauth/token")
         assert result is not None
         assert "jkt" in result
         assert "jwk" in result

@@ -7,52 +7,105 @@ from cryptography.hazmat.backends import default_backend
 from app.config import settings
 import os
 from pathlib import Path
+import logging
 
-# Key storage directory - use /tmp on Railway (read-only filesystem)
-_default_keys_dir = Path(__file__).resolve().parent.parent.parent / "keys"
-if os.getenv("RAILWAY_ENVIRONMENT"):
-    KEYS_DIR = Path("/tmp/keys")
-else:
-    KEYS_DIR = _default_keys_dir
+logger = logging.getLogger(__name__)
+
+# Key storage directory - defaults to repo `backend/keys`, with Railway fallback.
+_DEFAULT_KEYS_DIR = Path(__file__).resolve().parent.parent.parent / "keys"
+
+
+def _resolve_keys_dir() -> Path:
+    configured = (getattr(settings, "JWT_KEYS_DIR", None) or "").strip()
+    if configured:
+        return Path(configured).expanduser()
+    if os.getenv("RAILWAY_ENVIRONMENT"):
+        return Path("/tmp/keys")
+    return _DEFAULT_KEYS_DIR
+
+
+KEYS_DIR = _resolve_keys_dir()
 PRIVATE_KEY_PATH = KEYS_DIR / "private_key.pem"
 PUBLIC_KEY_PATH = KEYS_DIR / "public_key.pem"
 
-def _load_or_generate_keys():
-    """Load existing keys or generate new ones"""
-    KEYS_DIR.mkdir(exist_ok=True)
-    
-    if PRIVATE_KEY_PATH.exists() and PUBLIC_KEY_PATH.exists():
-        # Load existing keys
-        with open(PRIVATE_KEY_PATH, "rb") as f:
-            private_key = serialization.load_pem_private_key(
-                f.read(), password=None, backend=default_backend()
-            )
-        with open(PUBLIC_KEY_PATH, "rb") as f:
-            public_key = serialization.load_pem_public_key(
-                f.read(), backend=default_backend()
-            )
-    else:
-        # Generate new keys
-        private_key = rsa.generate_private_key(
-            public_exponent=65537, 
-            key_size=2048,
-            backend=default_backend()
+
+def _load_keys_from_env() -> Optional[tuple[object, object]]:
+    private_pem = (getattr(settings, "JWT_PRIVATE_KEY_PEM", None) or "").strip()
+    public_pem = (getattr(settings, "JWT_PUBLIC_KEY_PEM", None) or "").strip()
+
+    if not private_pem and not public_pem:
+        return None
+    if not private_pem or not public_pem:
+        raise RuntimeError("Both JWT_PRIVATE_KEY_PEM and JWT_PUBLIC_KEY_PEM must be provided together.")
+
+    private_key = serialization.load_pem_private_key(
+        private_pem.encode("utf-8"),
+        password=None,
+        backend=default_backend(),
+    )
+    public_key = serialization.load_pem_public_key(
+        public_pem.encode("utf-8"),
+        backend=default_backend(),
+    )
+    logger.info("Loaded JWT signing keys from environment variables.")
+    return private_key, public_key
+
+
+def _load_keys_from_disk() -> Optional[tuple[object, object]]:
+    if not (PRIVATE_KEY_PATH.exists() and PUBLIC_KEY_PATH.exists()):
+        return None
+
+    with open(PRIVATE_KEY_PATH, "rb") as f:
+        private_key = serialization.load_pem_private_key(
+            f.read(), password=None, backend=default_backend()
         )
-        public_key = private_key.public_key()
-        
-        # Save keys
-        with open(PRIVATE_KEY_PATH, "wb") as f:
-            f.write(private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.PKCS8,
-                encryption_algorithm=serialization.NoEncryption()
-            ))
-        with open(PUBLIC_KEY_PATH, "wb") as f:
-            f.write(public_key.public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo
-            ))
-    
+    with open(PUBLIC_KEY_PATH, "rb") as f:
+        public_key = serialization.load_pem_public_key(
+            f.read(), backend=default_backend()
+        )
+    logger.info("Loaded JWT signing keys from %s", KEYS_DIR)
+    return private_key, public_key
+
+
+def _persist_keys(private_key, public_key) -> None:
+    KEYS_DIR.mkdir(parents=True, exist_ok=True)
+    with open(PRIVATE_KEY_PATH, "wb") as f:
+        f.write(private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        ))
+    with open(PUBLIC_KEY_PATH, "wb") as f:
+        f.write(public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        ))
+
+
+def _load_or_generate_keys():
+    """Load existing keys, then fall back to generating new ones."""
+    env_keys = _load_keys_from_env()
+    if env_keys:
+        return env_keys
+
+    disk_keys = _load_keys_from_disk()
+    if disk_keys:
+        return disk_keys
+
+    if settings.IS_PRODUCTION and getattr(settings, "REQUIRE_PERSISTENT_JWT_KEYS", False):
+        raise RuntimeError(
+            "No JWT key material found. Configure JWT_PRIVATE_KEY_PEM/JWT_PUBLIC_KEY_PEM "
+            "or mount persistent key files."
+        )
+
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend()
+    )
+    public_key = private_key.public_key()
+    _persist_keys(private_key, public_key)
+    logger.warning("Generated new JWT signing keys at %s", KEYS_DIR)
     return private_key, public_key
 
 PRIVATE_KEY, PUBLIC_KEY = _load_or_generate_keys()
@@ -137,15 +190,36 @@ def refresh_token(db, refresh_token_str: str) -> dict:
     }
 
 def revoke_token(db, token: str) -> dict:
-    """Revoke a token — blacklists the user so all their tokens are rejected."""
-    payload = verify_token(token)
-    if not payload:
+    """Revoke a token — blacklists the user so all their tokens are rejected.
+
+    Decodes the token WITHOUT expiry verification so we can still extract
+    user_id/tenant_id and call force_user_offline() even for expired tokens.
+    This prevents the bug where an expired token returns None from verify_token()
+    and the user never gets blacklisted.
+    """
+    try:
+        # Decode ignoring expiry to always get the claims
+        payload = jwt.decode(
+            token,
+            PUBLIC_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
+            options={
+                "verify_exp": False,
+                "verify_aud": False,
+            },
+            issuer=settings.JWT_ISSUER,
+        )
+    except jwt.InvalidTokenError:
+        # Token is malformed (bad signature, wrong format, etc.) — truly invalid
         return {"message": "Token already invalid"}
+
     uid = payload.get("user_id")
     tid = payload.get("tenant_id")
     if uid and tid:
         force_user_offline(uid, tid)
-    return {"message": "Token revoked — user has been force-logged-out"}
+        return {"message": "Token revoked — user has been force-logged-out"}
+
+    return {"message": "Token revoked"}
 
 
 # ============== Online Presence (Redis) ==============
@@ -168,6 +242,32 @@ def is_user_online(user_id: int, tenant_id: int) -> bool:
         return redis_client.exists(key) == 1
     except Exception:
         return False
+
+
+def get_online_status_map(user_ids: list[int], tenant_id: int) -> dict[int, bool]:
+    """Return online status for many users with a single Redis round-trip when possible."""
+    if not user_ids:
+        return {}
+
+    try:
+        from app.redis import redis_client
+        keys = [f"user_online:{tenant_id}:{uid}" for uid in user_ids]
+        mget = getattr(redis_client, "mget", None)
+        if callable(mget):
+            values = mget(keys)
+            return {
+                uid: bool(value)
+                for uid, value in zip(user_ids, values)
+            }
+        return {uid: redis_client.exists(key) == 1 for uid, key in zip(user_ids, keys)}
+    except Exception:
+        return {uid: False for uid in user_ids}
+
+
+def count_online_users(user_ids: list[int], tenant_id: int) -> int:
+    """Count online users for a tenant from a list of user IDs."""
+    status_map = get_online_status_map(user_ids, tenant_id)
+    return sum(1 for is_online in status_map.values() if is_online)
 
 
 def force_user_offline(user_id: int, tenant_id: int):
@@ -203,4 +303,3 @@ def clear_user_blacklist(user_id: int, tenant_id: int):
         redis_client.delete(bl_key)
     except Exception:
         pass
-
