@@ -7,6 +7,22 @@ from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
 
 
+def _extract_oauth_session_id_from_html(html: str) -> str | None:
+    # Legacy template pattern:
+    #   const SESSION_ID = "..."
+    legacy_match = re.search(r'const SESSION_ID = "([^"]+)"', html)
+    if legacy_match:
+        return legacy_match.group(1)
+
+    # Current runtime-config pattern:
+    #   SESSION_ID: "..."
+    runtime_match = re.search(r'SESSION_ID:\s*"([^"]+)"', html)
+    if runtime_match:
+        return runtime_match.group(1)
+
+    return None
+
+
 def _login_admin_session(client):
     response = client.post(
         "/admin/login",
@@ -130,9 +146,8 @@ def test_oauth_disabled_app_login_completes_without_consent_screen(client, admin
     )
     assert authorize.status_code == 200
 
-    session_match = re.search(r'const SESSION_ID = "([^"]+)"', authorize.text)
-    assert session_match, "Expected OAuth session_id in hosted login page"
-    session_id = session_match.group(1)
+    session_id = _extract_oauth_session_id_from_html(authorize.text)
+    assert session_id, "Expected OAuth session_id in hosted login page"
 
     login = client.post(
         "/oauth/authenticate",
