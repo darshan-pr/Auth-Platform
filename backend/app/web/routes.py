@@ -66,6 +66,7 @@ async def admin_login_page(request: Request, oauth_warning: Optional[str] = None
     """Serve the admin login/register page."""
     return _with_no_cache_headers(
         _templates.TemplateResponse(
+            request,
             "admin_auth.html",
             {
                 "request": request,
@@ -93,7 +94,7 @@ async def admin_settings_page(request: Request):
         resp.delete_cookie("admin_token", path="/")
         return resp
 
-    return _with_no_cache_headers(_templates.TemplateResponse("admin_settings.html", {"request": request}))
+    return _with_no_cache_headers(_templates.TemplateResponse(request, "admin_settings.html", {"request": request}))
 
 
 @router.get("/reset-password", response_class=HTMLResponse)
@@ -117,12 +118,12 @@ async def reset_password_page(
 
     if not token or not email or not app_id:
         error_ctx["error"] = "This link is invalid or incomplete. Please check the link in your email."
-        return _with_no_cache_headers(_templates.TemplateResponse("reset_password.html", error_ctx))
+        return _with_no_cache_headers(_templates.TemplateResponse(request, "reset_password.html", error_ctx))
 
     app_obj = db.query(App).filter(App.app_id == app_id).first()
     if not app_obj:
         error_ctx["error"] = "The application associated with this link is no longer available."
-        return _with_no_cache_headers(_templates.TemplateResponse("reset_password.html", error_ctx))
+        return _with_no_cache_headers(_templates.TemplateResponse(request, "reset_password.html", error_ctx))
 
     app_name = app_obj.name or "Application"
     app_signin_url = infer_app_signin_url(app_obj.redirect_uris)
@@ -130,6 +131,7 @@ async def reset_password_page(
 
     return _with_no_cache_headers(
         _templates.TemplateResponse(
+            request,
             "reset_password.html",
             {
                 "request": request,

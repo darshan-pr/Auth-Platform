@@ -1,0 +1,57 @@
+# ============================================================
+#  Auth Platform Backend — Production Dockerfile
+#  Gunicorn + Uvicorn Workers (NOT raw uvicorn)
+# ============================================================
+
+FROM python:3.11-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# System dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       gcc \
+       libpq-dev \
+       curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python dependencies (cached layer)
+COPY backend/requirements.txt /app/requirements.txt
+RUN pip install --upgrade pip \
+    && pip install -r /app/requirements.txt
+
+# Application code
+COPY backend /app
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash appuser \
+    && chown -R appuser:appuser /app
+
+USER appuser
+
+EXPOSE 8000
+
+# Health check — uses Python stdlib (no curl needed as appuser)
+HEALTHCHECK --interval=10s --timeout=5s --retries=10 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+
+# ── Gunicorn + Uvicorn Workers ──
+# - Workers: CPU cores × 2 + 1 (configurable via GUNICORN_WORKERS env)
+# - Graceful timeout: 120s (for SSE long-poll connections)
+# - Keep-alive: 5s (Nginx upstream keepalive)
+# - Access log: stdout (Docker captures it)
+CMD ["gunicorn", "app.main:app", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--workers", "4", \
+     "--bind", "0.0.0.0:8000", \
+     "--timeout", "120", \
+     "--graceful-timeout", "30", \
+     "--keep-alive", "5", \
+     "--log-level", "info", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--capture-output"]

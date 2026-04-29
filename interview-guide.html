@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Auth Platform — SDE-3 Interview Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0f;--surface:#12121a;--card:#1a1a2e;--border:#2a2a3e;--accent:#6c5ce7;--accent2:#00cec9;--accent3:#fd79a8;--text:#e2e2e8;--text-dim:#8888a0;--green:#00b894;--orange:#fdcb6e;--red:#d63031;--code-bg:#0d0d14;--radius:12px}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;padding:0}
+.hero{background:linear-gradient(135deg,#0a0a1a 0%,#1a0a2e 30%,#0a1a2e 70%,#0a0a1a 100%);padding:60px 20px;text-align:center;border-bottom:1px solid var(--border);position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 30% 50%,rgba(108,92,231,.08) 0%,transparent 50%),radial-gradient(circle at 70% 50%,rgba(0,206,201,.06) 0%,transparent 50%);animation:pulse 8s ease-in-out infinite alternate}
+@keyframes pulse{0%{opacity:.5;transform:scale(1)}100%{opacity:1;transform:scale(1.05)}}
+.hero h1{font-size:2.4rem;font-weight:800;background:linear-gradient(135deg,#6c5ce7,#00cec9,#fd79a8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px;position:relative}
+.hero p{color:var(--text-dim);font-size:1.05rem;position:relative}
+.badge-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:18px;position:relative}
+.badge{padding:5px 14px;border-radius:20px;font-size:.75rem;font-weight:600;border:1px solid var(--border);background:rgba(255,255,255,.03)}
+.container{max-width:900px;margin:0 auto;padding:30px 20px 60px}
+.toc{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px 28px;margin-bottom:36px}
+.toc h2{font-size:1.1rem;color:var(--accent);margin-bottom:14px;text-transform:uppercase;letter-spacing:1px}
+.toc ol{padding-left:20px}.toc li{margin:6px 0}
+.toc a{color:var(--accent2);text-decoration:none;font-weight:500;transition:color .2s}.toc a:hover{color:#fff}
+.section-title{font-size:1.5rem;font-weight:700;margin:40px 0 20px;padding-bottom:10px;border-bottom:2px solid var(--accent);display:flex;align-items:center;gap:10px}
+.section-title .icon{font-size:1.4rem}
+.qa-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:20px;overflow:hidden;transition:border-color .3s}
+.qa-card:hover{border-color:var(--accent)}
+.q-header{padding:18px 22px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
+.q-header h3{font-size:.95rem;font-weight:600;color:#fff;flex:1}
+.q-tag{font-size:.65rem;padding:3px 10px;border-radius:10px;font-weight:600;margin-left:10px;white-space:nowrap}
+.tag-core{background:rgba(108,92,231,.2);color:#a29bfe;border:1px solid rgba(108,92,231,.3)}
+.tag-project{background:rgba(0,206,201,.15);color:#81ecec;border:1px solid rgba(0,206,201,.3)}
+.tag-design{background:rgba(253,121,168,.15);color:#fab1c8;border:1px solid rgba(253,121,168,.3)}
+.tag-security{background:rgba(214,48,49,.15);color:#ff7675;border:1px solid rgba(214,48,49,.3)}
+.chevron{color:var(--text-dim);transition:transform .3s;font-size:1.2rem}
+.qa-card.open .chevron{transform:rotate(180deg)}
+.answer{display:none;padding:0 22px 22px;border-top:1px solid var(--border)}
+.qa-card.open .answer{display:block}
+.answer p,.answer li{color:var(--text);font-size:.88rem;margin:8px 0}
+.answer ul,.answer ol{padding-left:20px}
+.answer strong{color:#fff}
+.answer em{color:var(--accent2);font-style:normal}
+code{font-family:'JetBrains Mono',monospace;font-size:.8rem;background:var(--code-bg);padding:2px 7px;border-radius:4px;color:var(--orange);border:1px solid var(--border)}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:16px;overflow-x:auto;margin:12px 0}
+pre code{padding:0;border:none;background:none;color:var(--text);font-size:.8rem;line-height:1.6}
+.deep-dive{background:rgba(108,92,231,.06);border-left:3px solid var(--accent);padding:12px 16px;margin:12px 0;border-radius:0 8px 8px 0}
+.deep-dive h4{color:var(--accent);font-size:.82rem;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.deep-dive p,.deep-dive li{font-size:.82rem;color:var(--text-dim)}
+.diagram{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:16px;margin:12px 0;font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--accent2);line-height:1.5;overflow-x:auto;white-space:pre}
+</style>
+</head>
+<body>
+
+<div class="hero">
+<h1>Auth Platform — SDE-3 Interview Prep</h1>
+<p>45 questions an SDE-3 interviewer would ask about this project & core fundamentals</p>
+<div class="badge-row">
+<span class="badge" style="color:#a29bfe">FastAPI</span>
+<span class="badge" style="color:#81ecec">OAuth 2.0 + PKCE</span>
+<span class="badge" style="color:#fab1c8">RS256 JWT</span>
+<span class="badge" style="color:#ff7675">DPoP</span>
+<span class="badge" style="color:#fdcb6e">WebAuthn</span>
+<span class="badge" style="color:#55efc4">Multi-Tenant</span>
+<span class="badge" style="color:#74b9ff">Redis</span>
+</div>
+</div>
+
+<div class="container">
+
+<div class="toc">
+<h2>📋 Knowledge Areas Tested</h2>
+<ol>
+<li><a href="#s1">OAuth 2.0 & PKCE Flow</a></li>
+<li><a href="#s2">JWT, RS256 & Key Management</a></li>
+<li><a href="#s3">DPoP — Sender-Constrained Tokens</a></li>
+<li><a href="#s4">WebAuthn / Passkeys</a></li>
+<li><a href="#s5">Multi-Tenancy & Data Isolation</a></li>
+<li><a href="#s6">Security Hardening (CSRF, Rate Limiting, Brute-Force)</a></li>
+<li><a href="#s7">System Design & Architecture</a></li>
+<li><a href="#s8">Database & Redis Patterns</a></li>
+<li><a href="#s9">Python / FastAPI Internals</a></li>
+</ol>
+</div>
+
+<!-- ═══════════════════ SECTION 1 ═══════════════════ -->
+<h2 class="section-title" id="s1"><span class="icon">🔐</span> 1. OAuth 2.0 & PKCE Flow</h2>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q1: Walk me through the OAuth 2.0 Authorization Code Flow with PKCE as implemented in your project.</h3>
+<span class="q-tag tag-project">PROJECT</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Answer:</strong></p>
+<ol>
+<li><strong>Client redirects</strong> to <code>GET /oauth/authorize</code> with <code>client_id</code>, <code>redirect_uri</code>, <code>state</code>, <code>code_challenge</code>, <code>code_challenge_method=S256</code>.</li>
+<li>Server validates — checks the app exists, redirect_uri is registered (or localhost in dev), PKCE challenge is present, state is present. Creates an <em>OAuth session in Redis</em> with a session_id.</li>
+<li>Renders the <strong>hosted login page</strong> (Jinja2 template) — the client app never sees user credentials.</li>
+<li>User submits credentials via <code>POST /oauth/authenticate</code>. On success, the server generates an <strong>authorization code</strong>, stores it in Redis with the code_challenge & user info, and returns a redirect URL back to the client's <code>redirect_uri?code=...&state=...</code>.</li>
+<li>Client exchanges code via <code>POST /oauth/token</code> with <code>code + code_verifier</code>. Server computes <code>SHA256(code_verifier)</code> and compares it with the stored <code>code_challenge</code>. On match → issues <strong>RS256 JWT access + refresh tokens</strong>.</li>
+</ol>
+<div class="diagram">Client                    Auth Server                Redis
+  │                           │                        │
+  │──GET /oauth/authorize────▶│──create_oauth_session──▶│
+  │◀──HTML login page─────────│                        │
+  │                           │                        │
+  │──POST /oauth/authenticate▶│──verify creds──────────▶│
+  │◀──redirect_url(code)──────│──store auth_code───────▶│
+  │                           │                        │
+  │──POST /oauth/token────────▶│──validate_code+PKCE───▶│
+  │◀──{access_token, refresh}─│                        │</div>
+<div class="deep-dive">
+<h4>🔍 How to dig deeper</h4>
+<ul>
+<li>Why is PKCE mandatory? → Prevents authorization code interception attacks for public clients (SPAs, mobile apps) that can't securely store a client_secret.</li>
+<li>Why <code>S256</code> and not <code>plain</code>? → Plain method sends verifier = challenge, making interception trivial. S256 is one-way hash.</li>
+<li>Ask about the <em>consent screen</em> flow — the project has a dedicated <code>/oauth/consent</code> endpoint.</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q2: Why does your project store OAuth sessions in Redis instead of the database?</h3>
+<span class="q-tag tag-design">DESIGN</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Answer:</strong> OAuth sessions are <strong>ephemeral</strong> — they live only for the duration of the authorization flow (typically &lt;5 minutes). Storing them in Redis provides:</p>
+<ul>
+<li><strong>Automatic expiry</strong> via TTL — no cleanup cron needed</li>
+<li><strong>Sub-millisecond reads</strong> during the code exchange, critical for user-facing latency</li>
+<li><strong>No schema migrations</strong> needed for session structure changes</li>
+<li><strong>Atomicity</strong> — Redis <code>SETEX</code> is atomic; no transaction overhead</li>
+</ul>
+<p>The database is reserved for <em>durable state</em>: users, apps, tenants, consent records, login events.</p>
+<div class="deep-dive">
+<h4>🔍 How to dig deeper</h4>
+<p>Ask: "What happens if Redis goes down mid-flow?" → The session is lost; user must restart. This is acceptable because the flow is short-lived. For critical data (e.g., user records), PostgreSQL provides durability.</p>
+</div>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q3: Explain the Silent SSO mechanism in your /oauth/authorize endpoint.</h3>
+<span class="q-tag tag-project">PROJECT</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Answer:</strong> When a user has already authenticated, a <code>platform_sso</code> HttpOnly cookie is set. On subsequent <code>/oauth/authorize</code> calls:</p>
+<ol>
+<li>Server reads the <code>platform_sso</code> cookie and verifies the JWT inside it.</li>
+<li>Checks the <code>type == "platform_sso"</code> and that the tenant_id matches the requesting app.</li>
+<li>If valid → <strong>skips the login page entirely</strong>, binds the OAuth session to the existing user, and redirects straight to the <em>consent page</em>.</li>
+<li>The <code>prompt</code> parameter can override this: <code>prompt=login</code> forces re-authentication, <code>prompt=consent</code> forces the consent screen.</li>
+</ol>
+<p>This mirrors how Google/Okta SSO works — once signed in, other apps under the same tenant get seamless access.</p>
+</div>
+</div>
+
+<!-- ═══════════════════ SECTION 2 ═══════════════════ -->
+<h2 class="section-title" id="s2"><span class="icon">🪙</span> 2. JWT, RS256 & Key Management</h2>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q4: Why RS256 over HS256 for JWTs? What are the trade-offs?</h3>
+<span class="q-tag tag-core">CORE</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Answer:</strong></p>
+<table style="width:100%;border-collapse:collapse;margin:10px 0">
+<tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:8px;color:var(--accent)">Aspect</th><th style="text-align:left;padding:8px;color:var(--accent2)">HS256 (Symmetric)</th><th style="text-align:left;padding:8px;color:var(--accent3)">RS256 (Asymmetric)</th></tr>
+<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px">Key</td><td style="padding:8px">Shared secret</td><td style="padding:8px">Private key signs, public key verifies</td></tr>
+<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px">Who can verify?</td><td style="padding:8px">Only holders of the secret</td><td style="padding:8px"><strong>Anyone with the public key</strong></td></tr>
+<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px">Microservice fit</td><td style="padding:8px">Bad — every service needs the secret</td><td style="padding:8px">Great — distribute public key, keep private key safe</td></tr>
+<tr><td style="padding:8px">Performance</td><td style="padding:8px">Faster (HMAC)</td><td style="padding:8px">Slower (RSA math)</td></tr>
+</table>
+<p>In this project, RS256 is critical because <strong>client apps must verify tokens without knowing the signing secret</strong>. The auth server signs with the private key; any microservice or client can verify with the public key via <code>/.well-known/jwks.json</code>.</p>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q5: Walk me through the key management strategy in jwt_service.py.</h3>
+<span class="q-tag tag-project">PROJECT</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Answer:</strong> The project uses a 3-tier fallback strategy:</p>
+<ol>
+<li><strong>Environment variables first</strong> — <code>JWT_PRIVATE_KEY_PEM</code> and <code>JWT_PUBLIC_KEY_PEM</code> (ideal for cloud deployments like Railway)</li>
+<li><strong>Disk files second</strong> — reads from <code>backend/keys/private_key.pem</code> and <code>public_key.pem</code></li>
+<li><strong>Auto-generate last</strong> — generates a 2048-bit RSA key pair and persists to disk. In production with <code>REQUIRE_PERSISTENT_JWT_KEYS=true</code>, this <strong>raises an error</strong> instead — preventing accidental key rotation on redeployment.</li>
+</ol>
+<pre><code># From jwt_service.py — the fallback chain:
+def _load_or_generate_keys():
+    env_keys = _load_keys_from_env()     # Priority 1
+    if env_keys: return env_keys
+    disk_keys = _load_keys_from_disk()   # Priority 2
+    if disk_keys: return disk_keys
+    if settings.IS_PRODUCTION and settings.REQUIRE_PERSISTENT_JWT_KEYS:
+        raise RuntimeError("No JWT key material found")  # Fail-safe
+    # Priority 3: generate new keys
+    private_key = rsa.generate_private_key(65537, 2048)
+    _persist_keys(private_key, private_key.public_key())
+    return private_key, private_key.public_key()</code></pre>
+<div class="deep-dive">
+<h4>🔍 How to dig deeper</h4>
+<p>Ask: "What happens if keys rotate?" → All existing JWTs become invalid because the public key changes. Solutions: <em>Key ID (kid)</em> in JWT header + JWKS endpoint serving multiple keys during rotation window.</p>
+</div>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q6: How does your project handle token revocation without a token blacklist table?</h3>
+<span class="q-tag tag-project">PROJECT</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Answer:</strong> The project uses a <strong>user-level blacklist in Redis</strong> rather than a per-token blacklist:</p>
+<pre><code># When admin force-logs-out a user:
+redis_client.delete(f"user_online:{tenant_id}:{user_id}")
+redis_client.setex(f"user_blacklist:{tenant_id}:{user_id}", 86400, "1")
+redis_client.publish(f"force_logout:{tenant_id}:{user_id}", "revoked")
+
+# During token verification:
+def verify_token(token):
+    payload = jwt.decode(token, PUBLIC_KEY, ...)
+    if is_user_blacklisted(payload["user_id"], payload["tenant_id"]):
+        return None  # Reject even though token is cryptographically valid</code></pre>
+<p><strong>Why user-level?</strong> A per-token blacklist grows unboundedly and requires checking every request. User-level blacklisting is O(1) lookup, automatically expires after 24 hours, and covers <em>all</em> tokens for that user at once — perfect for force-logout scenarios.</p>
+<p>The blacklist is <strong>cleared on next successful login</strong> via <code>clear_user_blacklist()</code>.</p>
+</div>
+</div>
+
+<!-- ═══════════════════ SECTION 3 ═══════════════════ -->
+<h2 class="section-title" id="s3"><span class="icon">📎</span> 3. DPoP — Sender-Constrained Tokens</h2>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q7: What problem does DPoP solve that bearer tokens don't?</h3>
+<span class="q-tag tag-core">CORE</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Answer:</strong> Bearer tokens are <strong>"whoever holds it, owns it"</strong>. If stolen (via XSS, logs, or network interception), the attacker can use them freely. DPoP (RFC 9449) solves this by <strong>binding the token to a client's cryptographic key pair</strong>:</p>
+<ol>
+<li>Client generates an ephemeral key pair</li>
+<li>On each request, client signs a <em>proof JWT</em> containing the HTTP method, URL, and timestamp with its private key</li>
+<li>Server verifies the proof's signature and checks that the JWK thumbprint matches the <code>cnf.jkt</code> claim embedded in the access token</li>
+</ol>
+<p><strong>Result:</strong> A stolen access token is useless without the client's private key. This is called a <em>sender-constrained</em> token.</p>
+<div class="deep-dive">
+<h4>🔍 How to dig deeper</h4>
+<ul>
+<li>How is replay prevented? → <code>jti</code> (unique nonce) stored in Redis with 5-min TTL</li>
+<li>How is the binding established? → During <code>/oauth/token</code>, if a DPoP header is present, server computes <code>JWK thumbprint</code> and embeds it as <code>cnf.jkt</code> in the access token</li>
+<li>What if the DPoP header is missing on a bound token? → The resource server should reject it</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q8: What specific validations does your DPoP service perform?</h3>
+<span class="q-tag tag-project">PROJECT</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Answer:</strong> From <code>dpop_service.py</code>, <code>validate_dpop_proof()</code> checks:</p>
+<ol>
+<li><strong>Structure</strong> — JWS must have exactly 3 parts (header.payload.signature)</li>
+<li><strong>Header typ</strong> == <code>"dpop+jwt"</code></li>
+<li><strong>Algorithm</strong> — must be asymmetric. Rejects <code>none</code>, <code>HS256</code>, <code>HS384</code>, <code>HS512</code></li>
+<li><strong>JWK present</strong> — public key in header, and must NOT contain <code>"d"</code> (private key material)</li>
+<li><strong>Cryptographic signature</strong> — reconstructs public key from JWK and verifies the JWT signature using PyJWT</li>
+<li><strong>htm</strong> matches the actual HTTP method</li>
+<li><strong>htu</strong> matches the actual request URI</li>
+<li><strong>iat</strong> within 5 minutes of current server time</li>
+<li><strong>jti</strong> present and not replayed (checked via Redis with 5-min TTL)</li>
+<li><strong>ath</strong> (if access_token provided) — SHA-256 of the access token must match</li>
+</ol>
+</div>
+</div>
+
+<!-- ═══════════════════ SECTION 4 ═══════════════════ -->
+<h2 class="section-title" id="s4"><span class="icon">🔑</span> 4. WebAuthn / Passkeys</h2>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q9: Explain the WebAuthn registration and authentication flows as you implemented them.</h3>
+<span class="q-tag tag-project">PROJECT</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Registration:</strong></p>
+<ol>
+<li>Server calls <code>generate_passkey_registration_challenge()</code> — creates 32 random bytes, stores in Redis with 5-min TTL, returns <code>PublicKeyCredentialCreationOptions</code></li>
+<li>Client calls <code>navigator.credentials.create()</code> and sends back the <code>attestationObject</code> + <code>clientDataJSON</code></li>
+<li>Server verifies: challenge matches, <code>type == "webauthn.create"</code>, RP ID hash matches, user-present flag is set. Extracts the COSE public key from the attestation's authData.</li>
+<li>Stores <code>credential_id</code>, <code>public_key</code>, <code>sign_count</code>, <code>algorithm</code> in the database.</li>
+</ol>
+<p><strong>Authentication:</strong></p>
+<ol>
+<li>Server sends challenge + <code>allowCredentials</code> list → client calls <code>navigator.credentials.get()</code></li>
+<li>Client returns <code>authenticatorData</code>, <code>clientDataJSON</code>, <code>signature</code></li>
+<li>Server verifies: challenge exists in Redis, RP ID hash, flags (user present + verified), <strong>sign count incremented</strong> (cloned authenticator detection), and <strong>cryptographic signature</strong> over <code>authData || SHA-256(clientDataJSON)</code></li>
+</ol>
+<div class="deep-dive">
+<h4>🔍 How to dig deeper</h4>
+<ul>
+<li>Why does your project parse CBOR manually? → To avoid external CBOR library dependencies. The <code>_extract_auth_data_from_cbor()</code> function does a simple byte-scan for the "authData" key.</li>
+<li>What's the sign count check? → Each authenticator increments a counter. If the server sees a <em>non-increasing</em> count, it likely means—the key was cloned.</li>
+</ul>
+</div>
+</div>
+</div>
+
+<!-- ═══════════════════ SECTION 5 ═══════════════════ -->
+<h2 class="section-title" id="s5"><span class="icon">🏢</span> 5. Multi-Tenancy & Data Isolation</h2>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q10: How does your project achieve multi-tenant data isolation?</h3>
+<span class="q-tag tag-project">PROJECT</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Answer:</strong> The project uses <strong>shared-database, discriminator-column isolation</strong>:</p>
+<ul>
+<li>Every data model has a <code>tenant_id</code> foreign key pointing to the <code>tenants</code> table</li>
+<li>The <code>User</code> model has a <strong>composite unique constraint</strong>: <code>UniqueConstraint('email', 'tenant_id', 'app_id')</code> — same email can exist in different tenants</li>
+<li><strong>Every query filters by tenant_id</strong>: <code>db.query(User).filter(User.tenant_id == app.tenant_id, ...)</code></li>
+<li>Tokens embed <code>tenant_id</code> in their payload, so verification is tenant-scoped</li>
+<li>Redis keys are namespaced: <code>user_online:{tenant_id}:{user_id}</code>, <code>user_blacklist:{tenant_id}:{user_id}</code></li>
+</ul>
+<div class="deep-dive">
+<h4>🔍 How to dig deeper</h4>
+<p>Ask about alternatives: <strong>Schema-per-tenant</strong> (better isolation, harder ops) vs. <strong>Database-per-tenant</strong> (strongest isolation, hardest to manage). The shared-table approach works well for <10K tenants where cross-tenant queries and simpler operations are priorities.</p>
+</div>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q11: What's the relationship between Tenant, App, and User in your data model?</h3>
+<span class="q-tag tag-project">PROJECT</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Answer:</strong></p>
+<div class="diagram">Tenant (org/company)
+  ├── App A (client_id, redirect_uris, OTP settings, token TTLs)
+  │     ├── User 1 (email: alice@x.com, tenant_id, app_id)
+  │     └── User 2 (email: bob@x.com, tenant_id, app_id)
+  ├── App B
+  │     └── User 3 (email: alice@x.com ← same email, different app!)
+  └── Admin (manages all apps in this tenant)</div>
+<p>Key insight: <strong>alice@x.com in App A and App B are separate User rows</strong>. The <code>_find_or_provision_user_for_app_login()</code> function handles cross-app provisioning — if alice logs into App B for the first time, her credentials are cloned from her App A record within the same tenant.</p>
+</div>
+</div>
+
+<!-- ═══════════════════ SECTION 6 ═══════════════════ -->
+<h2 class="section-title" id="s6"><span class="icon">🛡️</span> 6. Security Hardening</h2>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q12: Explain the CSRF protection strategy in your project.</h3>
+<span class="q-tag tag-security">SECURITY</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Answer:</strong> The project uses the <strong>Double-Submit Cookie Pattern</strong> in <code>csrf.py</code>:</p>
+<ol>
+<li>On any GET request, if no <code>csrf_token</code> cookie exists, the middleware sets one with <code>secrets.token_urlsafe(32)</code></li>
+<li>On POST/PUT/DELETE requests, the middleware checks that <code>X-CSRF-Token</code> header == <code>csrf_token</code> cookie using <code>hmac.compare_digest()</code> (timing-safe comparison)</li>
+<li><strong>Exemptions:</strong> Requests with Bearer auth header (API-to-API), <code>application/json</code> content-type (CORS preflight already prevents cross-origin JSON POST), <code>/oauth/token</code> (protected by PKCE), and docs endpoints</li>
+</ol>
+<p>The cookie is <code>httponly=False</code> so JavaScript can read it and include it in headers — this is by design for the double-submit pattern.</p>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q13: How does your brute-force protection work?</h3>
+<span class="q-tag tag-project">PROJECT</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Answer:</strong> Two layers in <code>auth.py</code>:</p>
+<p><strong>Layer 1 — Per-Account Lockout:</strong></p>
+<ul>
+<li>Redis counter <code>login_attempts:{app_id}:{email}</code> is incremented on each failed login</li>
+<li>After 5 failures → a <code>login_lockout:{app_id}:{email}</code> key is set with 15-min TTL</li>
+<li>Before every login attempt, <code>_check_account_lockout()</code> checks the lockout key and returns HTTP 429 with remaining time</li>
+<li>On successful login → <code>_clear_login_attempts()</code> deletes both keys</li>
+</ul>
+<p><strong>Layer 2 — Rate Limiting:</strong></p>
+<ul>
+<li><code>create_rate_limit_dependency()</code> creates FastAPI dependencies that enforce per-IP request limits: login=5/min, signup=10/min, OTP=3/min</li>
+</ul>
+<p><strong>Fail-open design:</strong> If Redis is down, both layers silently skip (fail open) — availability over strict security, with the tradeoff documented.</p>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q14: Your forgot-password endpoint returns success even for non-existent users. Why?</h3>
+<span class="q-tag tag-security">SECURITY</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><strong>Answer:</strong> This prevents <strong>email enumeration attacks</strong>. If the server returned "user not found" for invalid emails and "OTP sent" for valid ones, an attacker could probe the system to discover which emails are registered.</p>
+<pre><code># From auth.py:
+if not user:
+    # Don't reveal if user exists — always return success
+    return ForgotPasswordResponse(
+        message="If an account with this email exists, a password reset has been sent.",
+        ...
+    )</code></pre>
+<p>This is an OWASP best practice. The response is intentionally identical regardless of whether the user exists.</p>
+</div>
+</div>
+
+<!-- ═══════════════════ SECTION 7 ═══════════════════ -->
+<h2 class="section-title" id="s7"><span class="icon">🏗️</span> 7. System Design & Architecture</h2>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q15: If this auth platform needs to serve 10 million users, what would you change?</h3>
+<span class="q-tag tag-design">DESIGN</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<ul>
+<li><strong>Database</strong> — Shard tenants across multiple PostgreSQL instances (tenant-based partitioning). Add read replicas for token verification queries.</li>
+<li><strong>Redis</strong> — Move to Redis Cluster for horizontal scaling. Session data is already key-value, so it shards naturally.</li>
+<li><strong>Key rotation</strong> — Implement JWKS endpoint with <code>kid</code> (key ID) headers. Support overlapping key windows during rotation.</li>
+<li><strong>Rate limiting</strong> — Move to a distributed rate limiter (e.g., sliding window with Redis Lua scripts or token bucket).</li>
+<li><strong>Stateless sessions</strong> — Current Redis sessions are fine up to millions, but could add a stateless JWT-based session fallback.</li>
+<li><strong>Geographic distribution</strong> — Deploy auth servers in multiple regions with cross-region PostgreSQL replication.</li>
+</ul>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q16: Why did you choose FastAPI over Django/Flask for this project?</h3>
+<span class="q-tag tag-design">DESIGN</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<ul>
+<li><strong>Async support</strong> — FastAPI is ASGI-native. Auth flows involve Redis lookups, DB queries, email sending — async I/O is a natural fit.</li>
+<li><strong>Automatic OpenAPI docs</strong> — critical for an auth platform where client developers need clear API contracts</li>
+<li><strong>Pydantic validation</strong> — request/response models like <code>AuthenticateRequest</code> with typed fields are validated automatically</li>
+<li><strong>Dependency injection</strong> — <code>Depends(get_db)</code>, <code>Depends(_rl_login)</code> make middleware composable and testable</li>
+<li><strong>Performance</strong> — FastAPI on Uvicorn benchmarks 5-10x faster than Flask for I/O-bound workloads</li>
+</ul>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q17: Explain the middleware execution order in your app and why it matters.</h3>
+<span class="q-tag tag-project">PROJECT</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<pre><code># From main.py — middleware added in this order:
+app.add_middleware(CORSMiddleware, ...)   # Added first
+app.add_middleware(ConsoleAuthMiddleware) # Added second
+app.add_middleware(CSRFMiddleware)        # Added third</code></pre>
+<p><strong>Starlette processes middleware in LIFO order</strong> (last added = first executed). So the actual request flow is:</p>
+<ol>
+<li><strong>CSRFMiddleware</strong> → validates CSRF tokens on state-changing requests</li>
+<li><strong>ConsoleAuthMiddleware</strong> → protects <code>/dashboard</code> routes, redirects to login</li>
+<li><strong>CORSMiddleware</strong> → handles preflight OPTIONS and adds CORS headers</li>
+<li>Route handler executes</li>
+</ol>
+<p>This order ensures CSRF is checked <em>before</em> auth logic runs, and CORS headers are always added even on blocked requests.</p>
+</div>
+</div>
+
+<!-- ═══════════════════ SECTION 8 ═══════════════════ -->
+<h2 class="section-title" id="s8"><span class="icon">🗄️</span> 8. Database & Redis Patterns</h2>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q18: Explain the SQLAlchemy session management pattern in your project.</h3>
+<span class="q-tag tag-core">CORE</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<pre><code># db.py — Generator-based dependency:
+def get_db() -> Generator:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Used as a FastAPI dependency:
+@router.post("/login")
+def login(db: Session = Depends(get_db)):
+    ...</code></pre>
+<p>This is the <strong>Unit of Work</strong> pattern: each request gets its own session, which is guaranteed to close even on exceptions via <code>finally</code>. FastAPI's dependency injection ensures the generator is properly exhausted after the request completes. <strong>No connection leaks.</strong></p>
+<div class="deep-dive">
+<h4>🔍 How to dig deeper</h4>
+<p>Ask about <code>autoflush=False</code>: prevents SQLAlchemy from auto-flushing pending changes before queries, giving explicit control over when writes happen. This is important in auth flows where you want to validate before committing.</p>
+</div>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q19: How does your project use Redis pipeline/mget for online status?</h3>
+<span class="q-tag tag-project">PROJECT</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<pre><code># jwt_service.py — Batch online status check:
+def get_online_status_map(user_ids, tenant_id):
+    keys = [f"user_online:{tenant_id}:{uid}" for uid in user_ids]
+    mget = getattr(redis_client, "mget", None)
+    if callable(mget):
+        values = mget(keys)  # Single round-trip for N keys!
+        return {uid: bool(value) for uid, value in zip(user_ids, values)}
+    # Fallback: individual EXISTS calls
+    return {uid: redis_client.exists(key) == 1 for uid, key in zip(user_ids, keys)}</code></pre>
+<p><strong>Why MGET?</strong> The admin dashboard shows online status for potentially hundreds of users. Without MGET, that's N round-trips to Redis. With MGET, it's <strong>1 round-trip regardless of N</strong>. The fallback exists for Redis versions/clients that don't support MGET.</p>
+</div>
+</div>
+
+<!-- ═══════════════════ SECTION 9 ═══════════════════ -->
+<h2 class="section-title" id="s9"><span class="icon">🐍</span> 9. Python / FastAPI Internals</h2>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q20: What is the GIL and how does it affect your auth server?</h3>
+<span class="q-tag tag-core">CORE</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p>The <strong>Global Interpreter Lock</strong> allows only one thread to execute Python bytecode at a time. For an auth server, this matters because:</p>
+<ul>
+<li><strong>CPU-bound work</strong> (RSA signing, bcrypt hashing) — GIL serializes these. The project mitigates this by using <strong>Gunicorn with multiple workers</strong> in production (each worker is a separate process with its own GIL).</li>
+<li><strong>I/O-bound work</strong> (Redis, PostgreSQL, SMTP) — GIL is released during I/O system calls, so async FastAPI handlers can serve thousands of concurrent requests efficiently.</li>
+</ul>
+<p>The <code>Procfile</code> uses <code>gunicorn</code> with <code>uvicorn.workers.UvicornWorker</code> — multiple processes × async I/O = maximum throughput.</p>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q21: Your validate_app_credentials uses hmac.compare_digest. Why not just ==?</h3>
+<span class="q-tag tag-security">SECURITY</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p><code>==</code> is a <strong>short-circuit comparison</strong> — it returns <code>False</code> as soon as the first mismatched character is found. An attacker can measure response times at microsecond precision to guess the secret one character at a time (<strong>timing side-channel attack</strong>).</p>
+<p><code>hmac.compare_digest()</code> is <strong>constant-time</strong> — it always compares all bytes regardless of where the mismatch occurs, making timing analysis impossible.</p>
+<pre><code># Vulnerable:
+if provided_hash == stored_hash:  # ← timing leak!
+
+# Safe (from auth.py):
+if not hmac.compare_digest(provided_hash, app.app_secret):  # ← constant time</code></pre>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q22: What happens when the Settings class validates in production mode?</h3>
+<span class="q-tag tag-project">PROJECT</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<p>The <code>settings.validate()</code> method in <code>config.py</code> performs <strong>fail-fast checks at import time</strong>:</p>
+<ul>
+<li><code>ALLOWED_ORIGINS</code> cannot contain <code>"*"</code> — prevents accidental open CORS in production</li>
+<li><code>AUTH_SERVER_URL</code> must use HTTPS — prevents token transmission over plain HTTP</li>
+<li><code>AUTH_PLATFORM_URL</code> must use HTTPS</li>
+<li><code>JWT_PRIVATE_KEY_PEM</code> and <code>JWT_PUBLIC_KEY_PEM</code> must both be present or both absent</li>
+</ul>
+<p>This is the <strong>fail-fast principle</strong> — it's better to crash on startup with a clear error than silently run with insecure settings and discover the issue in production traffic.</p>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q23: Explain the IntegrityError handling pattern in _find_or_provision_app_user.</h3>
+<span class="q-tag tag-core">CORE</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<pre><code>def _find_or_provision_app_user(db, app, email):
+    target_user = db.query(User).filter(...).first()
+    if target_user:
+        return target_user
+    # Try to create
+    target_user = User(email=email, app_id=app.app_id, ...)
+    db.add(target_user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return db.query(User).filter(...).first()  # Race condition resolved
+    db.refresh(target_user)
+    return target_user</code></pre>
+<p>This is the <strong>UPSERT / "check-then-create" race condition</strong> pattern. Two concurrent requests could both see <code>target_user = None</code> and try to INSERT. The UniqueConstraint causes one to fail with IntegrityError. The handler rolls back and re-queries to get the row the other request created. This is <strong>optimistic concurrency control</strong>.</p>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q24: What is the difference between async def and def in FastAPI route handlers?</h3>
+<span class="q-tag tag-core">CORE</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<ul>
+<li><code>async def</code> → Runs on the <strong>main event loop</strong>. Must use <code>await</code> for I/O. Blocking calls will stall the entire server.</li>
+<li><code>def</code> (sync) → FastAPI automatically runs it in a <strong>threadpool</strong> (<code>run_in_executor</code>). Safe for blocking I/O like SQLAlchemy's synchronous ORM.</li>
+</ul>
+<p>This project uses <code>def</code> for route handlers because SQLAlchemy's session (<code>get_db</code>) is synchronous. If they were <code>async def</code>, the synchronous DB calls would block the event loop.</p>
+</div>
+</div>
+
+<div class="qa-card">
+<div class="q-header" onclick="this.parentElement.classList.toggle('open')">
+<h3>Q25: What are indexes in your User model and why do they exist?</h3>
+<span class="q-tag tag-core">CORE</span><span class="chevron">▼</span>
+</div>
+<div class="answer">
+<pre><code>class User(Base):
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, index=True, nullable=False)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), index=True)</code></pre>
+<p><strong>Why?</strong> The most frequent query pattern is <code>WHERE email = ? AND tenant_id = ? AND app_id = ?</code>. Without indexes on <code>email</code> and <code>tenant_id</code>, PostgreSQL would do a <strong>sequential scan</strong> — O(n) for every login. With indexes, it's <strong>B-tree lookup</strong> — O(log n).</p>
+<p>An ideal improvement would be a <strong>composite index</strong> on <code>(email, tenant_id, app_id)</code> to make the common 3-column filter a single index seek.</p>
+</div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// Allow clicking anywhere on the card header to toggle
+document.querySelectorAll('.q-header').forEach(h => {
+  h.style.cursor = 'pointer';
+});
+</script>
+</body>
+</html>

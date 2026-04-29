@@ -34,18 +34,19 @@ env/
 *.swn
 .DS_Store
 
-# Environment files
+# Environment files (Docker Compose reads .env from host, not build context)
 .env
 .env.local
 .env.*.local
+.railway.env
 
-# Frontend
-frontend/
-sample-app/
-node_modules/
+# Frontend (not needed in backend image)
+next-app/node_modules/
+next-app/.next/
 
-# Development scripts
+# Development scripts (not needed in Docker image)
 run.sh
+run-docker.sh
 
 # Git
 .git/
@@ -55,7 +56,7 @@ run.sh
 *.log
 logs/
 
-# Database
+# Database files
 *.db
 *.sqlite
 *.sqlite3
@@ -64,3 +65,18 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Documentation / deployment configs
+*.md
+interview-guide.html
+Procfile
+railway.json
+railway.toml
+nixpacks.toml
+RAILWAY_DEPLOYMENT.md
+prepare-railway.sh
+runtime.txt
+
+# PID files
+.backend.pid
+.cf_backend.pid

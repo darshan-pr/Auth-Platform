@@ -86,7 +86,8 @@ backend/
 
 next-app/           # sample client app integration
 frontend/           # additional frontend assets
-run.sh              # local/dev/prod-like service runner
+scripts/run.sh      # local/dev/prod-like service runner
+scripts/run-docker.sh # production docker runner
 ```
 
 ## Getting Started
@@ -104,10 +105,10 @@ docker compose up -d
 
 ```bash
 source .venv/bin/activate
-bash run.sh
+bash scripts/run.sh
 ```
 
-`run.sh` supports:
+`scripts/run.sh` supports:
 - Dev mode (`uvicorn --reload`)
 - Deployment mode (`gunicorn` + Cloudflare tunnel URL output)
 - Controlled startup/shutdown for backend and tunnels

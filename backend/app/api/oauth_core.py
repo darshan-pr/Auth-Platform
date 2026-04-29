@@ -363,28 +363,28 @@ def authorize(
     # Validate response_type
     if response_type != "code":
         error_ctx["error"] = "Unsupported response_type. Only 'code' is supported."
-        return _with_no_cache_headers(templates.TemplateResponse("auth.html", error_ctx))
+        return _with_no_cache_headers(templates.TemplateResponse(request, "auth.html", error_ctx))
 
     # Validate client_id
     app = db.query(App).filter(App.app_id == client_id).first()
     if not app:
         error_ctx["error"] = "Invalid client_id. This application is not registered."
-        return _with_no_cache_headers(templates.TemplateResponse("auth.html", error_ctx))
+        return _with_no_cache_headers(templates.TemplateResponse(request, "auth.html", error_ctx))
 
     # Validate redirect_uri
     if not validate_redirect_uri(app, redirect_uri):
         error_ctx["error"] = "Invalid redirect_uri. This URI is not registered for this application."
-        return _with_no_cache_headers(templates.TemplateResponse("auth.html", error_ctx))
+        return _with_no_cache_headers(templates.TemplateResponse(request, "auth.html", error_ctx))
 
     # PKCE is mandatory for security
     if not code_challenge:
         error_ctx["error"] = "PKCE code_challenge is required. Public clients must use PKCE."
-        return _with_no_cache_headers(templates.TemplateResponse("auth.html", error_ctx))
+        return _with_no_cache_headers(templates.TemplateResponse(request, "auth.html", error_ctx))
 
     # State is mandatory for CSRF protection
     if not state:
         error_ctx["error"] = "state parameter is required for CSRF protection."
-        return _with_no_cache_headers(templates.TemplateResponse("auth.html", error_ctx))
+        return _with_no_cache_headers(templates.TemplateResponse(request, "auth.html", error_ctx))
 
     # Create OAuth session in Redis
     session_id = create_oauth_session(
@@ -422,7 +422,7 @@ def authorize(
                 f"Please contact {admin_email} for further assistance."
             )
             delete_oauth_session(session_id)
-            return _with_no_cache_headers(templates.TemplateResponse("auth.html", error_ctx))
+            return _with_no_cache_headers(templates.TemplateResponse(request, "auth.html", error_ctx))
         update_oauth_session(
             session_id,
             {"authenticated_user_id": silent_user.id, "authenticated_email": silent_user.email},
@@ -453,7 +453,7 @@ def authorize(
         )
         return _with_no_cache_headers(login_redirect)
 
-    return _with_no_cache_headers(templates.TemplateResponse("auth.html", {
+    return _with_no_cache_headers(templates.TemplateResponse(request, "auth.html", {
         "request": request,
         "session_id": session_id,
         "app_name": app.name or "Application",
@@ -482,6 +482,7 @@ def bootstrap_oauth_session(
     if not session:
         return _with_no_cache_headers(
             templates.TemplateResponse(
+                request,
                 "auth.html",
                 {
                     "request": request,
@@ -500,6 +501,7 @@ def bootstrap_oauth_session(
     if session.get("client_id") != client_id:
         return _with_no_cache_headers(
             templates.TemplateResponse(
+                request,
                 "auth.html",
                 {
                     "request": request,
@@ -519,6 +521,7 @@ def bootstrap_oauth_session(
     if not app or not app.oauth_enabled:
         return _with_no_cache_headers(
             templates.TemplateResponse(
+                request,
                 "auth.html",
                 {
                     "request": request,
@@ -548,6 +551,7 @@ def bootstrap_oauth_session(
         admin_email = _get_admin_contact_email(db, app.tenant_id)
         return _with_no_cache_headers(
             templates.TemplateResponse(
+                request,
                 "auth.html",
                 {
                     "request": request,
@@ -677,6 +681,7 @@ def consent_page(
     if not session:
         return _with_no_cache_headers(
             templates.TemplateResponse(
+                request,
                 "oauth_consent.html",
                 {
                     "request": request,
@@ -695,6 +700,7 @@ def consent_page(
     if client_id and client_id != session_client_id:
         return _with_no_cache_headers(
             templates.TemplateResponse(
+                request,
                 "oauth_consent.html",
                 {
                     "request": request,
@@ -713,6 +719,7 @@ def consent_page(
     if not app or not app.oauth_enabled:
         return _with_no_cache_headers(
             templates.TemplateResponse(
+                request,
                 "oauth_consent.html",
                 {
                     "request": request,
@@ -739,6 +746,7 @@ def consent_page(
 
     return _with_no_cache_headers(
         templates.TemplateResponse(
+            request,
             "oauth_consent.html",
             {
                 "request": request,

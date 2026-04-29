@@ -8,6 +8,9 @@
 #       so one failed sub-command never kills the whole script.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PID_DIR="$ROOT_DIR"
+RUN_CMD="./scripts/run.sh"
 
 # Ports
 BACKEND_PORT=8000
@@ -22,7 +25,7 @@ usage() {
     echo "  Auth Platform — Service Runner"
     echo "  ────────────────────────────────────────"
     echo ""
-    echo "  Usage: ./run.sh [command]"
+    echo "  Usage: $RUN_CMD [command]"
     echo ""
     echo "  Commands:"
     echo "    start        Start all services (default)"
@@ -38,19 +41,19 @@ usage() {
 }
 
 activate_venv() {
-    if [ -d "$SCRIPT_DIR/.venv" ]; then
-        source "$SCRIPT_DIR/.venv/bin/activate"
-    elif [ -d "$SCRIPT_DIR/backend/.venv" ]; then
-        source "$SCRIPT_DIR/backend/.venv/bin/activate"
-    elif [ -d "$SCRIPT_DIR/backend/venv" ]; then
-        source "$SCRIPT_DIR/backend/venv/bin/activate"
+    if [ -d "$ROOT_DIR/.venv" ]; then
+        source "$ROOT_DIR/.venv/bin/activate"
+    elif [ -d "$ROOT_DIR/backend/.venv" ]; then
+        source "$ROOT_DIR/backend/.venv/bin/activate"
+    elif [ -d "$ROOT_DIR/backend/venv" ]; then
+        source "$ROOT_DIR/backend/venv/bin/activate"
     fi
 }
 
 load_env() {
-    if [ -f "$SCRIPT_DIR/.env" ]; then
+    if [ -f "$ROOT_DIR/.env" ]; then
         set -a
-        source "$SCRIPT_DIR/.env"
+        source "$ROOT_DIR/.env"
         set +a
     fi
 }
@@ -77,7 +80,7 @@ free_port() {
 run_backend_migrations() {
     local migrations_log="/tmp/auth_migrations.log"
     echo "[*] Applying database migrations ..."
-    cd "$SCRIPT_DIR/backend"
+    cd "$ROOT_DIR/backend"
     RUN_DB_MIGRATIONS_ON_STARTUP=false python -m app.migration_runner > "$migrations_log" 2>&1
     local rc=$?
     if [ "$rc" -ne 0 ]; then
@@ -141,7 +144,7 @@ start_backend() {
     activate_venv
     load_env
     run_backend_migrations || return 1
-    cd "$SCRIPT_DIR/backend"
+    cd "$ROOT_DIR/backend"
     export RUN_DB_MIGRATIONS_ON_STARTUP=false
     uvicorn app.main:app --reload --host 0.0.0.0 --port $BACKEND_PORT &
     local pid=$!
@@ -150,7 +153,7 @@ start_backend() {
         echo "[!] Backend failed to start on port $BACKEND_PORT"
         return 1
     fi
-    echo "$pid" > "$SCRIPT_DIR/.backend.pid"
+    echo "$pid" > "$PID_DIR/.backend.pid"
     echo "    -> http://localhost:$BACKEND_PORT"
     echo "    -> http://localhost:$BACKEND_PORT/docs  (Swagger)"
 }
@@ -162,7 +165,7 @@ start_backend_prod() {
     activate_venv
     load_env
     run_backend_migrations || return 1
-    cd "$SCRIPT_DIR/backend"
+    cd "$ROOT_DIR/backend"
 
     # macOS blocks Objective-C runtime calls after fork() by default.
     # Gunicorn's pre-fork worker model triggers this — setting this env var disables the guard.
@@ -187,7 +190,7 @@ start_backend_prod() {
         echo "[!] Gunicorn failed to start. Check /tmp/gunicorn_error.log"
         return 1
     fi
-    echo "$pid" > "$SCRIPT_DIR/.backend.pid"
+    echo "$pid" > "$PID_DIR/.backend.pid"
     echo "    -> http://localhost:$BACKEND_PORT  (Gunicorn + Uvicorn)"
     echo "    -> Logs: /tmp/gunicorn_access.log | /tmp/gunicorn_error.log"
 }
@@ -197,7 +200,7 @@ stop_services() {
     echo "[*] Stopping services ..."
 
     for svc in backend cf_backend; do
-        pidfile="$SCRIPT_DIR/.${svc}.pid"
+        pidfile="$PID_DIR/.${svc}.pid"
         if [ -f "$pidfile" ]; then
             pid=$(cat "$pidfile")
             if kill -0 "$pid" 2>/dev/null; then
@@ -225,7 +228,7 @@ show_status() {
     echo "  ────────────────────────────────────────"
 
     for svc in backend cf_backend; do
-        pidfile="$SCRIPT_DIR/.${svc}.pid"
+        pidfile="$PID_DIR/.${svc}.pid"
         if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
             echo "    $svc : running  (pid $(cat "$pidfile"))"
         else
@@ -274,7 +277,7 @@ start_all() {
         # Start Cloudflare tunnels — URLs written to temp files (not namerefs)
         start_cloudflare_tunnel \
             "$BACKEND_PORT"       "backend" \
-            "$SCRIPT_DIR/.cf_backend.pid" "$CF_BACKEND_URL_FILE"
+            "$PID_DIR/.cf_backend.pid" "$CF_BACKEND_URL_FILE"
 
 
         # Read URLs from temp files

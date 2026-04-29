@@ -1,0 +1,220 @@
+# ============================================================
+#  Auth Platform — Production Docker Compose
+# ============================================================
+#
+#  Architecture:
+#    ┌─────────────────────────────────────────────────────┐
+#    │  Cloudflare Tunnel (cloudflared)                    │
+#    │    ↓ HTTPS traffic                                  │
+#    │  Nginx (port 80)                                    │
+#    │    ├── gzip, security headers, rate limiting        │
+#    │    ├── static asset caching (CSS, JS, images)       │
+#    │    ├── SSE stream support (no-buffer)               │
+#    │    └── reverse proxy → backend                      │
+#    │           ↓                                         │
+#    │  Gunicorn + Uvicorn Workers (port 8000, internal)   │
+#    │    ├── PostgreSQL (port 5432, internal)              │
+#    │    └── Redis (port 6379, internal)                   │
+#    └─────────────────────────────────────────────────────┘
+#
+#  Usage:
+#    ./scripts/run-docker.sh start       # Build & start everything
+#    ./scripts/run-docker.sh stop        # Tear down
+#    ./scripts/run-docker.sh logs        # Tail all logs
+#    ./scripts/run-docker.sh status      # Health check
+# ============================================================
+
+name: auth-platform-prod
+
+services:
+
+  # ── PostgreSQL ──
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: auth_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-auth_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_admin -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ── Redis ──
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+        --appendonly yes
+        --maxmemory 256mb
+        --maxmemory-policy allkeys-lru
+        --tcp-keepalive 60
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ── Backend (Gunicorn + Uvicorn) ──
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Core
+      DATABASE_URL: postgresql://auth_admin:${POSTGRES_PASSWORD:-auth_password}@postgres:5432/auth_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ENVIRONMENT: production
+
+      # SMTP
+      SMTP_SERVER: ${SMTP_SERVER:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+
+      # URLs — update these with tunnel URL after first start
+      AUTH_SERVER_URL: ${AUTH_SERVER_URL:-http://localhost:80}
+      AUTH_PLATFORM_URL: ${AUTH_PLATFORM_URL:-http://localhost:80}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:80}
+
+      # Gunicorn workers (default 4, tune based on CPU cores)
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+
+      # Migrations run once via init container, not per-worker
+      RUN_DB_MIGRATIONS_ON_STARTUP: "false"
+
+      # Mail
+      MAIL_DEV_MODE: ${MAIL_DEV_MODE:-false}
+    volumes:
+      # Persist JWT keys across container restarts
+      - jwt_keys:/app/keys
+    networks:
+      - internal
+    # Not exposed to host — only Nginx talks to backend
+    expose:
+      - "8000"
+
+  # ── Nginx Reverse Proxy ──
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${NGINX_PORT:-8000}:80"
+    networks:
+      - internal
+      - tunnel_backend
+    healthcheck:
+      # MUST use 127.0.0.1, NOT localhost — Alpine resolves localhost to IPv6 ::1
+      # but Nginx only listens on IPv4 0.0.0.0:80
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/nginx-health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ── Cloudflare Tunnel (Backend) ──
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      nginx:
+        condition: service_healthy
+    command: tunnel --no-autoupdate --url http://nginx:80
+    networks:
+      - tunnel_backend
+
+  # ── Next.js Frontend (Demo Client App) ──
+  frontend:
+    build:
+      context: .
+      dockerfile: next-app/Dockerfile
+      args:
+        NEXT_PUBLIC_AUTH_SERVER: ${NEXT_PUBLIC_AUTH_SERVER:-http://localhost:8000}
+        NEXT_PUBLIC_CLIENT_ID: ${NEXT_PUBLIC_CLIENT_ID:-client-id-placeholder}
+        NEXT_PUBLIC_REDIRECT_URI: ${NEXT_PUBLIC_REDIRECT_URI:-http://localhost:3000}
+    restart: unless-stopped
+    depends_on:
+      nginx:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_AUTH_SERVER: ${NEXT_PUBLIC_AUTH_SERVER:-http://localhost:8000}
+      NEXT_PUBLIC_CLIENT_ID: ${NEXT_PUBLIC_CLIENT_ID:-client-id-placeholder}
+      NEXT_PUBLIC_REDIRECT_URI: ${NEXT_PUBLIC_REDIRECT_URI:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+    networks:
+      - tunnel_frontend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # ── Cloudflare Tunnel (Frontend) ──
+  cloudflared-frontend:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+    command: tunnel --no-autoupdate --url http://frontend:3000
+    networks:
+      - tunnel_frontend
+
+  # ── Database Migrations (run-once init container) ──
+  migrations:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://auth_admin:${POSTGRES_PASSWORD:-auth_password}@postgres:5432/auth_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ENVIRONMENT: production
+      RUN_DB_MIGRATIONS_ON_STARTUP: "false"
+    command: ["python", "-m", "app.migration_runner"]
+    volumes:
+      - jwt_keys:/app/keys
+    networks:
+      - internal
+    restart: "no"
+
+networks:
+  internal:
+    driver: bridge
+  tunnel_backend:
+    driver: bridge
+  tunnel_frontend:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  jwt_keys:
