@@ -5,6 +5,7 @@ from app.services.jwt_service import create_access_token
 from app.services.password_service import hash_password
 from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
+from tests.conftest import mock_redis_store
 
 
 def _extract_oauth_session_id_from_html(html: str) -> str | None:
@@ -390,3 +391,112 @@ def test_oauth_authorize_with_platform_sso_goes_to_consent_then_silent_after_app
     )
     assert forced_consent.status_code in (302, 307)
     assert forced_consent.headers.get("location", "").startswith("/oauth/consent?session_id=")
+
+
+def test_oauth_forgot_password_sends_reset_otp_for_passwordless_user(client, admin_token, db):
+    _login_admin_session(client)
+
+    app_id = _create_app(
+        client,
+        {
+            "name": "Passwordless Forgot Password",
+            "description": "Ensure OTP is sent even if password is not set yet",
+            "oauth_enabled": True,
+            "otp_enabled": True,
+            "redirect_uris": "http://localhost:3000/callback",
+        },
+    )["app_id"]
+
+    user = User(
+        email="nopassword@test.com",
+        tenant_id=admin_token["tenant_id"],
+        app_id=app_id,
+        password_hash=None,
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+
+    authorize = client.get(
+        "/oauth/authorize",
+        params={
+            "client_id": app_id,
+            "redirect_uri": "http://localhost:3000/callback",
+            "response_type": "code",
+            "state": "forgot-pwd",
+            "code_challenge": "challenge123",
+            "code_challenge_method": "plain",
+        },
+    )
+    assert authorize.status_code == 200
+    session_id = _extract_oauth_session_id_from_html(authorize.text)
+    assert session_id
+
+    response = client.post(
+        "/oauth/authenticate",
+        json={
+            "session_id": session_id,
+            "action": "forgot_password",
+            "email": "nopassword@test.com",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["action"] == "show_reset_otp"
+    assert "sent" in payload.get("message", "").lower()
+
+    redis_key = f"password_reset_otp:nopassword@test.com:{app_id}"
+    assert mock_redis_store.get(redis_key) is not None
+
+
+def test_oauth_login_passwordless_user_shows_reset_password_guidance(client, admin_token, db):
+    _login_admin_session(client)
+
+    app_id = _create_app(
+        client,
+        {
+            "name": "Passwordless Login Warning",
+            "description": "Ensure login warning guides users to password reset",
+            "oauth_enabled": True,
+            "otp_enabled": True,
+            "redirect_uris": "http://localhost:3000/callback",
+        },
+    )["app_id"]
+
+    user = User(
+        email="needreset@test.com",
+        tenant_id=admin_token["tenant_id"],
+        app_id=app_id,
+        password_hash=None,
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+
+    authorize = client.get(
+        "/oauth/authorize",
+        params={
+            "client_id": app_id,
+            "redirect_uri": "http://localhost:3000/callback",
+            "response_type": "code",
+            "state": "login-warning",
+            "code_challenge": "challenge123",
+            "code_challenge_method": "plain",
+        },
+    )
+    assert authorize.status_code == 200
+    session_id = _extract_oauth_session_id_from_html(authorize.text)
+    assert session_id
+
+    login = client.post(
+        "/oauth/authenticate",
+        json={
+            "session_id": session_id,
+            "action": "login",
+            "email": "needreset@test.com",
+            "password": "DoesNotMatter123!",
+        },
+    )
+    assert login.status_code == 400
+    detail = login.json().get("detail", "").lower()
+    assert "reset your password" in detail

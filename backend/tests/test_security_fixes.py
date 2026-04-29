@@ -8,6 +8,8 @@ HttpOnly cookie admin auth, app secret hashing.
 import pytest
 import hashlib
 from tests.conftest import mock_redis_store
+from app.models.app import App
+from app.models.user import User
 
 
 # ============== Fix 2: Email Enumeration (Forgot Password) ==============
@@ -69,6 +71,33 @@ class TestEmailEnumeration:
         # Both should be 200
         assert resp_real.status_code == 200
         assert resp_fake.status_code == 200
+
+    def test_forgot_password_passwordless_user_still_generates_reset(self, client, test_app, db):
+        """Existing users without password should still get reset material generated."""
+        app = db.query(App).filter(App.app_id == test_app["app_id"]).first()
+        assert app is not None
+
+        user = User(
+            email="passwordless@test.com",
+            password_hash=None,
+            app_id=test_app["app_id"],
+            tenant_id=app.tenant_id,
+            is_active=True,
+        )
+        db.add(user)
+        db.commit()
+
+        resp = client.post("/auth/forgot-password", json={
+            "email": "passwordless@test.com",
+            "app_id": test_app["app_id"],
+            "app_secret": test_app["app_secret"]
+        })
+        assert resp.status_code == 200
+
+        data = resp.json()
+        assert data.get("method") == "token"
+        reset_token_key = f"reset_token:passwordless@test.com:{test_app['app_id']}"
+        assert mock_redis_store.get(reset_token_key) is not None
 
 
 # ============== Fix 3: Brute-Force Protection ==============

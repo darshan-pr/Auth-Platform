@@ -17,3 +17,4 @@ CONTEXT.md
 *.tmp.db
 .pytest_cache/
 .tmp-test.db
+.vscode/

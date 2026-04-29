@@ -250,7 +250,7 @@ def login(request: LoginRequest, http_request: Request = None, db: Session = Dep
     if not user.password_hash:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User does not have a password set. Please sign up first."
+            detail="User exists but no password is set yet. You can reset your password to continue."
         )
     
     # Check brute-force lockout BEFORE verifying password
@@ -411,15 +411,6 @@ def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db
     if not user:
         # Don't reveal if user exists — always return success
         logger.info(f"Forgot password requested for non-existent user: {request.email}")
-        return ForgotPasswordResponse(
-            message="If an account with this email exists, a password reset has been sent.",
-            email=request.email,
-            method="otp" if app.otp_enabled else "token"
-        )
-    
-    if not user.password_hash:
-        # User exists but has no password (e.g., OTP-only) — still return generic success
-        logger.info(f"Forgot password requested for user without password: {request.email}")
         return ForgotPasswordResponse(
             message="If an account with this email exists, a password reset has been sent.",
             email=request.email,

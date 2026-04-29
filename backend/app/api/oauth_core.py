@@ -1084,7 +1084,10 @@ def _handle_login(req: AuthenticateRequest, session: dict, app: App, db: Session
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if not user.password_hash:
-        raise HTTPException(status_code=400, detail="User does not have a password set. Please sign up first.")
+        raise HTTPException(
+            status_code=400,
+            detail="User exists but no password is set yet. You can reset your password to continue."
+        )
 
     # Password verification: support both pre-hashed (client-side PBKDF2) and legacy plaintext.
     # When pre_hashed=True the client sent PBKDF2-SHA256(password, email) instead of the raw password.
@@ -1177,10 +1180,10 @@ def _handle_forgot_password(req: AuthenticateRequest, session: dict, app: App, d
         User.tenant_id == app.tenant_id,
         User.app_id == session["client_id"]
     ).first()
-    if not user or not user.password_hash:
+    if not user:
         # Don't reveal whether user exists — return generic success
         import logging
-        logging.getLogger(__name__).info(f"Forgot password requested for unknown/passwordless user via OAuth: {req.email}")
+        logging.getLogger(__name__).info(f"Forgot password requested for unknown user via OAuth: {req.email}")
         return {
             "action": "show_reset_otp",
             "message": "If an account exists with this email, a password reset code has been sent."
