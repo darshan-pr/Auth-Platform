@@ -53,9 +53,9 @@ class Settings:
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
 
     # JWT Configuration
-    JWT_SECRET: str = os.getenv("JWT_SECRET", "your-secret-key-here")
+    JWT_SECRET: str = os.getenv("JWT_SECRET", "")
     JWT_ISSUER: str = "auth-platform"
-    JWT_ALGORITHM: str = "RS256"
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "RS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     JWT_PRIVATE_KEY_PEM: str = os.getenv("JWT_PRIVATE_KEY_PEM", "")
@@ -119,6 +119,10 @@ class Settings:
             raise RuntimeError(
                 "JWT_PRIVATE_KEY_PEM and JWT_PUBLIC_KEY_PEM must be provided together."
             )
+
+        if self.JWT_ALGORITHM.upper().startswith("HS"):
+            if self.IS_PRODUCTION and not self.JWT_SECRET:
+                raise RuntimeError("JWT_SECRET must be configured when using HS* algorithms.")
 
         if not self.IS_PRODUCTION:
             return

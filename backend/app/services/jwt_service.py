@@ -1,6 +1,7 @@
 import jwt
 from datetime import datetime, timedelta
 from typing import Optional
+import secrets
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
@@ -10,6 +11,25 @@ from pathlib import Path
 import logging
 
 logger = logging.getLogger(__name__)
+
+JWT_ALGORITHM = settings.JWT_ALGORITHM or "RS256"
+
+
+def _is_hs_algorithm(algorithm: str) -> bool:
+    return (algorithm or "").upper().startswith("HS")
+
+
+def _load_hs_secret() -> str:
+    secret_value = (getattr(settings, "JWT_SECRET", None) or "").strip()
+    if secret_value:
+        return secret_value
+
+    if settings.IS_PRODUCTION:
+        raise RuntimeError("JWT_SECRET must be configured when using HS* algorithms.")
+
+    generated = secrets.token_urlsafe(48)
+    logger.warning("JWT_SECRET missing; generated ephemeral secret for non-production.")
+    return generated
 
 # Key storage directory - defaults to repo `backend/keys`, with Railway fallback.
 _DEFAULT_KEYS_DIR = Path(__file__).resolve().parent.parent.parent / "keys"
@@ -108,7 +128,13 @@ def _load_or_generate_keys():
     logger.warning("Generated new JWT signing keys at %s", KEYS_DIR)
     return private_key, public_key
 
-PRIVATE_KEY, PUBLIC_KEY = _load_or_generate_keys()
+if _is_hs_algorithm(JWT_ALGORITHM):
+    SIGNING_KEY = _load_hs_secret()
+    VERIFY_KEY = SIGNING_KEY
+else:
+    PRIVATE_KEY, PUBLIC_KEY = _load_or_generate_keys()
+    SIGNING_KEY = PRIVATE_KEY
+    VERIFY_KEY = PUBLIC_KEY
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a new access token"""
@@ -120,7 +146,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         "iss": settings.JWT_ISSUER,
     })
     payload.setdefault("type", "access")
-    return jwt.encode(payload, PRIVATE_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(payload, SIGNING_KEY, algorithm=settings.JWT_ALGORITHM)
 
 def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a new refresh token"""
@@ -132,14 +158,14 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
         "iss": settings.JWT_ISSUER,
     })
     payload.setdefault("type", "refresh")
-    return jwt.encode(payload, PRIVATE_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(payload, SIGNING_KEY, algorithm=settings.JWT_ALGORITHM)
 
 def verify_token(token: str) -> Optional[dict]:
     """Verify a token and return the payload"""
     try:
         payload = jwt.decode(
             token, 
-            PUBLIC_KEY, 
+            VERIFY_KEY, 
             algorithms=[settings.JWT_ALGORITHM],
             issuer=settings.JWT_ISSUER
         )
@@ -201,7 +227,7 @@ def revoke_token(db, token: str) -> dict:
         # Decode ignoring expiry to always get the claims
         payload = jwt.decode(
             token,
-            PUBLIC_KEY,
+            VERIFY_KEY,
             algorithms=[settings.JWT_ALGORITHM],
             options={
                 "verify_exp": False,
