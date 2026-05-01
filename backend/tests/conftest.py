@@ -5,12 +5,56 @@ Uses SQLite in-memory database for isolation and speed.
 Mocks Redis for OTP/session operations.
 """
 
-import pytest
+import os
+import tempfile
+from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+
+
+def _ensure_test_jwt_keys() -> None:
+    """Create a temporary RS256 keypair for tests if none is configured."""
+    if os.getenv("JWT_PRIVATE_KEY_PEM") or os.getenv("JWT_PUBLIC_KEY_PEM"):
+        return
+
+    configured_dir = os.getenv("JWT_KEYS_DIR")
+    if configured_dir:
+        keys_dir = Path(configured_dir)
+        if (keys_dir / "private_key.pem").exists() and (keys_dir / "public_key.pem").exists():
+            return
+    else:
+        keys_dir = Path(tempfile.mkdtemp(prefix="jwt-keys-"))
+        os.environ["JWT_KEYS_DIR"] = str(keys_dir)
+
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend(),
+    )
+    (keys_dir / "private_key.pem").write_bytes(
+        private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+    (keys_dir / "public_key.pem").write_bytes(
+        private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    )
+
+
+_ensure_test_jwt_keys()
 
 from app.db import Base, get_db
 from app.main import app

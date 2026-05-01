@@ -1,8 +1,6 @@
 import jwt
 from datetime import datetime, timedelta
 from typing import Optional
-import secrets
-from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 from app.config import settings
@@ -13,23 +11,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 JWT_ALGORITHM = settings.JWT_ALGORITHM or "RS256"
-
-
-def _is_hs_algorithm(algorithm: str) -> bool:
-    return (algorithm or "").upper().startswith("HS")
-
-
-def _load_hs_secret() -> str:
-    secret_value = (getattr(settings, "JWT_SECRET", None) or "").strip()
-    if secret_value:
-        return secret_value
-
-    if settings.IS_PRODUCTION:
-        raise RuntimeError("JWT_SECRET must be configured when using HS* algorithms.")
-
-    generated = secrets.token_urlsafe(48)
-    logger.warning("JWT_SECRET missing; generated ephemeral secret for non-production.")
-    return generated
 
 # Key storage directory - defaults to repo `backend/keys`, with Railway fallback.
 _DEFAULT_KEYS_DIR = Path(__file__).resolve().parent.parent.parent / "keys"
@@ -87,23 +68,8 @@ def _load_keys_from_disk() -> Optional[tuple[object, object]]:
     return private_key, public_key
 
 
-def _persist_keys(private_key, public_key) -> None:
-    KEYS_DIR.mkdir(parents=True, exist_ok=True)
-    with open(PRIVATE_KEY_PATH, "wb") as f:
-        f.write(private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
-        ))
-    with open(PUBLIC_KEY_PATH, "wb") as f:
-        f.write(public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        ))
-
-
-def _load_or_generate_keys():
-    """Load existing keys, then fall back to generating new ones."""
+def _load_required_keys():
+    """Load keys from env or disk; do not auto-generate."""
     env_keys = _load_keys_from_env()
     if env_keys:
         return env_keys
@@ -112,29 +78,15 @@ def _load_or_generate_keys():
     if disk_keys:
         return disk_keys
 
-    if settings.IS_PRODUCTION and getattr(settings, "REQUIRE_PERSISTENT_JWT_KEYS", False):
-        raise RuntimeError(
-            "No JWT key material found. Configure JWT_PRIVATE_KEY_PEM/JWT_PUBLIC_KEY_PEM "
-            "or mount persistent key files."
-        )
-
-    private_key = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048,
-        backend=default_backend()
+    raise RuntimeError(
+        "No JWT key material found. Configure JWT_PRIVATE_KEY_PEM/JWT_PUBLIC_KEY_PEM "
+        "or mount key files (private_key.pem/public_key.pem) in JWT_KEYS_DIR."
     )
-    public_key = private_key.public_key()
-    _persist_keys(private_key, public_key)
-    logger.warning("Generated new JWT signing keys at %s", KEYS_DIR)
-    return private_key, public_key
 
-if _is_hs_algorithm(JWT_ALGORITHM):
-    SIGNING_KEY = _load_hs_secret()
-    VERIFY_KEY = SIGNING_KEY
-else:
-    PRIVATE_KEY, PUBLIC_KEY = _load_or_generate_keys()
-    SIGNING_KEY = PRIVATE_KEY
-    VERIFY_KEY = PUBLIC_KEY
+
+PRIVATE_KEY, PUBLIC_KEY = _load_required_keys()
+SIGNING_KEY = PRIVATE_KEY
+VERIFY_KEY = PUBLIC_KEY
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a new access token"""

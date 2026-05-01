@@ -120,9 +120,8 @@ class Settings:
                 "JWT_PRIVATE_KEY_PEM and JWT_PUBLIC_KEY_PEM must be provided together."
             )
 
-        if self.JWT_ALGORITHM.upper().startswith("HS"):
-            if self.IS_PRODUCTION and not self.JWT_SECRET:
-                raise RuntimeError("JWT_SECRET must be configured when using HS* algorithms.")
+        if not self.JWT_ALGORITHM.upper().startswith("RS"):
+            raise RuntimeError("JWT_ALGORITHM must be RS256 (RS* algorithms only).")
 
         if not self.IS_PRODUCTION:
             return
