@@ -82,6 +82,7 @@ class AppCreateRequest(BaseModel):
     logo_url: Optional[str] = None
     logo_data_url: Optional[str] = None
     oauth_enabled: bool = True
+    client_type: str = "confidential"  # "confidential" or "public" (RFC 6749 §2.1)
     otp_enabled: bool = True
     login_notification_enabled: bool = False
     force_logout_notification_enabled: bool = False
@@ -97,6 +98,7 @@ class AppUpdateRequest(BaseModel):
     logo_url: Optional[str] = None
     logo_data_url: Optional[str] = None
     oauth_enabled: Optional[bool] = None
+    client_type: Optional[str] = None  # "confidential" or "public"
     otp_enabled: Optional[bool] = None
     login_notification_enabled: Optional[bool] = None
     force_logout_notification_enabled: Optional[bool] = None

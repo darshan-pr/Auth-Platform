@@ -25,6 +25,10 @@ class App(Base):
     passkey_enabled = Column(Boolean, default=False, nullable=False)
     # OAuth Settings
     oauth_enabled = Column(Boolean, default=True, nullable=False)
+    # OAuth Client Type (RFC 6749 §2.1)
+    #   "confidential" → has a server/proxy, uses client_secret + PKCE
+    #   "public"       → no server (SPA/mobile), uses PKCE only
+    client_type = Column(String, default="confidential", nullable=False)
     redirect_uris = Column(String, nullable=True)  # Comma-separated allowed redirect URIs
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

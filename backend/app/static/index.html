@@ -403,6 +403,7 @@
                                 <th>Name</th>
                                 <th>App ID</th>
                                 <th>OTP</th>
+                                <th>Client Type</th>
                                 <th>Passkey</th>
                                 <th>Login Alert</th>
                                 <th>Created</th>
@@ -410,7 +411,7 @@
                             </tr>
                         </thead>
                         <tbody id="appsTableBody">
-                            <tr><td colspan="7" class="loading">Loading...</td></tr>
+                            <tr><td colspan="8" class="loading">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -648,89 +649,112 @@
             <form id="appForm">
                 <input type="hidden" id="editAppId">
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="appName">App Name *</label>
-                        <input type="text" id="appName" required placeholder="My Application">
+                    <div id="appTypeSelectionSection" class="form-section app-type-section">
+                        <h4><i data-lucide="layers"></i> Application Type</h4>
+                        <small>Select app type first. You can continue once a type is selected.</small>
+                        <div class="app-client-type-options">
+                            <label class="app-client-type-card" data-client-type-card="confidential">
+                                <input type="radio" name="appClientType" value="confidential">
+                                <div class="app-client-type-card-title">Confidential</div>
+                                <div class="app-client-type-card-text">Has a server/proxy — uses client_secret + PKCE</div>
+                            </label>
+                            <label class="app-client-type-card" data-client-type-card="public">
+                                <input type="radio" name="appClientType" value="public">
+                                <div class="app-client-type-card-title">Public</div>
+                                <div class="app-client-type-card-text">SPA / Mobile — uses PKCE only, no secret</div>
+                            </label>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="appLogoUrl">Application Logo</label>
-                        <div class="app-logo-editor">
-                            <div class="app-logo-preview-wrap">
-                                <img id="appLogoPreview" src="/assets/logo.png" alt="App logo preview">
-                            </div>
-                            <div class="app-logo-controls">
-                                <div class="app-logo-input-row">
-                                    <input type="url" id="appLogoUrl" placeholder="https://example.com/logo.png">
-                                    <button type="button" class="btn btn-secondary btn-sm app-logo-preview-btn" id="appLogoPreviewBtn">Preview</button>
+
+                    <div id="appClientTypeTagRow" class="app-client-type-tag-row hidden">
+                        <span id="appClientTypeTag" class="app-client-type-tag"></span>
+                    </div>
+
+                    <div id="appConfigSection" class="hidden">
+                        <div class="form-group">
+                            <label for="appName">App Name *</label>
+                            <input type="text" id="appName" required placeholder="My Application">
+                        </div>
+                        <div class="form-group">
+                            <label for="appLogoUrl">Application Logo</label>
+                            <div class="app-logo-editor">
+                                <div class="app-logo-preview-wrap">
+                                    <img id="appLogoPreview" src="/assets/logo.png" alt="App logo preview">
                                 </div>
-                                <small>Paste the logo URL to preview instantly. This logo is reused on hosted auth screens and email templates.</small>
+                                <div class="app-logo-controls">
+                                    <div class="app-logo-input-row">
+                                        <input type="url" id="appLogoUrl" placeholder="https://example.com/logo.png">
+                                        <button type="button" class="btn btn-secondary btn-sm app-logo-preview-btn" id="appLogoPreviewBtn">Preview</button>
+                                    </div>
+                                    <small>Paste the logo URL to preview instantly. This logo is reused on hosted auth screens and email templates.</small>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="appDescription">Description</label>
-                        <textarea id="appDescription" placeholder="Describe your application" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="redirectUriList">Redirect URIs</label>
-                        <div class="redirect-uri-editor">
-                            <div id="redirectUriList" class="redirect-uri-list"></div>
-                            <button type="button" class="btn btn-secondary btn-sm" id="addRedirectUriBtn">
-                                <i data-lucide="plus"></i> Add Redirect URI
-                            </button>
+                        <div class="form-group">
+                            <label for="appDescription">Description</label>
+                            <textarea id="appDescription" placeholder="Describe your application" rows="3"></textarea>
                         </div>
-                        <small>Allowed redirect URIs for OAuth flow</small>
-                    </div>
-
-                    <div class="form-section">
-                        <h4><i data-lucide="shield"></i> Security</h4>
-                        <div class="form-group checkbox-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="appOAuthEnabled" checked>
-                                <span>Enable OAuth SSO</span>
-                            </label>
-                            <small>Allow this app to use Auth Platform as its OAuth/SSO identity provider</small>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="appOtpEnabled" checked>
-                                <span>Enable OTP Verification</span>
-                            </label>
-                            <small>Users must verify via OTP after password login</small>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="appPasskeyEnabled">
-                                <span>Enable Passkey Authentication</span>
-                            </label>
-                            <small>Allow users to sign in with biometrics or security keys (WebAuthn)</small>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="appLoginNotification">
-                                <span>Enable Login Notification Email</span>
-                            </label>
-                            <small>Send an email alert with session details on every successful login</small>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="appForceLogoutNotification">
-                                <span>Enable Force Logout Notification Email</span>
-                            </label>
-                            <small>Send an email to the user when an admin force-logs them out</small>
-                        </div>
-                    </div>
-
-                    <div class="form-section">
-                        <h4><i data-lucide="clock"></i> Session Settings</h4>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="appAccessTokenExpiry">Access Token (min)</label>
-                                <input type="number" id="appAccessTokenExpiry" min="1" max="1440" value="30">
+                        <div class="form-group">
+                            <label for="redirectUriList">Redirect URIs</label>
+                            <div class="redirect-uri-editor">
+                                <div id="redirectUriList" class="redirect-uri-list"></div>
+                                <button type="button" class="btn btn-secondary btn-sm" id="addRedirectUriBtn">
+                                    <i data-lucide="plus"></i> Add Redirect URI
+                                </button>
                             </div>
-                            <div class="form-group">
-                                <label for="appRefreshTokenExpiry">Refresh Token (days)</label>
-                                <input type="number" id="appRefreshTokenExpiry" min="1" max="365" value="7">
+                            <small>Allowed redirect URIs for OAuth flow</small>
+                        </div>
+
+                        <div class="form-section">
+                            <h4><i data-lucide="shield"></i> Security</h4>
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="appOAuthEnabled" checked>
+                                    <span>Enable OAuth SSO</span>
+                                </label>
+                                <small>Allow this app to use Auth Platform as its OAuth/SSO identity provider</small>
+                            </div>
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="appOtpEnabled" checked>
+                                    <span>Enable OTP Verification</span>
+                                </label>
+                                <small>Users must verify via OTP after password login</small>
+                            </div>
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="appPasskeyEnabled">
+                                    <span>Enable Passkey Authentication</span>
+                                </label>
+                                <small>Allow users to sign in with biometrics or security keys (WebAuthn)</small>
+                            </div>
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="appLoginNotification">
+                                    <span>Enable Login Notification Email</span>
+                                </label>
+                                <small>Send an email alert with session details on every successful login</small>
+                            </div>
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="appForceLogoutNotification">
+                                    <span>Enable Force Logout Notification Email</span>
+                                </label>
+                                <small>Send an email to the user when an admin force-logs them out</small>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h4><i data-lucide="clock"></i> Session Settings</h4>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="appAccessTokenExpiry">Access Token (min)</label>
+                                    <input type="number" id="appAccessTokenExpiry" min="1" max="1440" value="30">
+                                </div>
+                                <div class="form-group">
+                                    <label for="appRefreshTokenExpiry">Refresh Token (days)</label>
+                                    <input type="number" id="appRefreshTokenExpiry" min="1" max="365" value="7">
+                                </div>
                             </div>
                         </div>
                     </div>

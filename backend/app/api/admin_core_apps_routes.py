@@ -29,6 +29,7 @@ def create_app(
             description=request.description,
             logo_url=logo_url,
             oauth_enabled=request.oauth_enabled,
+            client_type=request.client_type if request.client_type in ("confidential", "public") else "confidential",
             otp_enabled=request.otp_enabled,
             login_notification_enabled=request.login_notification_enabled,
             force_logout_notification_enabled=request.force_logout_notification_enabled,
@@ -49,6 +50,7 @@ def create_app(
             "logo_url": app.logo_url,
             "tenant_id": app.tenant_id,
             "oauth_enabled": app.oauth_enabled,
+            "client_type": getattr(app, 'client_type', 'confidential') or 'confidential',
             "otp_enabled": app.otp_enabled,
             "login_notification_enabled": app.login_notification_enabled,
             "force_logout_notification_enabled": app.force_logout_notification_enabled,
@@ -110,6 +112,7 @@ def list_apps(
         "tenant_id": app.tenant_id,
         "is_active": True,  # All apps are active by default
         "oauth_enabled": app.oauth_enabled,
+        "client_type": getattr(app, 'client_type', 'confidential') or 'confidential',
         "otp_enabled": app.otp_enabled,
         "passkey_enabled": app.passkey_enabled,
         "login_notification_enabled": app.login_notification_enabled,
@@ -142,6 +145,7 @@ def get_app(
         "logo_url": app.logo_url,
         "tenant_id": app.tenant_id,
         "oauth_enabled": app.oauth_enabled,
+        "client_type": getattr(app, 'client_type', 'confidential') or 'confidential',
         "otp_enabled": app.otp_enabled,
         "login_notification_enabled": app.login_notification_enabled,
         "force_logout_notification_enabled": app.force_logout_notification_enabled,
@@ -177,6 +181,7 @@ def update_app(
             app.description = request.description
         if request.oauth_enabled is not None:
             app.oauth_enabled = request.oauth_enabled
+        # client_type is immutable after creation — not updated here
         if request.otp_enabled is not None:
             app.otp_enabled = request.otp_enabled
         if request.login_notification_enabled is not None:
@@ -218,6 +223,7 @@ def update_app(
         "logo_url": app.logo_url,
         "tenant_id": app.tenant_id,
         "oauth_enabled": app.oauth_enabled,
+        "client_type": getattr(app, 'client_type', 'confidential') or 'confidential',
         "otp_enabled": app.otp_enabled,
         "login_notification_enabled": app.login_notification_enabled,
         "force_logout_notification_enabled": app.force_logout_notification_enabled,

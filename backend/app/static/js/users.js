@@ -501,6 +501,12 @@ function setupForms() {
     if (addRedirectUriBtn) {
         addRedirectUriBtn.addEventListener('click', () => addRedirectUriRow(''));
     }
+
+    document.querySelectorAll('input[name="appClientType"]').forEach((radio) => {
+        radio.addEventListener('change', () => {
+            updateAppClientTypeUI({ requireSelection: !editingAppId });
+        });
+    });
 }
 
 function setAppLogoPreview(src) {

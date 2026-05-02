@@ -149,9 +149,9 @@ class TestClientAuthentication:
         assert response.status_code == 401
 
     def test_missing_client_secret_is_rejected(self, client, test_app):
-        """Without client_secret, request should be rejected (422 validation error).
+        """Without client_secret, confidential clients should be rejected with 401.
         
-        client_secret is now REQUIRED on /oauth/token (RFC 6749 §2.3.1).
+        For confidential clients, /oauth/token requires client_secret (RFC 6749 §2.3.1).
         The BFF proxy always injects it server-side — requests without it are invalid.
         """
         response = client.post("/oauth/token", json={
@@ -162,8 +162,7 @@ class TestClientAuthentication:
             "code_verifier": "test_verifier",
             # client_secret intentionally omitted
         })
-        # Should fail with 422 (missing required field) since client_secret is mandatory
-        assert response.status_code == 422
+        assert response.status_code == 401
 
 
 # ============== DPoP Service Unit Tests ==============

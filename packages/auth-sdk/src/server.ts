@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  Auth Platform SDK — Server Proxy  (v3.1.0)
+ *  Auth Platform SDK — Server Proxy  (v3.2.0)
  * ============================================================
  *
  *  Server-side BFF proxy for Next.js route handlers.
@@ -28,8 +28,10 @@ import type { NextRequest } from 'next/server';
 export interface AuthProxyOptions {
   /** Auth server URL (default: reads AUTH_SERVER_URL or NEXT_PUBLIC_AUTH_SERVER env) */
   authServerUrl?: string;
-  /** Client secret (default: reads AUTH_CLIENT_SECRET env) */
+  /** Client secret (default: reads AUTH_CLIENT_SECRET env). Not needed for public clients. */
   clientSecret?: string;
+  /** Client type: 'confidential' (default) or 'public'. Public clients skip client_secret. */
+  clientType?: 'confidential' | 'public';
 }
 
 export type AuthProxyHandler = (
@@ -113,6 +115,7 @@ async function _buildBody(
   accessToken: string | undefined,
   refreshToken: string | undefined,
   clientSecret: string,
+  clientType: 'confidential' | 'public',
 ): Promise<BodySpec> {
   if (request.method === 'GET' || request.method === 'HEAD') return {};
 
@@ -131,15 +134,18 @@ async function _buildBody(
   // ═══ CORE SECURITY LOGIC ═══════════════════════════════
   // This is the entire reason the proxy exists.
 
-  // 1. Token exchange: inject client_secret (RFC 6749 §2.3.1)
-  //    FAIL-CLOSED: no secret → hard error, not silent skip
+  // 1. Token exchange: inject client_secret for confidential clients (RFC 6749 §2.3.1)
+  //    Public clients skip this — they rely on PKCE only
   if (path === 'oauth/token') {
-    if (!clientSecret) {
-      return { error: _json(500, {
-        detail: 'AUTH_CLIENT_SECRET is not configured. Set it in .env.local (server-side only). Get it from Admin Console → Credentials.',
-      })};
+    if (clientType === 'confidential') {
+      if (!clientSecret) {
+        return { error: _json(500, {
+          detail: 'AUTH_CLIENT_SECRET is not configured. Set it in .env.local (server-side only). Get it from Admin Console → Credentials.',
+        })};
+      }
+      parsed.client_secret = clientSecret;
     }
-    parsed.client_secret = clientSecret;
+    // Public clients: no client_secret added — PKCE code_verifier is the only proof
   }
 
   // 2. Refresh: inject refresh_token from HttpOnly cookie
@@ -193,7 +199,12 @@ export function createAuthProxy(options: AuthProxyOptions = {}): AuthProxyHandle
     options.clientSecret || process.env.AUTH_CLIENT_SECRET || '',
   ).trim();
 
+  const clientType = options.clientType || (process.env.AUTH_CLIENT_TYPE as 'confidential' | 'public') || 'confidential';
+
   if (!authServer) console.error('[AuthProxy] No auth server URL configured.');
+  if (clientType === 'confidential' && !clientSecret) {
+    console.warn('[AuthProxy] AUTH_CLIENT_SECRET is not set. Confidential clients require it.');
+  }
 
   return async function handler(request, context) {
     if (!authServer) return _json(500, { detail: 'Auth server URL not configured.' });
@@ -206,7 +217,7 @@ export function createAuthProxy(options: AuthProxyOptions = {}): AuthProxyHandle
     const accessToken  = request.cookies.get(ACCESS_COOKIE)?.value;
     const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
 
-    const spec = await _buildBody(request, path, accessToken, refreshToken, clientSecret);
+    const spec = await _buildBody(request, path, accessToken, refreshToken, clientSecret, clientType);
     if (spec.error) return spec.error;
 
     // Build target URL

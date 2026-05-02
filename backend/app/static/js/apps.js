@@ -15,7 +15,7 @@ async function loadApps() {
         if (container) container.classList.remove('refreshing');
 
         if (apps.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="loading">No applications yet. Create your first app.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="loading">No applications yet. Create your first app.</td></tr>';
             return;
         }
 
@@ -33,6 +33,7 @@ async function loadApps() {
                 </td>
                 <td data-label="App ID"><code>${app.app_id}</code></td>
                 <td data-label="OTP"><span class="status-badge ${app.otp_enabled ? 'active' : 'inactive'}">${app.otp_enabled ? 'Enabled' : 'Disabled'}</span></td>
+                <td data-label="Client Type"><span class="status-badge ${(app.client_type || 'confidential') === 'confidential' ? 'active' : 'inactive'}">${(app.client_type || 'confidential') === 'confidential' ? 'Confidential' : 'Public'}</span></td>
                 <td data-label="Passkey"><span class="status-badge ${app.passkey_enabled ? 'active' : 'inactive'}">${app.passkey_enabled ? 'Enabled' : 'Disabled'}</span></td>
                 <td data-label="Notification"><span class="status-badge ${app.login_notification_enabled ? 'active' : 'inactive'}">${app.login_notification_enabled ? 'On' : 'Off'}</span></td>
                 <td data-label="Created">${formatDate(app.created_at)}</td>
@@ -66,7 +67,7 @@ async function loadApps() {
         renderIcons();
     } catch (error) {
         console.error('Error loading apps:', error);
-        tbody.innerHTML = '<tr><td colspan="7" class="loading">Failed to load applications</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">Failed to load applications</td></tr>';
     }
 }
 
@@ -132,12 +133,61 @@ function getRedirectUriCsv() {
     return values.join(',');
 }
 
+function getSelectedAppClientType() {
+    return document.querySelector('input[name="appClientType"]:checked')?.value || '';
+}
+
+function updateAppClientTypeUI({ requireSelection = false } = {}) {
+    const selectedType = getSelectedAppClientType();
+    const cards = document.querySelectorAll('[data-client-type-card]');
+    const selectorSection = document.getElementById('appTypeSelectionSection');
+    const configSection = document.getElementById('appConfigSection');
+    const tagRow = document.getElementById('appClientTypeTagRow');
+    const tag = document.getElementById('appClientTypeTag');
+    const submitBtn = document.getElementById('appFormSubmit');
+    const labelMap = {
+        confidential: ' Confidential',
+        public: ' Public'
+    };
+
+    cards.forEach((card) => {
+        card.classList.toggle('active', card.dataset.clientTypeCard === selectedType);
+        const input = card.querySelector('input[name="appClientType"]');
+        card.classList.toggle('readonly', !!input?.disabled);
+    });
+
+    if (selectedType) {
+        if (tag) {
+            const displayType = labelMap[selectedType] || selectedType;
+            tag.innerHTML = `<span class="app-client-type-tag-label">Client Type:</span><span class="app-client-type-tag-value">${displayType}</span>`;
+        }
+        if (tagRow) tagRow.classList.remove('hidden');
+    } else if (tagRow) {
+        tagRow.classList.add('hidden');
+    }
+
+    if (selectorSection) {
+        selectorSection.classList.toggle('hidden', !!selectedType);
+    }
+
+    if (configSection) {
+        const shouldShowConfig = !requireSelection || !!selectedType;
+        configSection.classList.toggle('hidden', !shouldShowConfig);
+    }
+
+    if (submitBtn) {
+        submitBtn.disabled = requireSelection && !selectedType;
+    }
+}
+
 function showCreateAppModal() {
     editingAppId = null;
     document.getElementById('appModalTitle').textContent = 'Create Application';
     document.getElementById('appFormSubmit').textContent = 'Create App';
     document.getElementById('appForm').reset();
     document.getElementById('appOAuthEnabled').checked = true;
+    document.querySelectorAll('input[name="appClientType"]').forEach(r => r.checked = false);
+    document.querySelectorAll('input[name="appClientType"]').forEach(r => r.disabled = false);
     document.getElementById('appOtpEnabled').checked = true;
     document.getElementById('appPasskeyEnabled').checked = false;
     document.getElementById('appLoginNotification').checked = false;
@@ -146,6 +196,7 @@ function showCreateAppModal() {
     document.getElementById('appRefreshTokenExpiry').value = 7;
     setRedirectUriValues('');
     resetAppLogoEditor('');
+    updateAppClientTypeUI({ requireSelection: true });
     openModal('appModal');
 }
 
@@ -159,6 +210,11 @@ function editApp(appId) {
     document.getElementById('appName').value = app.name || '';
     document.getElementById('appDescription').value = app.description || '';
     document.getElementById('appOAuthEnabled').checked = app.oauth_enabled !== false;
+    const clientType = app.client_type || 'confidential';
+    const clientTypeRadio = document.querySelector(`input[name="appClientType"][value="${clientType}"]`);
+    if (clientTypeRadio) clientTypeRadio.checked = true;
+    // Lock client_type after creation — it cannot be changed
+    document.querySelectorAll('input[name="appClientType"]').forEach(r => r.disabled = true);
     document.getElementById('appOtpEnabled').checked = !!app.otp_enabled;
     document.getElementById('appPasskeyEnabled').checked = !!app.passkey_enabled;
     document.getElementById('appLoginNotification').checked = !!app.login_notification_enabled;
@@ -167,6 +223,7 @@ function editApp(appId) {
     document.getElementById('appRefreshTokenExpiry').value = app.refresh_token_expiry_days || 7;
     setRedirectUriValues(app.redirect_uris || '');
     resetAppLogoEditor(app.logo_url || '');
+    updateAppClientTypeUI();
     openModal('appModal');
 }
 
@@ -182,16 +239,18 @@ async function saveApp() {
     const refresh_token_expiry_days = parseInt(document.getElementById('appRefreshTokenExpiry').value) || 7;
     const redirect_uris = getRedirectUriCsv();
     const logo_url = document.getElementById('appLogoUrl').value.trim();
+    const client_type = getSelectedAppClientType();
     const submitBtn = document.getElementById('appFormSubmit');
     const originalBtnHtml = submitBtn.innerHTML;
 
+    if (!client_type) { showToast('Please select an application type', 'error'); return; }
     if (!name) { showToast('Please enter an app name', 'error'); return; }
 
     submitBtn.disabled = true;
     submitBtn.innerHTML = `<span class="btn-inline-spinner" aria-hidden="true"></span>${editingAppId ? 'Saving...' : 'Adding...'} `;
 
     try {
-        const body = { name, description, oauth_enabled, otp_enabled, passkey_enabled, login_notification_enabled, force_logout_notification_enabled, access_token_expiry_minutes, refresh_token_expiry_days };
+        const body = { name, description, oauth_enabled, client_type, otp_enabled, passkey_enabled, login_notification_enabled, force_logout_notification_enabled, access_token_expiry_minutes, refresh_token_expiry_days };
         if (redirect_uris) body.redirect_uris = redirect_uris;
         if (editingAppId || logo_url) {
             body.logo_url = logo_url;
@@ -292,4 +351,3 @@ function confirmDeleteApp(appId, appName) {
     document.getElementById('deleteConfirmBtn').onclick = deleteCallback;
     openModal('deleteModal');
 }
-

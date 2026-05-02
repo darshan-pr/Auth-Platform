@@ -1600,23 +1600,6 @@ def _complete_auth(
         mark_user_online(user.id, app.tenant_id, ttl_seconds=ttl)
         clear_user_blacklist(user.id, app.tenant_id)
 
-    # Send login notification if enabled
-    if app and app.login_notification_enabled:
-        location_str = "Unavailable"
-        if http_request:
-            ip = get_client_ip(http_request)
-            geo = get_location(ip)
-            parts = [geo.get("city"), geo.get("region"), geo.get("country")]
-            location_str = ", ".join([p for p in parts if p]) or "Unavailable"
-        send_login_notification_email(
-            to=user.email,
-            app_name=app.name or "Auth Platform",
-            access_token_expiry_minutes=app.access_token_expiry_minutes,
-            refresh_token_expiry_days=app.refresh_token_expiry_days,
-            location=location_str,
-            app_logo_url=app.logo_url,
-        )
-
     # Record login event with IP/location
     if db and http_request and app:
         record_login_event(db, user.id, session["client_id"], app.tenant_id, http_request, event_type)
@@ -1640,7 +1623,7 @@ class TokenExchangeRequest(BaseModel):
     client_id: str
     redirect_uri: str
     code_verifier: str  # PKCE proof — proves this is the same client that started the flow
-    client_secret: str  # Required: authenticates the client application (injected by BFF proxy)
+    client_secret: Optional[str] = None  # Required for confidential clients, rejected for public clients
 
 
 @router.post("/token", dependencies=[Depends(_rl_oauth_token)])
@@ -1650,9 +1633,9 @@ def token_exchange(req: TokenExchangeRequest, request: Request = None, db: Sessi
     
     Exchanges an authorization code + PKCE code_verifier for access/refresh tokens.
     
-    Security (defense in depth — both mechanisms required):
-    - client_secret: authenticates the client application (RFC 6749 §2.3.1)
-    - PKCE code_verifier: proves the token requester started the flow (RFC 7636)
+    Security:
+    - Confidential clients: client_secret + PKCE code_verifier (defense in depth)
+    - Public clients: PKCE code_verifier only (RFC 7636)
     - Authorization code is single-use (deleted from Redis on first use)
     - client_id and redirect_uri must match the original authorize request
     
@@ -1670,18 +1653,40 @@ def token_exchange(req: TokenExchangeRequest, request: Request = None, db: Sessi
         raise HTTPException(status_code=401, detail="Invalid client_id")
 
     # --- Client Authentication (RFC 6749 §2.3.1) ---
-    # client_secret is required — the BFF proxy injects it server-side.
-    # This authenticates the *client application* (not the user).
+    # Enforcement is based on the app's registered client_type.
     import hashlib, hmac
-    if len(app.app_secret) == 64:
-        # Secret is stored as SHA-256 hash
-        provided_hash = hashlib.sha256(req.client_secret.encode()).hexdigest()
-        if not hmac.compare_digest(provided_hash, app.app_secret):
-            raise HTTPException(status_code=401, detail="Invalid client_secret")
+    client_type = getattr(app, "client_type", "confidential") or "confidential"
+
+    if client_type == "confidential":
+        # Confidential client: client_secret is REQUIRED (injected by BFF proxy)
+        if not req.client_secret:
+            raise HTTPException(
+                status_code=401,
+                detail="client_secret is required for confidential clients. "
+                       "Ensure your server proxy is injecting it."
+            )
+        if len(app.app_secret) == 64:
+            # Secret is stored as SHA-256 hash
+            provided_hash = hashlib.sha256(req.client_secret.encode()).hexdigest()
+            if not hmac.compare_digest(provided_hash, app.app_secret):
+                raise HTTPException(status_code=401, detail="Invalid client_secret")
+        else:
+            # Secret is stored in plaintext (legacy)
+            if not hmac.compare_digest(req.client_secret, app.app_secret):
+                raise HTTPException(status_code=401, detail="Invalid client_secret")
+
+    elif client_type == "public":
+        # Public client: MUST NOT send client_secret (prevents accidental leaks)
+        if req.client_secret:
+            raise HTTPException(
+                status_code=400,
+                detail="Public clients must not send client_secret. "
+                       "Remove it from your request — security relies on PKCE only."
+            )
+        # Security relies entirely on PKCE code_verifier (validated below)
+
     else:
-        # Secret is stored in plaintext (legacy)
-        if not hmac.compare_digest(req.client_secret, app.app_secret):
-            raise HTTPException(status_code=401, detail="Invalid client_secret")
+        raise HTTPException(status_code=500, detail=f"Unknown client_type: {client_type}")
 
     # Validate code + PKCE
     code_data = validate_authorization_code(
@@ -1725,6 +1730,21 @@ def token_exchange(req: TokenExchangeRequest, request: Request = None, db: Sessi
     # Record login event
     if request and app:
         record_login_event(db, user.id, req.client_id, app.tenant_id, request, "oauth_token_exchange")
+
+    # Send login notification only after successful token issuance.
+    if request and app and app.login_notification_enabled:
+        ip = get_client_ip(request)
+        geo = get_location(ip)
+        parts = [geo.get("city"), geo.get("region"), geo.get("country")]
+        location_str = ", ".join([p for p in parts if p]) or "Unavailable"
+        send_login_notification_email(
+            to=user.email,
+            app_name=app.name or "Auth Platform",
+            access_token_expiry_minutes=app.access_token_expiry_minutes,
+            refresh_token_expiry_days=app.refresh_token_expiry_days,
+            location=location_str,
+            app_logo_url=app.logo_url,
+        )
 
     token_type = "DPoP" if cnf_claim else "bearer"
 

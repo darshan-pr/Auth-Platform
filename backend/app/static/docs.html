@@ -1,820 +1,337 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <link rel="icon" type="image/png" href="/assets/logo.png">
-    <script>(function(){var img=new Image();img.onload=function(){var c=document.createElement('canvas');c.width=c.height=64;var ctx=c.getContext('2d');ctx.beginPath();ctx.arc(32,32,32,0,Math.PI*2);ctx.clip();ctx.drawImage(img,0,0,64,64);var l=document.querySelector("link[rel='icon']");if(l)l.href=c.toDataURL();};img.src='/assets/logo.png';})();</script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auth Platform — API Documentation</title>
-    <link rel="stylesheet" href="/static/docs.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <script>(function(){var img=new Image();img.onload=function(){var c=document.createElement('canvas');c.width=c.height=64;var ctx=c.getContext('2d');ctx.beginPath();ctx.arc(32,32,32,0,Math.PI*2);ctx.clip();ctx.drawImage(img,0,0,64,64);var l=document.querySelector("link[rel='icon']");if(l)l.href=c.toDataURL();};img.src='/assets/logo.png';})();</script>
+  <title>Auth Platform Docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/static/docs.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 <body>
-    <!-- Mobile top bar (phones only) -->
-    <div class="docs-mobile-header" id="docsMobileHeader">
-        <button class="docs-hamburger" id="docsHamburger" aria-label="Open navigation">
-            <i class="fas fa-bars"></i>
-        </button>
-        <span class="docs-mobile-title">API Docs</span>
-        <a href="/dashboard" class="docs-mobile-console">Dashboard</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="/" class="logo">
+        <img src="/assets/logo.png" alt="Auth Platform" class="logo-img">
+        <span>Auth Platform</span>
+      </a>
+      <nav class="menu">
+        <a href="#quickstart">Quickstart</a>
+        <a href="#sdk">SDK</a>
+        <a href="/docs">OpenAPI</a>
+        <a href="/login" class="menu-login">Dashboard</a>
+      </nav>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <svg class="icon-menu" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        <svg class="icon-close" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
-    <!-- Sidebar backdrop -->
-    <div class="docs-overlay" id="docsOverlay"></div>
+    <nav class="mobile-nav">
+      <a href="#quickstart">Quickstart</a>
+      <a href="#sdk">SDK</a>
+      <a href="/docs">OpenAPI</a>
+      <a href="/login" class="menu-login">Dashboard</a>
+    </nav>
+  </header>
 
-    <div class="docs-container">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar" id="docsSidebar">
-            <div class="docs-sidebar-top">
-                <button class="docs-sidebar-close" id="docsSidebarClose" aria-label="Close navigation">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <button onclick="location.href='/dashboard'" class="btn-secondary docs-sidebar-console">Dashboard</button>
-            <div class="sidebar-header">
-                <p>Auth Platform</p>
-                <span class="version">v3.1.0</span>
-            </div>
-            <nav class="sidebar-nav">
-                <div class="nav-section">
-                    <h3>Getting Started</h3>
-                    <a href="#overview" class="nav-item active">Overview</a>
-                    <a href="#quickstart" class="nav-item">Quick Start</a>
-                    <a href="#sdk-download" class="nav-item">SDK Installation</a>
-                </div>
-                <div class="nav-section">
-                    <h3>Authentication</h3>
-                    <a href="#integration" class="nav-item">Integration Guide</a>
-                    <a href="#env-setup" class="nav-item">Environment Setup</a>
-                    <a href="#sdk-reference" class="nav-item">SDK Reference</a>
-                </div>
-                <div class="nav-section">
-                    <h3>API Reference</h3>
-                    <a href="#endpoints-oauth" class="nav-item">OAuth Endpoints</a>
-                    <a href="#endpoints-auth" class="nav-item">Auth Endpoints</a>
-                    <a href="#endpoints-token" class="nav-item">Token Management</a>
-                    <a href="#endpoints-admin" class="nav-item">Admin Endpoints</a>
-                </div>
-                <div class="nav-section">
-                    <h3>Resources</h3>
-                    <a href="#examples" class="nav-item">Code Examples</a>
-                    <a href="#architecture" class="nav-item">Architecture</a>
-                    <a href="/docs" class="nav-item external">OpenAPI Spec ↗</a>
-                </div>
-            </nav>
+  <main>
+    <section id="overview" class="hero">
+      <div class="hero-grid">
+        <div>
+          <p class="eyebrow">Developer Docs</p>
+          <h1>Ship secure auth fast, <span>without giving up control.</span></h1>
+          <p class="lead">Production docs for Auth Platform and <code>auth-platform-sdk</code> <strong>v3.2.0</strong>. OAuth 2.0 + PKCE, HttpOnly token handling, session revocation streams, and multi-tenant admin controls.</p>
+          <div class="hero-actions">
+            <a href="#quickstart" class="btn btn-primary">Start Integration</a>
+            <a href="/docs" class="btn btn-secondary">Open API Spec</a>
+          </div>
+          <div class="hero-tags">
+            <span>OAuth 2.0 + PKCE</span>
+            <span>Confidential/Public Clients</span>
+            <span>HttpOnly Cookies</span>
+            <span>SSE Session Revocation</span>
+          </div>
+        </div>
+        <aside class="hero-panel">
+          <h2>What changed in v3.2.0</h2>
+          <ul>
+            <li><i class="fa-solid fa-check"></i> <code>createAuthProxy</code> now supports <code>clientType: 'confidential' | 'public'</code>.</li>
+            <li><i class="fa-solid fa-check"></i> Explicit allowlist proxying for auth/session endpoints only.</li>
+            <li><i class="fa-solid fa-check"></i> Auto token scrubbing + HttpOnly cookie lifecycle in the server proxy.</li>
+            <li><i class="fa-solid fa-check"></i> Client session monitor + revocation stream reconnect flow.</li>
+          </ul>
         </aside>
-        <!-- Main Content -->
-        <main class="content">
-            <div class="content-wrapper">
-                <!-- Overview -->
-                <section id="overview" class="doc-section">
-                    <h1>Auth Platform API</h1>
-                    <p class="lead">Self-hosted authentication microservice with OAuth 2.0 Authorization Code Flow (PKCE), email OTP verification, RS256 JWT tokens, and multi-tenant application management.</p>
-                    <p><strong>Install via npm:</strong> <code>npm install auth-platform-sdk</code></p>
-                   
-                    <div class="feature-grid">
-                        <div class="feature-card">
-                            <div class="feature-icon"><i class="fas fa-shield-alt"></i></div>
-                            <h3>OAuth 2.0 + PKCE</h3>
-                            <p>Secure authorization code flow with no client secrets required on the frontend</p>
-                        </div>
-                        <div class="feature-card">
-                            <div class="feature-icon"><i class="fas fa-sign-in-alt"></i></div>
-                            <h3>Hosted Login</h3>
-                            <p>Beautiful login UI rendered by the auth platform, like Google or GitHub</p>
-                        </div>
-                        <div class="feature-card">
-                            <div class="feature-icon"><i class="fas fa-key"></i></div>
-                            <h3>RS256 JWT</h3>
-                            <p>Asymmetric key signing with automatic token refresh</p>
-                        </div>
-                        <div class="feature-card">
-                            <div class="feature-icon"><i class="fas fa-bolt"></i></div>
-                            <h3>Real-Time Revocation</h3>
-                            <p>SSE-powered instant session invalidation when admin force-logouts a user</p>
-                        </div>
-                        <div class="feature-card">
-                            <div class="feature-icon"><i class="fas fa-buildings"></i></div>
-                            <h3>Multi-Tenant</h3>
-                            <p>Register multiple apps with isolated users and settings</p>
-                        </div>
-                    </div>
-                </section>
-                <!-- Quick Start -->
-                <section id="quickstart" class="doc-section">
-                    <h2>Quick Start (Next.js)</h2>
-                    <p>Get up and running in 4 steps:</p>
-                    <div class="step">
-                        <div class="step-number">1</div>
-                        <div class="step-content">
-                            <h3>Install SDK &amp; Register App</h3>
-                            <pre><code class="language-bash">npm install auth-platform-sdk</code></pre>
-                            <p>Then open the <a id="dashboard-link" href="#">Admin Dashboard</a>, create an app, and copy your <strong>Client ID</strong> + <strong>Client Secret</strong>.</p>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <div class="step-number">2</div>
-                        <div class="step-content">
-                            <h3>Configure Environment</h3>
-                            <p>Create <code>.env.local</code> in your Next.js project root:</p>
-                            <pre><code class="language-bash"># .env.local
+      </div>
+    </section>
+
+    <section class="anchor-row-wrap">
+      <div class="anchor-row">
+        <a href="#quickstart">Quickstart</a>
+        <a href="#sdk">SDK Reference</a>
+        <a href="#endpoints">Proxy Endpoints</a>
+        <a href="#security">Security Model</a>
+        <a href="#operations">Ops Features</a>
+      </div>
+    </section>
+
+    <section id="quickstart" class="doc-section">
+      <div class="section-head">
+        <p class="section-label">Get Running</p>
+        <h2>Quickstart (Next.js)</h2>
+      </div>
+
+      <div class="steps-grid">
+        <article class="step-card">
+          <div class="step-num">1</div>
+          <h3>Install SDK</h3>
+          <pre><code class="language-bash">npm install auth-platform-sdk</code></pre>
+          <p>Create an app in <a href="/dashboard/" class="dashboard-link">Admin Dashboard</a> and copy `Client ID` and `Client Secret`.</p>
+        </article>
+
+        <article class="step-card">
+          <div class="step-num">2</div>
+          <h3>Set Environment</h3>
+          <pre><code class="language-bash"># .env.local
 NEXT_PUBLIC_AUTH_SERVER=__AUTH_SERVER__
 NEXT_PUBLIC_CLIENT_ID=your-client-id
 NEXT_PUBLIC_REDIRECT_URI=http://localhost:3000/callback
 
-# Server-side only — NEVER prefix with NEXT_PUBLIC_
-AUTH_CLIENT_SECRET=your-client-secret</code></pre>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <div class="step-number">3</div>
-                        <div class="step-content">
-                            <h3>Create Auth Proxy Route</h3>
-                            <p>Create <code>app/api/auth/[...path]/route.ts</code> — this is the secure server-side proxy that handles <code>client_secret</code> and HttpOnly cookies:</p>
-                            <pre><code class="language-typescript">import type { NextRequest } from 'next/server';
-import { createAuthProxy } from '@/lib/auth-server';
+# server-only
+AUTH_CLIENT_SECRET=your-client-secret
+AUTH_CLIENT_TYPE=confidential</code></pre>
+        </article>
+
+        <article class="step-card step-wide">
+          <div class="step-num">3</div>
+          <h3>Add Route Proxy</h3>
+          <pre><code class="language-typescript">import { createAuthProxy } from 'auth-platform-sdk/server';
+import type { NextRequest } from 'next/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const proxy = createAuthProxy();
 type Ctx = { params: Promise&lt;{ path?: string[] }&gt; };
+
 async function handler(req: NextRequest, ctx: Ctx): Promise&lt;Response&gt; {
   return proxy(req, ctx);
 }
 
-export const GET  = handler;
+export const GET = handler;
 export const POST = handler;</code></pre>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <div class="step-number">4</div>
-                        <div class="step-content">
-                            <h3>Wrap App & Use</h3>
-                            <pre><code class="language-typescript">// layout.tsx
+        </article>
+
+        <article class="step-card step-wide">
+          <div class="step-num">4</div>
+          <h3>Wrap App and Use Hook</h3>
+          <pre><code class="language-tsx">// app/layout.tsx
 import { AuthProvider } from 'auth-platform-sdk/client';
-export default function Layout({ children }) {
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return &lt;html&gt;&lt;body&gt;&lt;AuthProvider&gt;{children}&lt;/AuthProvider&gt;&lt;/body&gt;&lt;/html&gt;;
 }
 
-// any component
+// any client component
 import { useAuth } from 'auth-platform-sdk/client';
-const { user, login, logout, isAuthenticated } = useAuth();</code></pre>
-                        </div>
-                    </div>
-                </section>
-                <!-- SDK Download Section -->
-                <section id="sdk-download" class="doc-section">
-                    <h2>SDK Installation</h2>
 
-                    <div class="download-card">
-                        <div class="download-info">
-                            <h3><i class="fas fa-cube"></i> NPM Package <span style="opacity:0.5">(recommended)</span></h3>
-                            <pre><code class="language-bash">npm install auth-platform-sdk</code></pre>
-                            <p>Then import in your code:</p>
-                            <pre><code class="language-typescript">import { AuthProvider, useAuth } from 'auth-platform-sdk/client';  // Browser
-import { createAuthProxy } from 'auth-platform-sdk/server';        // Server</code></pre>
-                        </div>
-                    </div>
+const { user, login, logout, isAuthenticated, logoutReason } = useAuth();</code></pre>
+        </article>
+      </div>
+    </section>
 
-                    <div class="info-box">
-                        <strong><i class="fas fa-shield-alt"></i> Security Architecture:</strong>
-                        <ul>
-                            <li><code>auth-sdk.js</code> runs in the <strong>browser</strong> — handles PKCE, login redirect, session monitoring. Has <strong>NO secrets, NO tokens</strong>.</li>
-                            <li><code>auth-server.js</code> runs on the <strong>server</strong> — injects <code>client_secret</code>, stores tokens in HttpOnly cookies. The browser never sees them.</li>
-                            <li>Both PKCE <em>and</em> <code>client_secret</code> are required — defense in depth (RFC 7636 + RFC 6749 §2.3.1).</li>
-                        </ul>
-                    </div>
-                </section>
-                <!-- Integration Guide -->
-                <section id="integration" class="doc-section">
-                    <h2>Integration Guide</h2>
-                   
-                    <h3>1. Basic Setup</h3>
-                    <p>Configure the SDK using environment variables — <strong>never hardcode secrets or URLs in source code</strong>.</p>
-                    <pre><code class="language-javascript">// Read from your environment / .env file
-const auth = new AuthClient({
-  AUTH_SERVER:  '__AUTH_SERVER__',          // or process.env.NEXT_PUBLIC_AUTH_SERVER
-  CLIENT_ID:   'app_xxxxxxxxxxxx',          // from Admin Console
-  REDIRECT_URI: window.location.origin,     // must match Admin Console
+    <section id="sdk" class="doc-section">
+      <div class="section-head">
+        <p class="section-label">SDK Surface</p>
+        <h2>Client + Server Reference</h2>
+      </div>
+
+      <div class="split-grid">
+        <article class="panel-card">
+          <h3><code>auth-platform-sdk/client</code></h3>
+          <p>Browser + React integration for OAuth flow and authenticated session state.</p>
+          <ul class="check-list">
+            <li><code>AuthProvider</code>, <code>useAuth()</code>, <code>AuthClient</code></li>
+            <li><code>login({ prompt, loginHint })</code> to control OAuth prompt behavior</li>
+            <li><code>onAuthChange((isAuth, reason) =&gt; ...)</code> for revocation/expiry handling</li>
+            <li><code>restoreSession()</code>, <code>refreshAccessToken()</code>, <code>startAutoRefresh()</code></li>
+          </ul>
+        </article>
+
+        <article class="panel-card">
+          <h3><code>auth-platform-sdk/server</code></h3>
+          <p>BFF proxy that keeps secrets/tokens out of browser JavaScript.</p>
+          <pre><code class="language-typescript">createAuthProxy({
+  authServerUrl: process.env.AUTH_SERVER_URL,
+  clientSecret: process.env.AUTH_CLIENT_SECRET,
+  clientType: 'confidential' // or 'public'
 });</code></pre>
-                    <h3>2. Handle Authentication</h3>
-                    <pre><code class="language-javascript">// On page load — check for OAuth callback
-await auth.handleCallback();
+          <p class="muted">Use `public` only when your OAuth client is intentionally configured as public (PKCE-only).</p>
+        </article>
+      </div>
+    </section>
 
-if (auth.isAuthenticated()) {
-  const user = auth.getUser();
-  showDashboard(user);
-  auth.startAutoRefresh();  // token refresh + SSE revocation stream
-} else {
-  showLoginButton();
-}</code></pre>
-                    <h3>3. Listen for Auth Changes</h3>
-                    <p>Get notified in real-time when the session state changes — including admin force-logouts.</p>
-                    <pre><code class="language-javascript">auth.onAuthChange((isLoggedIn, reason) => {
-  if (!isLoggedIn) {
-    if (reason === 'revoked_by_admin') {
-      showBanner('Your session was ended by an administrator');
-    } else if (reason === 'session_expired') {
-      showBanner('Session expired — please log in again');
-    }
-    redirectToLogin();
-  }
-});</code></pre>
-                    <h3>4. Making Authenticated Requests</h3>
-                    <pre><code class="language-javascript">async function fetchUserData() {
-  const token = auth.getAccessToken();
- 
-  const response = await fetch('https://your-api.com/user/profile', {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
-  });
- 
-  return response.json();
-}</code></pre>
-                    <h3>5. Logout</h3>
-                    <pre><code class="language-javascript">document.getElementById('logoutBtn').onclick = () => {
-  auth.logout();
-  window.location.href = '/';
-};</code></pre>
-                </section>
+    <section id="endpoints" class="doc-section">
+      <div class="section-head">
+        <p class="section-label">Proxy Contract</p>
+        <h2>Allowed Proxy Endpoints</h2>
+      </div>
 
-                <!-- Environment Setup -->
-                <section id="env-setup" class="doc-section">
-                    <h2>Environment Setup</h2>
-                    <p>The SDK reads its configuration from a config object — use your framework's environment variables to supply the values. <strong>Never commit real credentials to source control.</strong></p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="method post">POST</span></td><td><code>/oauth/token</code></td><td>Code exchange, server injects `client_secret` for confidential clients</td></tr>
+            <tr><td><span class="method get">GET</span></td><td><code>/oauth/logout</code></td><td>Ends upstream auth session + local cookie cleanup</td></tr>
+            <tr><td><span class="method post">POST</span></td><td><code>/token/refresh</code></td><td>Refresh from HttpOnly cookie</td></tr>
+            <tr><td><span class="method post">POST</span></td><td><code>/token/verify</code></td><td>Validates access token, returns payload for UI session state</td></tr>
+            <tr><td><span class="method post">POST</span></td><td><code>/token/revoke</code></td><td>Revokes session and clears local cookies</td></tr>
+            <tr><td><span class="method post">POST</span></td><td><code>/token/session-check</code></td><td>Lightweight session status check</td></tr>
+            <tr><td><span class="method get">GET</span></td><td><code>/token/session-stream</code></td><td>SSE stream for force-logout revocation events</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-                    <h3>Next.js</h3>
-                    <pre><code class="language-bash"># .env.local
-NEXT_PUBLIC_AUTH_SERVER=__AUTH_SERVER__
-NEXT_PUBLIC_CLIENT_ID=app_xxxxxxxxxxxx
-NEXT_PUBLIC_REDIRECT_URI=http://localhost:3000/callback</code></pre>
-                    <pre><code class="language-javascript">// lib/config.js
-export const AUTH_CONFIG = {
-  AUTH_SERVER:  process.env.NEXT_PUBLIC_AUTH_SERVER,
-  CLIENT_ID:   process.env.NEXT_PUBLIC_CLIENT_ID,
-  REDIRECT_URI: process.env.NEXT_PUBLIC_REDIRECT_URI,
-};</code></pre>
+    <section id="security" class="doc-section">
+      <div class="section-head">
+        <p class="section-label">Security Model</p>
+        <h2>How Tokens Stay Protected</h2>
+      </div>
 
-                    <h3>Vite (Vue / React / Svelte)</h3>
-                    <pre><code class="language-bash"># .env
-VITE_AUTH_SERVER=__AUTH_SERVER__
-VITE_CLIENT_ID=app_xxxxxxxxxxxx
-VITE_REDIRECT_URI=http://localhost:5173/callback</code></pre>
-                    <pre><code class="language-javascript">const auth = new AuthClient({
-  AUTH_SERVER:  import.meta.env.VITE_AUTH_SERVER,
-  CLIENT_ID:   import.meta.env.VITE_CLIENT_ID,
-  REDIRECT_URI: import.meta.env.VITE_REDIRECT_URI,
-});</code></pre>
+      <div class="security-grid">
+        <article class="security-card">
+          <h3>Browser</h3>
+          <ul class="check-list">
+            <li>Generates PKCE verifier/challenge + state</li>
+            <li>Never stores client secret</li>
+            <li>Never reads access/refresh tokens directly</li>
+          </ul>
+        </article>
+        <article class="security-card">
+          <h3>Server Proxy</h3>
+          <ul class="check-list">
+            <li>Injects client secret only on server-side</li>
+            <li>Stores tokens as HttpOnly cookies</li>
+            <li>Scrubs token fields from response bodies</li>
+          </ul>
+        </article>
+        <article class="security-card">
+          <h3>Auth Platform</h3>
+          <ul class="check-list">
+            <li>Issues RS256 JWT access + refresh tokens</li>
+            <li>Supports live session revocation signaling</li>
+            <li>Applies tenant and app isolation rules</li>
+          </ul>
+        </article>
+      </div>
 
-                    <h3>Create React App</h3>
-                    <pre><code class="language-bash"># .env
-REACT_APP_AUTH_SERVER=__AUTH_SERVER__
-REACT_APP_CLIENT_ID=app_xxxxxxxxxxxx
-REACT_APP_REDIRECT_URI=http://localhost:3000/callback</code></pre>
-                    <pre><code class="language-javascript">const auth = new AuthClient({
-  AUTH_SERVER:  process.env.REACT_APP_AUTH_SERVER,
-  CLIENT_ID:   process.env.REACT_APP_CLIENT_ID,
-  REDIRECT_URI: process.env.REACT_APP_REDIRECT_URI,
-});</code></pre>
+      <pre><code class="language-text">Browser (PKCE + state) -> /api/auth/* proxy (secret + HttpOnly cookies) -> Auth Platform
+Auth Platform -> proxy verifies/refreshes session -> browser receives auth status only</code></pre>
+    </section>
 
-                    <h3>Plain HTML / Vanilla JS</h3>
-                    <p>Since plain HTML has no build step, pass values directly or use <code>&lt;meta&gt;</code> tags:</p>
-                    <pre><code class="language-html">&lt;script src="auth-sdk.js"&gt;&lt;/script&gt;
-&lt;script&gt;
-  const auth = new AuthClient({
-    AUTH_SERVER:  '__AUTH_SERVER__',
-    CLIENT_ID:   'app_xxxxxxxxxxxx',
-    REDIRECT_URI: window.location.origin,
-  });
-&lt;/script&gt;</code></pre>
-                </section>
-                <!-- SDK Reference -->
-                <section id="sdk-reference" class="doc-section">
-                    <h2>SDK Reference</h2>
-                    <p class="info-box"><i class="fas fa-lock"></i> The SDK uses <strong>true private fields</strong> (<code>#</code>) — internal state like tokens and streams are completely inaccessible from outside the class.</p>
+    <section id="operations" class="doc-section">
+      <div class="section-head">
+        <p class="section-label">Operations</p>
+        <h2>Admin and Runtime Features</h2>
+      </div>
 
-                    <div class="method-card">
-                        <h3>new AuthClient(config)</h3>
-                        <p>Create an auth client. Throws if <code>AUTH_SERVER</code> is missing.</p>
-                        <pre><code class="language-javascript">const auth = new AuthClient({
-  AUTH_SERVER:  process.env.NEXT_PUBLIC_AUTH_SERVER,
-  CLIENT_ID:   process.env.NEXT_PUBLIC_CLIENT_ID,
-  REDIRECT_URI: process.env.NEXT_PUBLIC_REDIRECT_URI,
-});</code></pre>
-                        <table class="param-table">
-                            <tr><td><code>AUTH_SERVER</code></td><td>string</td><td><strong>Required.</strong> Auth platform URL (from env).</td></tr>
-                            <tr><td><code>CLIENT_ID</code></td><td>string</td><td>OAuth Client ID from Admin Console.</td></tr>
-                            <tr><td><code>REDIRECT_URI</code></td><td>string</td><td>Callback URL — must match Admin Console.</td></tr>
-                        </table>
-                    </div>
+      <div class="ops-grid">
+        <article class="ops-card">
+          <h3>Identity Controls</h3>
+          <p>OAuth SSO toggle per app, OTP flows, passkeys, admin MFA, and redirect URI policy.</p>
+        </article>
+        <article class="ops-card">
+          <h3>Session Control</h3>
+          <p>Real-time force logout, refresh token rotation, and active session visibility.</p>
+        </article>
+        <article class="ops-card">
+          <h3>Auditability</h3>
+          <p>Login history, OAuth consent activity, and admin activity events for security reviews.</p>
+        </article>
+      </div>
 
-                    <div class="method-card">
-                        <h3>auth.login()</h3>
-                        <p>Redirect to the hosted login page (OAuth 2.0 + PKCE). Like "Sign in with Google" — your app never sees the password.</p>
-                        <pre><code class="language-javascript">auth.login();</code></pre>
-                    </div>
+      <div class="cta-band">
+        <a href="/dashboard/" class="btn btn-primary dashboard-link">Open Dashboard</a>
+        <a href="/docs" class="btn btn-secondary">Open OpenAPI UI</a>
+        <a href="/assets/architecture.html" class="btn btn-ghost">View Architecture Diagram</a>
+      </div>
+    </section>
+  </main>
 
-                    <div class="method-card">
-                        <h3>auth.logout(reason?)</h3>
-                        <p>Clear session, stop refresh timers &amp; SSE stream, and fire the <code>onAuthChange</code> callback.</p>
-                        <pre><code class="language-javascript">auth.logout();  // voluntary logout (reason = null)</code></pre>
-                    </div>
+  <footer class="docs-footer">
+    <p>Auth Platform <span id="year"></span> • SDK v3.2.0 • FastAPI + Next.js integration</p>
+  </footer>
 
-                    <div class="method-card">
-                        <h3>auth.isAuthenticated() → boolean</h3>
-                        <p>Check if user has a valid, non-expired access token.</p>
-                        <pre><code class="language-javascript">if (auth.isAuthenticated()) {
-  console.log('User is logged in');
-}</code></pre>
-                    </div>
+  <script>
+    (function () {
+      var navToggle = document.getElementById('navToggle');
+      if (navToggle) {
+        navToggle.addEventListener('click', function () {
+          document.body.classList.toggle('nav-open');
+        });
+      }
 
-                    <div class="method-card">
-                        <h3>auth.getUser() → object | null</h3>
-                        <p>Get current user info decoded from the JWT. Returns a <strong>frozen</strong> object (cannot be mutated).</p>
-                        <pre><code class="language-javascript">const user = auth.getUser();
-// { email, user_id, app_id, issuer, expires_at, issued_at }</code></pre>
-                    </div>
+      document.querySelectorAll('.mobile-nav a').forEach(function (link) {
+        link.addEventListener('click', function () {
+          document.body.classList.remove('nav-open');
+        });
+      });
+    })();
 
-                    <div class="method-card">
-                        <h3>auth.getAccessToken() → string | null</h3>
-                        <p>Get the raw JWT for <code>Authorization</code> headers.</p>
-                        <pre><code class="language-javascript">fetch('/api/data', {
-  headers: { 'Authorization': `Bearer ${auth.getAccessToken()}` }
-});</code></pre>
-                    </div>
+    (async function initDocs() {
+      var fallback = window.location.origin;
+      var authServerUrl = fallback;
 
-                    <div class="method-card">
-                        <h3>auth.handleCallback() → Promise&lt;boolean&gt;</h3>
-                        <p>Process the OAuth redirect. Call once on page load (or on your callback route). Returns <code>true</code> if tokens were received.</p>
-                        <pre><code class="language-javascript">const handled = await auth.handleCallback();</code></pre>
-                    </div>
-
-                    <div class="method-card">
-                        <h3>auth.onAuthChange(callback)</h3>
-                        <p>Register a listener for authentication state changes. Fires on login, logout, and <strong>real-time admin revocation</strong>.</p>
-                        <pre><code class="language-javascript">auth.onAuthChange((isLoggedIn, reason) => {
-  // reason: 'revoked_by_admin' | 'session_expired' | null
-  if (!isLoggedIn &amp;&amp; reason === 'revoked_by_admin') {
-    alert('Admin ended your session');
-  }
-});</code></pre>
-                    </div>
-
-                    <div class="method-card">
-                        <h3>auth.startAutoRefresh()</h3>
-                        <p>Enable two automatic features:</p>
-                        <ul>
-                            <li><strong>Token refresh</strong> — refreshes access token before it expires (checks every 15 s)</li>
-                            <li><strong>SSE revocation stream</strong> — opens a server-sent event connection that fires instantly when an admin force-logouts the user</li>
-                        </ul>
-                        <pre><code class="language-javascript">if (auth.isAuthenticated()) {
-  auth.startAutoRefresh();
-}</code></pre>
-                    </div>
-
-                    <div class="method-card">
-                        <h3>auth.refreshAccessToken() → Promise&lt;boolean&gt;</h3>
-                        <p>Manually refresh the access token. Normally handled automatically by <code>startAutoRefresh()</code>.</p>
-                        <pre><code class="language-javascript">const ok = await auth.refreshAccessToken();</code></pre>
-                    </div>
-
-                    <div class="method-card">
-                        <h3>auth.verifyToken() → Promise&lt;object | null&gt;</h3>
-                        <p>Verify the current access token server-side and get the decoded payload.</p>
-                        <pre><code class="language-javascript">const payload = await auth.verifyToken();</code></pre>
-                    </div>
-
-                    <div class="method-card">
-                        <h3>auth.getTimeUntilExpiry() → number</h3>
-                        <p>Seconds remaining until the access token expires (0 if expired or missing).</p>
-                        <pre><code class="language-javascript">console.log(`Token expires in ${auth.getTimeUntilExpiry()}s`);</code></pre>
-                    </div>
-                </section>
-                <!-- API Endpoints -->
-                <section id="endpoints-oauth" class="doc-section">
-                    <h2>OAuth Endpoints</h2>
-                    <div class="endpoint-card">
-                        <div class="endpoint-header">
-                            <span class="method get">GET</span>
-                            <code>/oauth/authorize</code>
-                        </div>
-                        <p>Start OAuth authorization flow. Renders hosted login page.</p>
-                        <h4>Query Parameters</h4>
-                        <table class="param-table">
-                            <tr>
-                                <td><code>client_id</code></td>
-                                <td>string</td>
-                                <td>Your application's client ID</td>
-                            </tr>
-                            <tr>
-                                <td><code>redirect_uri</code></td>
-                                <td>string</td>
-                                <td>Redirect URI after authentication</td>
-                            </tr>
-                            <tr>
-                                <td><code>response_type</code></td>
-                                <td>string</td>
-                                <td>Must be "code"</td>
-                            </tr>
-                            <tr>
-                                <td><code>state</code></td>
-                                <td>string</td>
-                                <td>CSRF protection token</td>
-                            </tr>
-                            <tr>
-                                <td><code>code_challenge</code></td>
-                                <td>string</td>
-                                <td>PKCE code challenge (SHA256)</td>
-                            </tr>
-                            <tr>
-                                <td><code>code_challenge_method</code></td>
-                                <td>string</td>
-                                <td>Must be "S256"</td>
-                            </tr>
-                        </table>
-                    </div>
-                    <div class="endpoint-card">
-                        <div class="endpoint-header">
-                            <span class="method post">POST</span>
-                            <code>/oauth/token</code>
-                        </div>
-                        <p>Exchange authorization code for access and refresh tokens.</p>
-                        <h4>Request Body</h4>
-                        <pre><code class="language-json">{
-  "grant_type": "authorization_code",
-  "code": "auth_code_here",
-  "client_id": "your_client_id",
-  "redirect_uri": "https://your-app.com/callback",
-  "code_verifier": "pkce_verifier"
-}</code></pre>
-                        <h4>Response</h4>
-                        <pre><code class="language-json">{
-  "access_token": "eyJhbGc...",
-  "token_type": "Bearer",
-  "expires_in": 900,
-  "refresh_token": "refresh_token_here"
-}</code></pre>
-                    </div>
-                </section>
-                <section id="endpoints-auth" class="doc-section">
-                    <h2>Auth Endpoints</h2>
-                    <div class="endpoint-card">
-                        <div class="endpoint-header">
-                            <span class="method post">POST</span>
-                            <code>/auth/request-otp</code>
-                        </div>
-                        <p>Request OTP for email-based authentication.</p>
-                        <h4>Request Body</h4>
-                        <pre><code class="language-json">{
-  "email": "user@example.com",
-  "app_id": "app_xxxxxxxxxxxx"
-}</code></pre>
-                    </div>
-                    <div class="endpoint-card">
-                        <div class="endpoint-header">
-                            <span class="method post">POST</span>
-                            <code>/auth/verify-otp</code>
-                        </div>
-                        <p>Verify OTP and receive tokens.</p>
-                        <h4>Request Body</h4>
-                        <pre><code class="language-json">{
-  "email": "user@example.com",
-  "otp": "123456",
-  "app_id": "app_xxxxxxxxxxxx"
-}</code></pre>
-                        <h4>Response</h4>
-                        <pre><code class="language-json">{
-  "access_token": "eyJhbGc...",
-  "refresh_token": "refresh_token_here"
-}</code></pre>
-                    </div>
-                </section>
-                <section id="endpoints-token" class="doc-section">
-                    <h2>Token Management</h2>
-                    <div class="endpoint-card">
-                        <div class="endpoint-header">
-                            <span class="method post">POST</span>
-                            <code>/token/refresh</code>
-                        </div>
-                        <p>Refresh an access token using a refresh token.</p>
-                        <h4>Request Body</h4>
-                        <pre><code class="language-json">{
-  "refresh_token": "your_refresh_token"
-}</code></pre>
-                        <h4>Response</h4>
-                        <pre><code class="language-json">{
-  "access_token": "eyJhbGc...",
-  "token_type": "Bearer",
-  "expires_in": 900
-}</code></pre>
-                    </div>
-                    <div class="endpoint-card">
-                        <div class="endpoint-header">
-                            <span class="method post">POST</span>
-                            <code>/token/verify</code>
-                        </div>
-                        <p>Verify token validity and decode payload.</p>
-                        <h4>Request Body</h4>
-                        <pre><code class="language-json">{
-  "token": "eyJhbGc..."
-}</code></pre>
-                    </div>
-                </section>
-                <section id="endpoints-admin" class="doc-section">
-                    <h2>Admin Endpoints</h2>
-                    <p class="info-box warning"><i class="fas fa-triangle-exclamation"></i> Admin endpoints require authentication with admin credentials.</p>
-                    <div class="endpoint-card">
-                        <div class="endpoint-header">
-                            <span class="method get">GET</span>
-                            <code>/admin/apps</code>
-                        </div>
-                        <p>List all registered applications.</p>
-                    </div>
-                    <div class="endpoint-card">
-                        <div class="endpoint-header">
-                            <span class="method post">POST</span>
-                            <code>/admin/apps</code>
-                        </div>
-                        <p>Create a new application.</p>
-                        <h4>Request Body</h4>
-                        <pre><code class="language-json">{
-  "app_name": "My App",
-  "redirect_uris": ["https://myapp.com/callback"],
-  "session_duration": 900,
-  "refresh_token_duration": 604800
-}</code></pre>
-                    </div>
-                    <div class="endpoint-card">
-                        <div class="endpoint-header">
-                            <span class="method get">GET</span>
-                            <code>/admin/users</code>
-                        </div>
-                        <p>List all users across apps.</p>
-                    </div>
-                    <div class="endpoint-card">
-                        <div class="endpoint-header">
-                            <span class="method get">GET</span>
-                            <code>/admin/stats</code>
-                        </div>
-                        <p>Get dashboard statistics (app count, user count, active sessions).</p>
-                    </div>
-                </section>
-                <!-- Examples -->
-                <section id="examples" class="doc-section">
-                    <h2>Code Examples</h2>
-
-                    <h3>React / Next.js</h3>
-                    <pre><code class="language-javascript">// .env.local
-// NEXT_PUBLIC_AUTH_SERVER=__AUTH_SERVER__
-// NEXT_PUBLIC_CLIENT_ID=app_xxxxxxxxxxxx
-// NEXT_PUBLIC_REDIRECT_URI=http://localhost:3000/callback
-
-import AuthClient from './auth-sdk';
-import { AUTH_CONFIG } from './config';
-import { useEffect, useState } from 'react';
-
-function App() {
-  const [user, setUser] = useState(null);
-  const [logoutReason, setLogoutReason] = useState(null);
-  const [auth] = useState(() => new AuthClient(AUTH_CONFIG));
-
-  useEffect(() => {
-    async function init() {
-      await auth.handleCallback();
-
-      auth.onAuthChange((loggedIn, reason) => {
-        if (loggedIn) {
-          setUser(auth.getUser());
-          setLogoutReason(null);
-        } else {
-          setUser(null);
-          setLogoutReason(reason);
+      try {
+        var response = await fetch('/api/config');
+        if (response.ok) {
+          var cfg = await response.json();
+          authServerUrl = (cfg.AUTH_SERVER_URL || fallback).replace(/\/$/, '');
         }
+      } catch (_) {
+        authServerUrl = fallback;
+      }
+
+      function replacePlaceholders() {
+        document.querySelectorAll('code').forEach(function (el) {
+          if (el.textContent && el.textContent.indexOf('__AUTH_SERVER__') !== -1) {
+            el.textContent = el.textContent.split('__AUTH_SERVER__').join(authServerUrl);
+          }
+        });
+      }
+
+      function updateLinks() {
+        document.querySelectorAll('.dashboard-link').forEach(function (link) {
+          if (link.getAttribute('href') === '/dashboard/') return;
+          link.setAttribute('href', authServerUrl + '/dashboard/');
+        });
+      }
+
+      replacePlaceholders();
+      updateLinks();
+      hljs.highlightAll();
+
+      document.querySelectorAll('a[href^="#"]').forEach(function (anchor) {
+        anchor.addEventListener('click', function (e) {
+          var targetId = this.getAttribute('href');
+          var target = targetId ? document.querySelector(targetId) : null;
+          if (!target) return;
+          e.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
       });
 
-      if (auth.isAuthenticated()) {
-        setUser(auth.getUser());
-        auth.startAutoRefresh();
-      }
-    }
-    init();
-  }, []);
-
-  if (logoutReason === 'revoked_by_admin') {
-    return &lt;div className="banner"&gt;Admin ended your session&lt;/div&gt;;
-  }
-  if (!user) {
-    return &lt;button onClick={() =&gt; auth.login()}&gt;Login&lt;/button&gt;;
-  }
-  return (
-    &lt;div&gt;
-      &lt;h1&gt;Welcome, {user.email}&lt;/h1&gt;
-      &lt;button onClick={() =&gt; auth.logout()}&gt;Logout&lt;/button&gt;
-    &lt;/div&gt;
-  );
-}</code></pre>
-
-                    <h3>Vue.js (Vite)</h3>
-                    <pre><code class="language-javascript">// .env
-// VITE_AUTH_SERVER=__AUTH_SERVER__
-// VITE_CLIENT_ID=app_xxxxxxxxxxxx
-// VITE_REDIRECT_URI=http://localhost:5173/callback
-
-import AuthClient from './auth-sdk';
-
-export default {
-  data() {
-    return {
-      auth: new AuthClient({
-        AUTH_SERVER:  import.meta.env.VITE_AUTH_SERVER,
-        CLIENT_ID:   import.meta.env.VITE_CLIENT_ID,
-        REDIRECT_URI: import.meta.env.VITE_REDIRECT_URI,
-      }),
-      user: null,
-      logoutReason: null
-    };
-  },
-  async mounted() {
-    this.auth.onAuthChange((loggedIn, reason) => {
-      this.user = loggedIn ? this.auth.getUser() : null;
-      this.logoutReason = reason;
-    });
-    await this.auth.handleCallback();
-    if (this.auth.isAuthenticated()) {
-      this.user = this.auth.getUser();
-      this.auth.startAutoRefresh();
-    }
-  },
-  methods: {
-    login()  { this.auth.login(); },
-    logout() { this.auth.logout(); }
-  }
-};</code></pre>
-                    <h3>Protected API Route (Express)</h3>
-                    <pre><code class="language-javascript">const jwt = require('jsonwebtoken');
-const fs = require('fs');
-const publicKey = fs.readFileSync('public_key.pem');
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.sendStatus(401);
-  jwt.verify(token, publicKey, { algorithms: ['RS256'] }, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-}
-app.get('/api/protected', authenticateToken, (req, res) => {
-  res.json({ message: 'Protected data', user: req.user });
-});</code></pre>
-                </section>
-                <!-- Architecture & Flow Diagrams -->
-                <section id="architecture" class="doc-section">
-                    <h2>Architecture &amp; Flow Diagrams</h2>
-                    <p>Interactive sequence diagrams for all authentication flows — OAuth 2.0, OTP, WebAuthn, token refresh, multi-tenant isolation, and more.</p>
-                    <div style="border:1px solid #e5e7eb; border-radius:12px; overflow:hidden; background:#ffffff;">
-                        <iframe
-                            src="/assets/architecture.html"
-                            title="Auth Platform Architecture &amp; Flow Diagrams"
-                            style="width:100%; height:780px; border:none; display:block;"
-                            loading="lazy"
-                        ></iframe>
-                    </div>
-                </section>
-
-                <!-- Footer -->
-                <footer class="doc-footer">
-                    <div class="footer-links">
-                        <a href="/dashboard">Admin Dashboard</a>
-                        <a href="/docs">OpenAPI Spec</a>
-                        <a href="https://github.com">GitHub</a>
-                    </div>
-                    <p>Auth Platform v3.1.0 • Built with FastAPI</p>
-                </footer>
-            </div>
-            <!-- Table of Contents -->
-            <aside class="toc">
-                <h4>On this page</h4>
-                <nav id="toc-nav"></nav>
-            </aside>
-        </main>
-    </div>
-    <script>
-        (async function init() {
-            // ── 1. Fetch auth server URL from env (via /api/config) ──
-            const FALLBACK = window.location.origin;
-            let authServerUrl = FALLBACK;
-            try {
-                const res = await fetch('/api/config');
-                if (res.ok) {
-                    const cfg = await res.json();
-                    authServerUrl = (cfg.AUTH_SERVER_URL || FALLBACK).replace(/\/$/, '');
-                }
-            } catch (_) { /* use fallback */ }
-
-            // ── 2. Replace __AUTH_SERVER__ in raw <code> elements BEFORE highlight.js ──
-            document.querySelectorAll('code').forEach(el => {
-                if (el.textContent.includes('__AUTH_SERVER__')) {
-                    el.textContent = el.textContent.split('__AUTH_SERVER__').join(authServerUrl);
-                }
-            });
-
-            // ── 3. Replace in non-code text nodes (links, paragraphs) ──
-            function replaceInTextNodes(node, from, to) {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    if (node.textContent.includes(from)) {
-                        node.textContent = node.textContent.split(from).join(to);
-                    }
-                } else if (!['CODE', 'SCRIPT', 'STYLE'].includes(node.nodeName)) {
-                    node.childNodes.forEach(child => replaceInTextNodes(child, from, to));
-                }
-            }
-            replaceInTextNodes(document.body, '__AUTH_SERVER__', authServerUrl);
-
-            // ── 4. Update dashboard anchor href ──
-            const dashLink = document.getElementById('dashboard-link');
-            if (dashLink) dashLink.href = authServerUrl + '/dashboard/';
-
-            // ── 5. Now run syntax highlighting (URLs are already correct) ──
-            hljs.highlightAll();
-
-            // ── 6. Smooth scroll ──
-            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-                anchor.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    const target = document.querySelector(this.getAttribute('href'));
-                    if (target) {
-                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-                        this.classList.add('active');
-                    }
-                });
-            });
-
-            // ── 7. Generate table of contents ──
-            const tocNav = document.getElementById('toc-nav');
-            const headings = document.querySelectorAll('.content h2, .content h3');
-            headings.forEach(heading => {
-                const link = document.createElement('a');
-                link.href = `#${heading.parentElement.id}`;
-                link.textContent = heading.textContent;
-                link.className = heading.tagName === 'H3' ? 'toc-sub' : 'toc-main';
-                tocNav.appendChild(link);
-            });
-
-            // ── 8. Intersection observer for active nav ──
-            const observerOptions = { threshold: 0.5, rootMargin: '-100px 0px -66%' };
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const id = entry.target.id;
-                        document.querySelectorAll('.nav-item').forEach(item => {
-                            item.classList.remove('active');
-                            if (item.getAttribute('href') === `#${id}`) {
-                                item.classList.add('active');
-                            }
-                        });
-                    }
-                });
-            }, observerOptions);
-            document.querySelectorAll('.doc-section').forEach(section => observer.observe(section));
-        })();
-    </script>
-
-    <!-- Mobile sidebar toggle -->
-    <script>
-        (function () {
-            var hamburger   = document.getElementById('docsHamburger');
-            var closeBtn    = document.getElementById('docsSidebarClose');
-            var overlay     = document.getElementById('docsOverlay');
-            var sidebar     = document.getElementById('docsSidebar');
-
-            function openSidebar() {
-                sidebar.classList.add('open');
-                overlay.classList.add('active');
-                document.body.style.overflow = 'hidden';
-            }
-            function closeSidebar() {
-                sidebar.classList.remove('open');
-                overlay.classList.remove('active');
-                document.body.style.overflow = '';
-            }
-
-            if (hamburger)  hamburger.addEventListener('click', openSidebar);
-            if (closeBtn)   closeBtn.addEventListener('click', closeSidebar);
-            if (overlay)    overlay.addEventListener('click', closeSidebar);
-
-            // Close when a nav link is clicked on mobile
-            sidebar.querySelectorAll('.nav-item').forEach(function(item) {
-                item.addEventListener('click', function() {
-                    if (window.innerWidth <= 768) closeSidebar();
-                });
-            });
-        })();
-    </script>
+      var year = document.getElementById('year');
+      if (year) year.textContent = String(new Date().getFullYear());
+    })();
+  </script>
 </body>
 </html>

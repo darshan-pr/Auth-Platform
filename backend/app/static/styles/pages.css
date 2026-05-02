@@ -327,6 +327,7 @@
 
     .card { border-radius: var(--radius-sm); }
     .form-row { grid-template-columns: 1fr; }
+    .app-client-type-options { grid-template-columns: 1fr; }
     .app-logo-editor { grid-template-columns: 60px 1fr; }
     .app-logo-preview-wrap { width: 60px; height: 60px; border-radius: 12px; }
     .app-logo-input-row { grid-template-columns: 1fr auto; gap: 6px; }
