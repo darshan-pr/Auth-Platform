@@ -684,27 +684,34 @@
         </div>
       </div>
       <aside class="hero-panel">
-        <h2>What teams usually do first</h2>
+        <h2>Quick setup in 4 steps</h2>
         <ol>
           <li>
             <span class="step-num">1</span>
             <div>
-              <strong>Create an application</strong>
-              <p>Generate client credentials, set redirect URI allowlists, and keep each app isolated by tenant.</p>
+              <strong>Install SDK</strong>
+              <p>Run <code>npm install auth-platform-sdk</code> in your frontend app.</p>
             </div>
           </li>
           <li>
             <span class="step-num">2</span>
             <div>
-              <strong>Set auth policy</strong>
-              <p>Enable OAuth SSO, OTP, passkeys, login alerts, force-logout alerts, and token/session lifetimes.</p>
+              <strong>Create callback page</strong>
+              <p>Add <code>/auth/callback</code> and set your redirect URI to that path.</p>
             </div>
           </li>
           <li>
             <span class="step-num">3</span>
             <div>
-              <strong>Integrate in frontend</strong>
-              <p>Drop in the SDK, handle callback, and get automatic refresh plus instant revocation handling.</p>
+              <strong>Prompt AI</strong>
+              <p>Paste the prompt below into Copilot/Cursor/Claude to wire login + logout.</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-num">4</span>
+            <div>
+              <strong>Done</strong>
+              <p>Run the app, sign in once, and your auth flow is ready.</p>
             </div>
           </li>
         </ol>
@@ -715,13 +722,13 @@
   <!-- FLOW TAGLINE — hidden on mobile via CSS -->
   <div class="flow-arc-wrap">
     <div class="flow-arc-row">
-      <div class="flow-step"><span class="num">1</span><span class="step-label">Create App</span></div>
+      <div class="flow-step"><span class="num">1</span><span class="step-label">Install SDK</span></div>
       <span class="flow-arrow">→</span>
-      <div class="flow-step"><span class="num">2</span><span class="step-label">Set Security Policy</span></div>
+      <div class="flow-step"><span class="num">2</span><span class="step-label">Create Callback Page</span></div>
       <span class="flow-arrow">→</span>
-      <div class="flow-step"><span class="num">3</span><span class="step-label">Integrate SDK</span></div>
+      <div class="flow-step"><span class="num">3</span><span class="step-label">Prompt AI</span></div>
       <span class="flow-arrow">→</span>
-      <div class="flow-step"><span class="num">4</span><span class="step-label">Monitor Activity</span></div>
+      <div class="flow-step"><span class="num">4</span><span class="step-label">Done</span></div>
     </div>
   </div>
 
@@ -847,9 +854,9 @@
     <section class="prompt-section">
       <div class="prompt-inner">
         <div class="reveal">
-          <p class="section-label" style="display:block; margin-bottom:12px;">Zero dependencies · OAuth 2.0 PKCE · Revocation-aware sessions</p>
+          <p class="section-label" style="display:block; margin-bottom:12px;">NPM SDK · OAuth 2.0 PKCE · Revocation-aware sessions</p>
           <h2 class="section-title">Auth in &lt;5 lines.<br><em>Your users deserve it.</em></h2>
-          <p class="section-sub">One tiny JS file. No npm, no bundler, no backend rewrites. Paste the prompt below into your AI editor and wire up secure login quickly.</p>
+          <p class="section-sub">Install with npm, create a callback page, then paste this prompt into your AI editor and ship auth fast.</p>
         </div>
         <div class="prompt-box reveal reveal-d1" id="ai-prompt-box" onclick="copyPrompt()">
           <div class="prompt-bar">
@@ -861,15 +868,12 @@
           </div>
           <div class="prompt-code">
 <span class="c-comment"># Paste into GitHub Copilot / Cursor / Claude</span><br><br>
-I have <span class="c-fn">auth-sdk.js</span> from Auth Platform (self-hosted OAuth 2.0 + PKCE).<br>
-<span class="c-var">AUTH_SERVER</span>=<span class="c-str">"https://your-auth-server.com"</span>, <span class="c-var">CLIENT_ID</span>=<span class="c-str">"app_xxxx"</span>.<br>
-<span class="c-comment">Please:</span>
-<span class="prompt-point"><span class="c-kw">1.</span> Add <span class="c-str">&lt;script src="auth-sdk.js"&gt;&lt;/script&gt;</span> to my HTML</span>
-<span class="prompt-point"><span class="c-kw">2.</span> Init <span class="c-fn">AuthClient</span> with <span class="c-var">AUTH_SERVER</span>, <span class="c-var">CLIENT_ID</span>, <span class="c-var">REDIRECT_URI</span>=<span class="c-kw">window</span>.location.origin</span>
-<span class="prompt-point"><span class="c-kw">3.</span> Call <span class="c-fn">auth.handleCallback</span>() on page load</span>
-<span class="prompt-point"><span class="c-kw">4.</span> Show protected content if <span class="c-fn">auth.isAuthenticated</span>(), else call <span class="c-fn">auth.login</span>()</span>
-<span class="prompt-point"><span class="c-kw">5.</span> Add Logout → <span class="c-fn">auth.logout</span>() &amp; auto-refresh → <span class="c-fn">auth.startAutoRefresh</span>()</span><br>
-<span class="prompt-point"><span class="c-kw">6.</span> On auth change, handle <span class="c-str">'revoked_by_admin'</span> to force a clean re-login UX</span><br>
+Use <span class="c-str">auth-platform-sdk</span> in my Next.js app.<br>
+<span class="c-comment">Do exactly this:</span>
+<span class="prompt-point"><span class="c-kw">1.</span> Install: <span class="c-str">npm install auth-platform-sdk</span></span>
+<span class="prompt-point"><span class="c-kw">2.</span> Create <span class="c-str">/auth/callback</span> page and set redirect URI to that path</span>
+<span class="prompt-point"><span class="c-kw">3.</span> Wire SDK in layout + home page with Sign In/Sign Out using <span class="c-fn">AuthProvider</span> and <span class="c-fn">useAuth</span></span>
+<span class="prompt-point"><span class="c-kw">4.</span> Done: show final changed files and run commands</span><br>
 <span class="c-comment"># Docs: https://your-auth-server.com/api/docs</span>
           </div>
         </div>
@@ -895,29 +899,29 @@ I have <span class="c-fn">auth-sdk.js</span> from Auth Platform (self-hosted OAu
             <div class="cta-step">
               <div class="cta-step-num">1</div>
               <div class="cta-step-text">
-                <strong>Create tenant</strong>
-                <span>Set up your admin account and bootstrap your identity workspace.</span>
+                <strong>Install SDK</strong>
+                <span>Run <code>npm install auth-platform-sdk</code> in your app.</span>
               </div>
             </div>
             <div class="cta-step">
               <div class="cta-step-num">2</div>
               <div class="cta-step-text">
-                <strong>Register app</strong>
-                <span>Add redirect URIs and generate OAuth credentials for your client.</span>
+                <strong>Create callback page</strong>
+                <span>Add <code>/auth/callback</code> and configure the redirect URI.</span>
               </div>
             </div>
             <div class="cta-step">
               <div class="cta-step-num">3</div>
               <div class="cta-step-text">
-                <strong>Set security policy</strong>
-                <span>Configure OTP, passkeys, notifications, and token/session settings per app.</span>
+                <strong>Prompt AI</strong>
+                <span>Use the prompt block to generate the integration quickly.</span>
               </div>
             </div>
             <div class="cta-step">
               <div class="cta-step-num">4</div>
               <div class="cta-step-text">
-                <strong>Integrate and launch</strong>
-                <span>Wire the SDK, handle callback/revocation events, and ship with confidence.</span>
+                <strong>Done</strong>
+                <span>Start the app and verify login/logout works end-to-end.</span>
               </div>
             </div>
           </div>

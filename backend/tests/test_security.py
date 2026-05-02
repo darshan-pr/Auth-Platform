@@ -148,17 +148,22 @@ class TestClientAuthentication:
         })
         assert response.status_code == 401
 
-    def test_missing_client_secret_uses_pkce_only(self, client, test_app):
-        """Without client_secret, should proceed with PKCE-only (existing behavior)"""
+    def test_missing_client_secret_is_rejected(self, client, test_app):
+        """Without client_secret, request should be rejected (422 validation error).
+        
+        client_secret is now REQUIRED on /oauth/token (RFC 6749 §2.3.1).
+        The BFF proxy always injects it server-side — requests without it are invalid.
+        """
         response = client.post("/oauth/token", json={
             "grant_type": "authorization_code",
             "code": "fake_code",
             "client_id": test_app["app_id"],
             "redirect_uri": "http://localhost:3000/callback",
             "code_verifier": "test_verifier",
+            # client_secret intentionally omitted
         })
-        # Should fail on code validation, not client authentication
-        assert response.status_code != 401 or "client_secret" not in response.json().get("detail", "")
+        # Should fail with 422 (missing required field) since client_secret is mandatory
+        assert response.status_code == 422
 
 
 # ============== DPoP Service Unit Tests ==============

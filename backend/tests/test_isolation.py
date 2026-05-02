@@ -264,7 +264,9 @@ class TestJWTTenantClaims:
         # Verify claims
         verify_r = client.post("/token/verify", json={"token": token})
         payload = verify_r.json()["payload"]
-        assert payload["sub"] == "jwt@test.com"
+        # sub should be an opaque, immutable identifier (not email)
+        assert payload["sub"].startswith("usr_")
+        assert payload.get("email") == "jwt@test.com"
         assert "user_id" in payload
         assert "tenant_id" in payload
         assert payload["app_id"] == test_app["app_id"]

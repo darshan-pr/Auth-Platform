@@ -34,14 +34,14 @@
             <button onclick="location.href='/dashboard'" class="btn-secondary docs-sidebar-console">Dashboard</button>
             <div class="sidebar-header">
                 <p>Auth Platform</p>
-                <span class="version">v2.0.0</span>
+                <span class="version">v3.1.0</span>
             </div>
             <nav class="sidebar-nav">
                 <div class="nav-section">
                     <h3>Getting Started</h3>
                     <a href="#overview" class="nav-item active">Overview</a>
                     <a href="#quickstart" class="nav-item">Quick Start</a>
-                    <a href="#sdk-download" class="nav-item">Download SDK</a>
+                    <a href="#sdk-download" class="nav-item">SDK Installation</a>
                 </div>
                 <div class="nav-section">
                     <h3>Authentication</h3>
@@ -71,6 +71,7 @@
                 <section id="overview" class="doc-section">
                     <h1>Auth Platform API</h1>
                     <p class="lead">Self-hosted authentication microservice with OAuth 2.0 Authorization Code Flow (PKCE), email OTP verification, RS256 JWT tokens, and multi-tenant application management.</p>
+                    <p><strong>Install via npm:</strong> <code>npm install auth-platform-sdk</code></p>
                    
                     <div class="feature-grid">
                         <div class="feature-card">
@@ -102,81 +103,87 @@
                 </section>
                 <!-- Quick Start -->
                 <section id="quickstart" class="doc-section">
-                    <h2>Quick Start</h2>
-                    <p>Get up and running in 3 steps:</p>
+                    <h2>Quick Start (Next.js)</h2>
+                    <p>Get up and running in 4 steps:</p>
                     <div class="step">
                         <div class="step-number">1</div>
                         <div class="step-content">
-                            <h3>Register Your Application</h3>
-                            <p>Open the <a id="dashboard-link" href="#">Admin Dashboard</a> and create a new application. You'll receive a <strong>Client ID</strong>.</p>
-                            <pre><code class="language-text">Admin Dashboard: __AUTH_SERVER__/dashboard/</code></pre>
+                            <h3>Install SDK &amp; Register App</h3>
+                            <pre><code class="language-bash">npm install auth-platform-sdk</code></pre>
+                            <p>Then open the <a id="dashboard-link" href="#">Admin Dashboard</a>, create an app, and copy your <strong>Client ID</strong> + <strong>Client Secret</strong>.</p>
                         </div>
                     </div>
                     <div class="step">
                         <div class="step-number">2</div>
                         <div class="step-content">
-                            <h3>Download the SDK</h3>
-                            <p>Get our JavaScript SDK to integrate authentication into your app.</p>
-                            <a href="/static/auth-sdk.js" download class="download-button">
-                                <span class="download-icon"><i class="fas fa-download"></i></span>
-                                Download auth-sdk.js
-                            </a>
+                            <h3>Configure Environment</h3>
+                            <p>Create <code>.env.local</code> in your Next.js project root:</p>
+                            <pre><code class="language-bash"># .env.local
+NEXT_PUBLIC_AUTH_SERVER=__AUTH_SERVER__
+NEXT_PUBLIC_CLIENT_ID=your-client-id
+NEXT_PUBLIC_REDIRECT_URI=http://localhost:3000/callback
+
+# Server-side only — NEVER prefix with NEXT_PUBLIC_
+AUTH_CLIENT_SECRET=your-client-secret</code></pre>
                         </div>
                     </div>
                     <div class="step">
                         <div class="step-number">3</div>
                         <div class="step-content">
-                            <h3>Initialize & Use</h3>
-                            <p>Add the SDK to your HTML and initialize with your Client ID.</p>
-                            <pre><code class="language-html">&lt;script src="auth-sdk.js"&gt;&lt;/script&gt;
-&lt;script&gt;
-  const auth = new AuthClient({
-    AUTH_SERVER: '__AUTH_SERVER__',
-    CLIENT_ID: 'your-client-id',
-    REDIRECT_URI: window.location.origin
-  });
-  await auth.handleCallback();
-  if (auth.isAuthenticated()) {
-    console.log('Logged in as', auth.getUser().email);
-    auth.startAutoRefresh();
-  } else {
-    auth.login(); // Redirects to hosted login
-  }
-&lt;/script&gt;</code></pre>
+                            <h3>Create Auth Proxy Route</h3>
+                            <p>Create <code>app/api/auth/[...path]/route.ts</code> — this is the secure server-side proxy that handles <code>client_secret</code> and HttpOnly cookies:</p>
+                            <pre><code class="language-typescript">import type { NextRequest } from 'next/server';
+import { createAuthProxy } from '@/lib/auth-server';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+const proxy = createAuthProxy();
+type Ctx = { params: Promise&lt;{ path?: string[] }&gt; };
+async function handler(req: NextRequest, ctx: Ctx): Promise&lt;Response&gt; {
+  return proxy(req, ctx);
+}
+
+export const GET  = handler;
+export const POST = handler;</code></pre>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h3>Wrap App & Use</h3>
+                            <pre><code class="language-typescript">// layout.tsx
+import { AuthProvider } from 'auth-platform-sdk/client';
+export default function Layout({ children }) {
+  return &lt;html&gt;&lt;body&gt;&lt;AuthProvider&gt;{children}&lt;/AuthProvider&gt;&lt;/body&gt;&lt;/html&gt;;
+}
+
+// any component
+import { useAuth } from 'auth-platform-sdk/client';
+const { user, login, logout, isAuthenticated } = useAuth();</code></pre>
                         </div>
                     </div>
                 </section>
                 <!-- SDK Download Section -->
                 <section id="sdk-download" class="doc-section">
-                    <h2>Download SDK</h2>
-                    <p>Our JavaScript SDK handles all OAuth 2.0 + PKCE complexity for you. Just download, configure, and integrate.</p>
-                   
+                    <h2>SDK Installation</h2>
+
                     <div class="download-card">
                         <div class="download-info">
-                            <h3>JavaScript SDK</h3>
-                            <p>Drop-in authentication for any frontend framework</p>
-                            <ul class="feature-list">
-                                <li>OAuth 2.0 Authorization Code Flow with PKCE</li>
-                                <li>Automatic token refresh &amp; SSE real-time revocation</li>
-                                <li>True encapsulation — internal state is inaccessible</li>
-                                <li>Auth change events with logout reason</li>
-                                <li>Zero dependencies &amp; framework-agnostic</li>
-                            </ul>
-                        </div>
-                        <div class="download-actions">
-                            <a href="/static/auth-sdk.js" download class="btn-primary">
-                                <i class="fas fa-download"></i> Download SDK
-                            </a>
-                            <a href="#sdk-reference" class="btn-secondary">View Documentation</a>
+                            <h3><i class="fas fa-cube"></i> NPM Package <span style="opacity:0.5">(recommended)</span></h3>
+                            <pre><code class="language-bash">npm install auth-platform-sdk</code></pre>
+                            <p>Then import in your code:</p>
+                            <pre><code class="language-typescript">import { AuthProvider, useAuth } from 'auth-platform-sdk/client';  // Browser
+import { createAuthProxy } from 'auth-platform-sdk/server';        // Server</code></pre>
                         </div>
                     </div>
+
                     <div class="info-box">
-                        <strong><i class="fas fa-box"></i> What's included:</strong>
+                        <strong><i class="fas fa-shield-alt"></i> Security Architecture:</strong>
                         <ul>
-                            <li><code>auth-sdk.js</code> — Complete AuthClient class with true <code>#</code> private fields</li>
-                            <li>PKCE crypto utilities (code verifier, SHA-256 challenge)</li>
-                            <li>Auto token refresh timer + SSE session stream for real-time revocation</li>
-                            <li>Works as <code>&lt;script&gt;</code> tag (UMD) or ES module <code>import</code></li>
+                            <li><code>auth-sdk.js</code> runs in the <strong>browser</strong> — handles PKCE, login redirect, session monitoring. Has <strong>NO secrets, NO tokens</strong>.</li>
+                            <li><code>auth-server.js</code> runs on the <strong>server</strong> — injects <code>client_secret</code>, stores tokens in HttpOnly cookies. The browser never sees them.</li>
+                            <li>Both PKCE <em>and</em> <code>client_secret</code> are required — defense in depth (RFC 7636 + RFC 6749 §2.3.1).</li>
                         </ul>
                     </div>
                 </section>
@@ -686,7 +693,7 @@ app.get('/api/protected', authenticateToken, (req, res) => {
                         <a href="/docs">OpenAPI Spec</a>
                         <a href="https://github.com">GitHub</a>
                     </div>
-                    <p>Auth Platform v2.0.0 • Built with FastAPI</p>
+                    <p>Auth Platform v3.1.0 • Built with FastAPI</p>
                 </footer>
             </div>
             <!-- Table of Contents -->

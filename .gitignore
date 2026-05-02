@@ -18,3 +18,11 @@ CONTEXT.md
 .pytest_cache/
 .tmp-test.db
 .vscode/
+
+
+packages/auth-sdk/dist
+packages/auth-sdk/node_modules
+packages/auth-sdk/.env
+packages/auth-sdk/auth-platform-sdk-3.1.0.tgz
+next-test-app/node_modules
+next-test-app/.env

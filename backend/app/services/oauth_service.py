@@ -8,6 +8,7 @@ Security Flow:
 4. Client exchanges code + code_verifier for tokens at /oauth/token
 5. PKCE ensures only the original client can exchange the code — no app_secret needed on frontend
 """
+from __future__ import annotations
 
 import secrets
 import hashlib
@@ -29,7 +30,8 @@ def create_oauth_session(
     redirect_uri: str,
     state: str,
     code_challenge: str,
-    code_challenge_method: str
+    code_challenge_method: str,
+    scope: str = "openid profile email",
 ) -> str:
     """
     Create an OAuth session when user lands on the authorize page.
@@ -41,14 +43,15 @@ def create_oauth_session(
         "redirect_uri": redirect_uri,
         "state": state,
         "code_challenge": code_challenge,
-        "code_challenge_method": code_challenge_method
+        "code_challenge_method": code_challenge_method,
+        "scope": scope,
     }
     redis_client.setex(
         f"oauth:session:{session_id}",
         OAUTH_SESSION_EXPIRY,
         json.dumps(session_data)
     )
-    logger.info(f"OAuth session created for client_id={client_id}")
+    logger.info(f"OAuth session created for client_id={client_id}, scope={scope}")
     return session_id
 
 
@@ -88,7 +91,8 @@ def generate_authorization_code(
     user_email: str,
     user_id: int,
     code_challenge: str,
-    code_challenge_method: str
+    code_challenge_method: str,
+    scope: str = "openid profile email",
 ) -> str:
     """
     Generate a one-time authorization code after successful authentication.
@@ -101,14 +105,15 @@ def generate_authorization_code(
         "user_email": user_email,
         "user_id": user_id,
         "code_challenge": code_challenge,
-        "code_challenge_method": code_challenge_method
+        "code_challenge_method": code_challenge_method,
+        "scope": scope,
     }
     redis_client.setex(
         f"oauth:code:{code}",
         AUTH_CODE_EXPIRY,
         json.dumps(code_data)
     )
-    logger.info(f"Authorization code generated for user={user_email}, client={client_id}")
+    logger.info(f"Authorization code generated for user={user_email}, client={client_id}, scope={scope}")
     return code
 
 
@@ -169,17 +174,15 @@ def validate_authorization_code(
 def verify_code_challenge(code_verifier: str, code_challenge: str, method: str) -> bool:
     """
     Verify PKCE code_challenge against code_verifier.
-    
+
+    Only S256 is accepted — plain PKCE is insecure and MUST NOT be used.
     S256: code_challenge == base64url(SHA256(code_verifier))
-    plain: code_challenge == code_verifier (not recommended)
     """
-    if method == "S256":
-        computed = base64.urlsafe_b64encode(
-            hashlib.sha256(code_verifier.encode("ascii")).digest()
-        ).rstrip(b"=").decode("ascii")
-        return computed == code_challenge
-    elif method == "plain":
-        return code_verifier == code_challenge
-    
-    logger.warning(f"Unknown code_challenge_method: {method}")
-    return False
+    if method != "S256":
+        logger.warning(f"Rejected PKCE method '{method}' — only S256 is allowed")
+        return False
+
+    computed = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode("ascii")).digest()
+    ).rstrip(b"=").decode("ascii")
+    return computed == code_challenge

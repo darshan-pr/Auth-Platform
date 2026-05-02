@@ -48,6 +48,7 @@ def _set_platform_sso_cookie(client, email: str, tenant_id: int):
     token = create_access_token(
         {
             "sub": email,
+            "email": email,
             "tenant_id": tenant_id,
             "source_app_id": "tests",
             "type": "platform_sso",
@@ -133,7 +134,7 @@ def test_my_auth_activity_includes_oauth_consent_grants(client, admin_token):
             "response_type": "code",
             "state": "history-consent",
             "code_challenge": "challenge123",
-            "code_challenge_method": "plain",
+            "code_challenge_method": "S256",
         },
         follow_redirects=False,
     )

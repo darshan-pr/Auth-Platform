@@ -1,62 +1,78 @@
+'use client';
 /**
  * ============================================================
- *  Auth Platform — JavaScript SDK  (v2.0.0)
+ *  Auth Platform — SDK  (v3.1.0)
  * ============================================================
  *
- *  Drop-in authentication for any web app.
- *  Uses OAuth 2.0 Authorization Code Flow with PKCE.
- *  Zero dependencies. Works with any framework.
+ *  Complete, secure authentication for Next.js apps.
+ *  OAuth 2.0 Authorization Code Flow with PKCE + client_secret.
+ *  Zero external dependencies.
  *
- *  Quick start:
- *  ─────────────────────────────────────────────────
- *  1. Set environment variables (or use a .env file):
+ *  This SDK has 2 parts:
+ *    1. auth-sdk.js    — Browser-side (this file)
+ *    2. auth-server.js — Server-side proxy (handles secrets & cookies)
  *
- *       AUTH_SERVER_URL=https://auth.yourplatform.com
- *       AUTH_CLIENT_ID=your-client-id
- *       AUTH_REDIRECT_URI=https://yourapp.com/callback
+ *  ┌──────────────────────────────────────────────────────────┐
+ *  │                    SETUP GUIDE                           │
+ *  │                                                          │
+ *  │  Step 1: Create .env.local                               │
+ *  │  ────────────────────────────────────────                 │
+ *  │    NEXT_PUBLIC_AUTH_SERVER=http://localhost:8000           │
+ *  │    NEXT_PUBLIC_CLIENT_ID=<from Admin Console>             │
+ *  │    NEXT_PUBLIC_REDIRECT_URI=http://localhost:3000/callback│
+ *  │    AUTH_CLIENT_SECRET=<from Admin Console → Credentials>  │
+ *  │                                                          │
+ *  │  Step 2: Create the auth proxy route                     │
+ *  │  ────────────────────────────────────────                 │
+ *  │    File: app/api/auth/[...path]/route.ts                 │
+ *  │                                                          │
+ *  │    import { createAuthProxy } from '@/lib/auth-server';  │
+ *  │    const handler = createAuthProxy();                    │
+ *  │    export const GET = handler;                           │
+ *  │    export const POST = handler;                          │
+ *  │    export const dynamic = 'force-dynamic';               │
+ *  │                                                          │
+ *  │  Step 3: Wrap your app with AuthProvider                 │
+ *  │  ────────────────────────────────────────                 │
+ *  │    // In your layout.tsx:                                │
+ *  │    import { AuthProvider } from '@/lib/auth-sdk';        │
+ *  │    <AuthProvider>{children}</AuthProvider>               │
+ *  │                                                          │
+ *  │  Step 4: Use in any component                            │
+ *  │  ────────────────────────────────────────                 │
+ *  │    import { useAuth } from '@/lib/auth-sdk';             │
+ *  │    const { user, login, logout } = useAuth();            │
+ *  │                                                          │
+ *  │  That's it. 4 steps. The SDK handles everything else.    │
+ *  └──────────────────────────────────────────────────────────┘
  *
- *  2. Initialise the SDK:
- *
- *       const auth = new AuthClient({
- *         // Read from your environment / config — never hardcode in production
- *         AUTH_SERVER:   process.env.AUTH_SERVER_URL,   // or import.meta.env.VITE_AUTH_SERVER
- *         CLIENT_ID:     process.env.AUTH_CLIENT_ID,    // from Admin Console
- *         REDIRECT_URI:  process.env.AUTH_REDIRECT_URI, // must match Admin Console
- *       });
- *
- *  3. Handle the callback & check session:
- *
- *       await auth.handleCallback();
- *       if (auth.isAuthenticated()) {
- *         console.log('Hello', auth.getUser().email);
- *         auth.startAutoRefresh();  // auto token refresh + real-time revocation
- *       } else {
- *         auth.login();
- *       }
- *
- *  That's it. No secrets needed on the frontend.
- *
- *  Environment variable naming by framework:
- *  ──────────────────────────────────────────
- *    Next.js  →  NEXT_PUBLIC_AUTH_SERVER, NEXT_PUBLIC_CLIENT_ID, NEXT_PUBLIC_REDIRECT_URI
- *    Vite     →  VITE_AUTH_SERVER,        VITE_CLIENT_ID,        VITE_REDIRECT_URI
- *    CRA      →  REACT_APP_AUTH_SERVER,   REACT_APP_CLIENT_ID,   REACT_APP_REDIRECT_URI
- *    Plain JS →  pass values directly from your build config or <meta> tags
+ *  Security architecture:
+ *  ────────────────────────────────────────────────────────────
+ *    Browser (this file)              Server (auth-server.js)
+ *    ┌─────────────────────┐          ┌──────────────────────────┐
+ *    │ PKCE (code_verifier) │  ────►  │ + client_secret injection │
+ *    │ State (CSRF)         │          │ + HttpOnly cookie storage  │
+ *    │ Login redirect       │          │ + Token body scrubbing     │
+ *    │ Session monitoring   │          │ + Cookie cleanup on logout │
+ *    └─────────────────────┘          └──────────────────────────┘
+ *       has NO secrets                   has client_secret + tokens
+ *       has NO tokens                    in HttpOnly cookies
  *
  * ============================================================
  */
 
+
+/* ═══════════════════════════════════════════════════════════
+ *  PART 1: AuthClient — Browser-side OAuth client
+ * ═══════════════════════════════════════════════════════════ */
+
 class AuthClient {
 
-    /* ──────────────────────────────────────────────
-     *  TRUE PRIVATE STATE
-     *  Using # private fields — inaccessible outside this class.
-     *  Developers cannot read or mutate tokens, streams, etc.
-     * ────────────────────────────────────────────── */
     #authServer;
-    #authProxyPath;
+    #proxyPath;
     #clientId;
     #redirectUri;
+    #scope;
     #sessionPayload = null;
     #onAuthChangeCb = null;
     #sessionInterval = null;
@@ -66,146 +82,95 @@ class AuthClient {
      * Create an AuthClient instance.
      *
      * @param {Object} config
-     * @param {string} config.AUTH_SERVER   - Auth platform URL (from env)
-     * @param {string} config.CLIENT_ID    - OAuth Client ID (from Admin Console)
-     * @param {string} config.REDIRECT_URI - Callback URL (must match Admin Console)
+     * @param {string} config.authServer    - Auth server URL (alias: AUTH_SERVER)
+     * @param {string} config.clientId      - OAuth Client ID (alias: CLIENT_ID)
+     * @param {string} config.redirectUri   - Callback URL (alias: REDIRECT_URI)
+     * @param {string} [config.proxyPath]   - Proxy route path (alias: AUTH_PROXY_PATH, default: '/api/auth')
+     * @param {string} [config.scope]       - OAuth scope (alias: SCOPE, default: 'openid profile email')
      */
     constructor(config = {}) {
-        const authServer = AuthClient.#clean(config.AUTH_SERVER).replace(/\/+$/, '');
-        if (!authServer) {
-            throw new Error(
-                '[AuthClient] AUTH_SERVER is required.\n' +
-                'Set it via environment variable (e.g. NEXT_PUBLIC_AUTH_SERVER).'
-            );
-        }
-        this.#authServer = authServer;
-        this.#authProxyPath = AuthClient.#clean(config.AUTH_PROXY_PATH).replace(/\/+$/, '');
-        this.#clientId = AuthClient.#clean(config.CLIENT_ID);
-        this.#redirectUri = AuthClient.#clean(config.REDIRECT_URI);
+        const clean = (v) => v == null ? '' : String(v).trim().replace(/^['"]|['"]$/g, '');
 
-        // Helpful diagnostics for common local tunnel drift issues.
-        if (typeof window !== 'undefined') {
-            try {
-                const authHost = new URL(this.#authServer).hostname;
-                const browserHost = window.location.hostname;
-                const isLocalBrowser = browserHost === 'localhost' || browserHost === '127.0.0.1';
-                if (isLocalBrowser && /\.trycloudflare\.com$/i.test(authHost)) {
-                    console.warn(
-                        '[AuthClient] AUTH_SERVER points to a trycloudflare host while app runs locally. ' +
-                        'If tunnel URL changed, update env and restart your app.'
-                    );
-                }
-            } catch {
-                // Ignore URL parsing diagnostics.
-            }
+        // Accept both camelCase (new) and UPPER_CASE (legacy) config keys
+        this.#authServer = clean(config.authServer || config.AUTH_SERVER).replace(/\/+$/, '');
+        this.#clientId   = clean(config.clientId || config.CLIENT_ID);
+        this.#redirectUri = clean(config.redirectUri || config.REDIRECT_URI);
+        this.#proxyPath  = clean(config.proxyPath || config.AUTH_PROXY_PATH || '/api/auth').replace(/\/+$/, '');
+        this.#scope      = clean(config.scope || config.SCOPE) || 'openid profile email';
+
+        if (!this.#authServer) {
+            throw new Error('[AuthSDK] authServer is required. Check your .env.local');
         }
     }
 
 
-    /* =====================================================
-     *  PUBLIC API — These are the ONLY methods developers
-     *  should use. Everything else is truly private.
-     * ===================================================== */
+    /* ─── Public API ─────────────────────────────────────── */
 
-    /**
-     * Redirect to the hosted login page (OAuth 2.0 + PKCE).
-     * Like "Sign in with Google" — your app never sees the password.
-     */
+    /** Redirect to the Auth Platform hosted login page. */
     login(options = {}) {
-        if (!this.#clientId) {
-            throw new Error(
-                '[AuthClient] CLIENT_ID is not configured.\n' +
-                'Get one from the Admin Console and set it via environment variable.'
-            );
-        }
-        if (!this.#redirectUri) {
-            throw new Error(
-                '[AuthClient] REDIRECT_URI is not configured.\n' +
-                'Set NEXT_PUBLIC_REDIRECT_URI (or framework equivalent) to a registered callback URL.'
-            );
-        }
+        if (!this.#clientId) throw new Error('[AuthSDK] clientId is not configured.');
+        if (!this.#redirectUri) throw new Error('[AuthSDK] redirectUri is not configured.');
         this.#startOAuthFlow(options);
     }
 
-    /**
-     * Clear session and notify listeners.
-     * Also calls GET /oauth/logout on the auth server to clear the platform_sso
-     * HttpOnly cookie — without this, the next login() would silently re-authenticate
-     * the user via the persisted SSO cookie without showing the login form.
-     * @param {string} [reason] - Optional reason: 'revoked_by_admin' | 'session_expired' | null
-     */
+    /** Clear session, notify listeners, clear server-side cookies. */
     logout(reason) {
-        const postLogoutRedirect = encodeURIComponent(window.location.origin);
+        const redirect = encodeURIComponent(window.location.origin);
 
-        // Fire-and-forget through proxy first so HttpOnly auth cookies are cleared.
-        // Proxy is same-origin, so this call includes cookies automatically.
+        // Clear HttpOnly cookies via proxy
         try {
-            this.#fetchAuth(`/oauth/logout?post_logout_redirect_uri=${postLogoutRedirect}`, {
+            this.#fetch(`/oauth/logout?post_logout_redirect_uri=${redirect}`, {
                 method: 'GET',
             }).catch(() => {});
         } catch { /* ignore */ }
 
-        // Fire-and-forget: clear the server-side SSO cookie in the background.
-        // Use an image/beacon rather than fetch to avoid CORS preflight issues.
+        // Clear server-side SSO cookie directly
         try {
-            const logoutUrl = this.#authServer + '/oauth/logout?post_logout_redirect_uri=' + postLogoutRedirect;
-            // Create a hidden iframe to trigger the cookie-clearing redirect
             const img = new Image();
-            img.src = logoutUrl;
-        } catch { /* ignore — server-side cookie clears on next login attempt anyway */ }
+            img.src = this.#authServer + '/oauth/logout?post_logout_redirect_uri=' + redirect;
+        } catch { /* ignore */ }
 
         this.#clearSession();
         if (this.#onAuthChangeCb) this.#onAuthChangeCb(false, reason || null);
     }
 
-    /**
-     * Check if the user has a valid (non-expired) access token.
-     * @returns {boolean}
-     */
+    /** @returns {boolean} Whether user has a valid (non-expired) session */
     isAuthenticated() {
         return Boolean(this.#sessionPayload?.exp && this.#sessionPayload.exp * 1000 > Date.now());
     }
 
     /**
-     * Get current user info decoded from the JWT.
-     * Returns a frozen object — cannot be accidentally mutated.
-     * @returns {{ email: string, user_id: number, app_id: string, issuer: string, expires_at: Date, issued_at: Date } | null}
+     * Get current user info. Returns a frozen, immutable object.
+     * @returns {{ sub: string, email: string, user_id: number, app_id: string, scope: string|null, issuer: string, expires_at: Date, issued_at: Date } | null}
      */
     getUser() {
         const p = this.#sessionPayload;
         if (!p) return null;
         try {
             return Object.freeze({
-                email:      p.sub,
+                sub:        p.sub,
+                email:      p.email || p.sub,
                 user_id:    p.user_id,
                 app_id:     p.app_id,
+                scope:      p.scope || null,
                 issuer:     p.iss,
                 expires_at: new Date(p.exp * 1000),
                 issued_at:  new Date(p.iat * 1000),
             });
-        } catch {
-            return null;
-        }
+        } catch { return null; }
     }
 
     /**
-     * Get the raw access token string for Authorization headers.
-     * Usage: fetch(url, { headers: { Authorization: `Bearer ${auth.getAccessToken()}` } })
-     * @returns {string | null}
+     * Access token is stored in HttpOnly cookies — browser cannot read it.
+     * Use the proxy to make authenticated requests to your backend.
+     * @returns {null} Always null by design.
      */
-    getAccessToken() {
-        // Access token is intentionally HttpOnly cookie scoped by the auth proxy.
-        return null;
-    }
+    getAccessToken() { return null; }
 
-    /**
-     * Manually refresh the access token using the stored refresh token.
-     * Normally you don't need this — startAutoRefresh() handles it automatically.
-     * @returns {Promise<boolean>} true if refresh succeeded
-     */
+    /** Refresh the access token using the HttpOnly refresh_token cookie. */
     async refreshAccessToken() {
         try {
-            const res = await this.#fetchAuth('/token/refresh', {
+            const res = await this.#fetch('/token/refresh', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({}),
@@ -214,41 +179,35 @@ class AuthClient {
                 const payload = await this.verifyToken();
                 return Boolean(payload);
             }
-        } catch (err) {
-            console.error('[AuthClient] Token refresh failed:', err.message);
+        } catch (e) {
+            console.error('[AuthSDK] Refresh failed:', e.message);
         }
         this.#clearSession();
         return false;
     }
 
-    /**
-     * Verify the current access token with the auth server.
-     * @returns {Promise<Object | null>} decoded payload or null
-     */
+    /** Verify the current access token with the auth server. */
     async verifyToken() {
         try {
-            const res = await this.#fetchAuth('/token/verify', {
+            const res = await this.#fetch('/token/verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({}),
             });
             if (!res.ok) return null;
             const data = await res.json();
-            const payload = (data && typeof data === 'object' && data.payload) ? data.payload : data;
+            const payload = data?.payload || data;
             if (!payload || typeof payload !== 'object') return null;
             this.#sessionPayload = payload;
             return payload;
-        } catch (err) {
-            console.error('[AuthClient] Token verify failed:', err.message);
+        } catch (e) {
+            console.error('[AuthSDK] Verify failed:', e.message);
             this.#sessionPayload = null;
             return null;
         }
     }
 
-    /**
-     * Restore session state from HttpOnly cookies via server-side token verification.
-     * @returns {Promise<boolean>} true when an authenticated session exists
-     */
+    /** Restore session from HttpOnly cookies (call on page load). */
     async restoreSession() {
         const payload = await this.verifyToken();
         if (payload) {
@@ -261,31 +220,9 @@ class AuthClient {
     }
 
     /**
-     * Register a callback that fires on login/logout events.
-     *
-     * @param {(isAuthenticated: boolean, reason?: string) => void} callback
-     *
-     * The reason parameter on logout:
-     *   'revoked_by_admin' — admin force-logged out the user
-     *   'session_expired'  — tokens expired and refresh failed
-     *   null               — user logged out voluntarily
-     *
-     * Example:
-     *   auth.onAuthChange((loggedIn, reason) => {
-     *     if (!loggedIn && reason === 'revoked_by_admin') {
-     *       showBanner('Your session was ended by an administrator');
-     *     }
-     *   });
-     */
-    onAuthChange(callback) {
-        this.#onAuthChangeCb = callback;
-    }
-
-    /**
-     * Handle the OAuth redirect callback.
-     * Call this once on page load (or on your callback route).
-     * Returns true if a callback was successfully processed.
-     * @returns {Promise<boolean>}
+     * Handle OAuth callback — call this on your callback page.
+     * Exchanges the authorization code for tokens via the proxy.
+     * @returns {Promise<boolean>} true if callback was successfully processed
      */
     async handleCallback() {
         const params = new URLSearchParams(window.location.search);
@@ -293,28 +230,32 @@ class AuthClient {
         const state = params.get('state');
         if (!code || !state) return false;
 
-        // CSRF protection
-        const savedState = sessionStorage.getItem('_auth_state');
-        if (state !== savedState) {
-            console.error('[AuthClient] State mismatch — possible CSRF attack');
-            this.#cleanupOAuthParams();
+        // CSRF check
+        if (state !== sessionStorage.getItem('_auth_state')) {
+            console.error('[AuthSDK] State mismatch — possible CSRF');
+            this.#cleanup();
             return false;
         }
 
         const codeVerifier = sessionStorage.getItem('_auth_code_verifier');
         if (!codeVerifier) {
-            console.error('[AuthClient] Missing PKCE code_verifier');
-            this.#cleanupOAuthParams();
+            console.error('[AuthSDK] Missing PKCE code_verifier');
+            this.#cleanup();
             return false;
         }
 
-        // Remove OAuth params from the URL bar
+        // Remove sensitive params from URL bar immediately
         window.history.replaceState({}, document.title, window.location.pathname);
-        this.#cleanupOAuthParams();
+        this.#cleanup();
 
-        // Exchange authorization code for server-side cookie session.
+        // Validate code format
+        if (!/^[A-Za-z0-9_-]{20,}$/.test(code)) {
+            console.error('[AuthSDK] Invalid authorization code format');
+            return false;
+        }
+
         try {
-            const res = await this.#fetchAuth('/oauth/token', {
+            const res = await this.#fetch('/oauth/token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -323,68 +264,47 @@ class AuthClient {
                     client_id:     this.#clientId,
                     redirect_uri:  this.#redirectUri,
                     code_verifier: codeVerifier,
+                    // NOTE: client_secret is NOT here — the proxy injects it server-side
                 }),
             });
 
-            let data = {};
-            const rawBody = await res.text();
-            try {
-                data = rawBody ? JSON.parse(rawBody) : {};
-            } catch {
-                data = { detail: rawBody || `HTTP ${res.status}` };
-            }
-
             if (!res.ok) {
-                console.error('[AuthClient] Token exchange failed:', data.detail);
+                const err = await res.json().catch(() => ({}));
+                console.error('[AuthSDK] Token exchange failed:', err.detail || res.status);
                 return false;
             }
 
             const restored = await this.restoreSession();
             if (restored && this.#onAuthChangeCb) this.#onAuthChangeCb(true);
             return restored;
-        } catch (err) {
-            const from = window.location.origin;
-            console.error('[AuthClient] Token exchange error:', err.message, {
-                authServer: this.#authServer,
-                proxyPath: this.#authProxyPath || null,
-                redirectUri: this.#redirectUri,
-                browserOrigin: from,
-                hint: 'If using trycloudflare, ensure tunnel URLs are current and restart your app after env changes.',
-            });
+        } catch (e) {
+            console.error('[AuthSDK] Token exchange error:', e.message);
             return false;
         }
     }
 
-    /**
-     * Enable automatic session management:
-     *   1. Refreshes the access token before it expires (timer-based)
-     *   2. Opens an SSE stream for real-time admin revocation detection
-     *
-     * Call this AFTER confirming isAuthenticated() === true.
-     */
+    /** Register a callback for login/logout events. */
+    onAuthChange(callback) { this.#onAuthChangeCb = callback; }
+
+    /** Start auto-refresh and real-time revocation monitoring. */
     startAutoRefresh() {
         this.#startSessionMonitor();
         this.#startSessionStream();
     }
 
-    /**
-     * Seconds until the access token expires (0 if expired or missing).
-     * @returns {number}
-     */
+    /** Seconds until the access token expires (0 if expired/missing). */
     getTimeUntilExpiry() {
         if (!this.#sessionPayload?.exp) return 0;
         return Math.max(0, Math.floor((this.#sessionPayload.exp * 1000 - Date.now()) / 1000));
     }
 
 
-    /* =====================================================
-     *  PRIVATE — OAuth Flow
-     * ===================================================== */
+    /* ─── Private: OAuth Flow ────────────────────────────── */
 
     async #startOAuthFlow(options = {}) {
-        const codeVerifier  = AuthClient.#generateRandom(32);
+        const codeVerifier  = AuthClient.#random(64);
         const codeChallenge = await AuthClient.#sha256Base64Url(codeVerifier);
-        const state         = AuthClient.#generateRandom(16);
+        const state         = AuthClient.#random(16);
 
         sessionStorage.setItem('_auth_code_verifier', codeVerifier);
         sessionStorage.setItem('_auth_state', state);
@@ -394,176 +314,213 @@ class AuthClient {
             redirect_uri:          this.#redirectUri,
             response_type:         'code',
             state,
+            scope:                 this.#scope,
             code_challenge:        codeChallenge,
             code_challenge_method: 'S256',
-            // NOTE: We do NOT pass prompt=login here — silent SSO should work
-            // when the user already has a valid platform_sso cookie.
-            // Logout clears the cookie via GET /oauth/logout, which ensures
-            // the NEXT login after sign-out will show the login form.
         });
-        const prompt = AuthClient.#clean(options.prompt);
-        if (prompt) qs.set('prompt', prompt);
-        const loginHint = AuthClient.#clean(options.login_hint || options.loginHint);
-        if (loginHint) qs.set('login_hint', loginHint);
+        if (options.prompt)    qs.set('prompt', options.prompt);
+        if (options.loginHint) qs.set('login_hint', options.loginHint);
 
         window.location.href = this.#authServer + '/oauth/authorize?' + qs;
     }
 
-
     #clearSession() {
         this.#sessionPayload = null;
-        this.#stopSessionMonitor();
-        this.#stopSessionStream();
+        this.#stopMonitor();
+        this.#stopStream();
     }
 
-    #cleanupOAuthParams() {
+    #cleanup() {
         sessionStorage.removeItem('_auth_code_verifier');
         sessionStorage.removeItem('_auth_state');
     }
 
 
-    /* =====================================================
-     *  PRIVATE — Token Auto-Refresh Timer
-     * ===================================================== */
+    /* ─── Private: Auto-Refresh Timer ────────────────────── */
 
     #startSessionMonitor() {
-        this.#stopSessionMonitor();
+        this.#stopMonitor();
         this.#sessionInterval = setInterval(async () => {
             const ttl = this.getTimeUntilExpiry();
             if (ttl <= 0) {
-                const ok = await this.refreshAccessToken();
-                if (!ok) this.logout('session_expired');
+                if (!(await this.refreshAccessToken())) this.logout('session_expired');
             } else if (ttl < 120) {
                 await this.refreshAccessToken();
             }
         }, 15_000);
     }
 
-    #stopSessionMonitor() {
-        if (this.#sessionInterval) {
-            clearInterval(this.#sessionInterval);
-            this.#sessionInterval = null;
-        }
+    #stopMonitor() {
+        if (this.#sessionInterval) { clearInterval(this.#sessionInterval); this.#sessionInterval = null; }
     }
 
 
-    /* =====================================================
-     *  PRIVATE — SSE Real-Time Revocation Stream
-     *  The server pushes a "revoked" event the instant an
-     *  admin force-logouts the user. Zero polling overhead.
-     * ===================================================== */
+    /* ─── Private: SSE Real-Time Revocation Stream ───────── */
 
     #startSessionStream() {
-        this.#stopSessionStream();
-        if (!this.isAuthenticated()) return;
-        if (typeof EventSource === 'undefined') return;
+        this.#stopStream();
+        if (!this.isAuthenticated() || typeof EventSource === 'undefined') return;
 
-        const streamUrl = this.#resolveApiUrl('/token/session-stream');
-        this.#eventSource = new EventSource(streamUrl);
+        this.#eventSource = new EventSource(`${this.#proxyPath}/token/session-stream`);
 
         this.#eventSource.addEventListener('revoked', () => {
-            this.#stopSessionStream();
+            this.#stopStream();
             this.logout('revoked_by_admin');
         });
 
         this.#eventSource.onerror = async () => {
             if (this.#eventSource?.readyState === EventSource.CLOSED) {
-                this.#stopSessionStream();
-                const ok = await this.refreshAccessToken();
-                if (ok) setTimeout(() => this.#startSessionStream(), 2000);
-                else    this.logout('session_expired');
+                this.#stopStream();
+                if (await this.refreshAccessToken()) setTimeout(() => this.#startSessionStream(), 2000);
+                else this.logout('session_expired');
             }
-            // CONNECTING state = auto-reconnect, let it be
         };
     }
 
-    #stopSessionStream() {
-        if (this.#eventSource) {
-            this.#eventSource.close();
-            this.#eventSource = null;
-        }
+    #stopStream() {
+        if (this.#eventSource) { this.#eventSource.close(); this.#eventSource = null; }
     }
 
 
-    /* =====================================================
-     *  PRIVATE STATIC — Crypto & JWT Utilities
-     * ===================================================== */
+    /* ─── Private: Networking ────────────────────────────── */
 
-    static #generateRandom(bytes) {
+    /**
+     * ALL requests go through the proxy. No fallback. No direct calls.
+     * The proxy is the security boundary — bypassing it leaks tokens.
+     */
+    #fetch(path, init) {
+        const p = String(path || '').startsWith('/') ? path : `/${path}`;
+        return fetch(`${this.#proxyPath}${p}`, { credentials: 'include', ...(init || {}) });
+    }
+
+
+    /* ─── Private Static: Crypto ─────────────────────────── */
+
+    static #random(bytes) {
         const arr = new Uint8Array(bytes);
         crypto.getRandomValues(arr);
-        return AuthClient.#base64Url(arr);
-    }
-
-    static #clean(value) {
-        if (value == null) return '';
-        return String(value).trim().replace(/^['"]|['"]$/g, '');
+        let s = ''; for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
+        return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     }
 
     static async #sha256Base64Url(plain) {
         const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(plain));
-        return AuthClient.#base64Url(new Uint8Array(digest));
-    }
-
-    static #base64Url(buf) {
-        let s = '';
-        for (let i = 0; i < buf.length; i++) s += String.fromCharCode(buf[i]);
+        const arr = new Uint8Array(digest);
+        let s = ''; for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
         return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    }
-
-    static #decodeJWT(token) {
-        const seg = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        const json = decodeURIComponent(
-            atob(seg).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
-        );
-        return JSON.parse(json);
-    }
-
-    #resolveApiUrl(path) {
-        const normalized = String(path || '').startsWith('/') ? String(path) : `/${String(path || '')}`;
-        if (this.#authProxyPath) return `${this.#authProxyPath}${normalized}`;
-        return this.#authServer + normalized;
-    }
-
-    async #fetchAuth(path, init) {
-        const normalized = String(path || '').startsWith('/') ? String(path) : `/${String(path || '')}`;
-        const primaryUrl = this.#resolveApiUrl(normalized);
-        const fallbackUrl = this.#authProxyPath ? (this.#authServer + normalized) : '';
-        const shouldFallbackByStatus = (status) => [404, 405, 501, 502, 503].includes(status);
-        const requestInit = {
-            credentials: 'include',
-            ...(init || {}),
-        };
-
-        try {
-            const primaryRes = await fetch(primaryUrl, requestInit);
-            if (fallbackUrl && primaryUrl !== fallbackUrl && shouldFallbackByStatus(primaryRes.status)) {
-                try {
-                    return await fetch(fallbackUrl, requestInit);
-                } catch {
-                    return primaryRes;
-                }
-            }
-            return primaryRes;
-        } catch (primaryErr) {
-            if (fallbackUrl && primaryUrl !== fallbackUrl) {
-                try {
-                    return await fetch(fallbackUrl, requestInit);
-                } catch (fallbackErr) {
-                    const primaryMsg = primaryErr?.message || 'Primary fetch failed';
-                    const fallbackMsg = fallbackErr?.message || 'Fallback fetch failed';
-                    throw new Error(
-                        `${primaryMsg} (primary: ${primaryUrl}); ${fallbackMsg} (fallback: ${fallbackUrl})`
-                    );
-                }
-            }
-            throw primaryErr;
-        }
     }
 }
 
 
-/* =====================================================
- *  Browser Global Export
- * ===================================================== */
-if (typeof window !== 'undefined') window.AuthClient = AuthClient;
+/* ═══════════════════════════════════════════════════════════
+ *  PART 2: React Integration — AuthProvider + useAuth()
+ *
+ *  Usage:
+ *    // layout.tsx
+ *    import { AuthProvider } from '@/lib/auth-sdk';
+ *    <AuthProvider>{children}</AuthProvider>
+ *
+ *    // any component
+ *    import { useAuth } from '@/lib/auth-sdk';
+ *    const { user, login, logout, isAuthenticated, loading } = useAuth();
+ *
+ * ═══════════════════════════════════════════════════════════ */
+
+// React imports (tree-shaken if not used)
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+
+
+const AuthContext = createContext(undefined);
+
+/**
+ * AuthProvider — wrap your app to enable authentication.
+ *
+ * Reads config from environment variables automatically:
+ *   NEXT_PUBLIC_AUTH_SERVER    → Auth server URL
+ *   NEXT_PUBLIC_CLIENT_ID     → OAuth client ID
+ *   NEXT_PUBLIC_REDIRECT_URI  → Callback URL
+ *
+ * @example
+ *   // app/layout.tsx
+ *   import { AuthProvider } from '@/lib/auth-sdk';
+ *   export default function Layout({ children }) {
+ *     return <html><body><AuthProvider>{children}</AuthProvider></body></html>;
+ *   }
+ */
+export function AuthProvider({ children }) {
+    const [client, setClient]     = useState(null);
+    const [isAuth, setIsAuth]     = useState(false);
+    const [user, setUser]         = useState(null);
+    const [loading, setLoading]   = useState(true);
+    const [reason, setReason]     = useState(null);
+
+    useEffect(() => {
+        const init = async () => {
+            try {
+                const c = new AuthClient({
+                    authServer:  process.env.NEXT_PUBLIC_AUTH_SERVER,
+                    clientId:    process.env.NEXT_PUBLIC_CLIENT_ID,
+                    redirectUri: process.env.NEXT_PUBLIC_REDIRECT_URI,
+                    proxyPath:   process.env.NEXT_PUBLIC_AUTH_PROXY_PATH || '/api/auth',
+                    scope:       process.env.NEXT_PUBLIC_AUTH_SCOPE,
+                });
+                setClient(c);
+
+                const handled = await c.handleCallback();
+                let authenticated = c.isAuthenticated();
+                if (!authenticated && !handled) {
+                    authenticated = await c.restoreSession();
+                }
+
+                setIsAuth(authenticated);
+                if (authenticated) {
+                    setUser(c.getUser());
+                    if (!handled) c.startAutoRefresh();
+                }
+
+                c.onAuthChange((authed, logoutReason) => {
+                    setIsAuth(authed);
+                    if (authed) { setUser(c.getUser()); setReason(null); }
+                    else { setUser(null); if (logoutReason) setReason(logoutReason); }
+                });
+            } catch (e) {
+                console.error('[AuthSDK] Init failed:', e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        init();
+    }, []);
+
+    const login  = useCallback((opts) => client?.login(opts), [client]);
+    const logout = useCallback(() => { client?.logout(); setUser(null); setIsAuth(false); setReason(null); }, [client]);
+
+    return React.createElement(AuthContext.Provider, {
+        value: { isAuthenticated: isAuth, user, login, logout, loading, logoutReason: reason, authClient: client },
+    }, children);
+}
+
+/**
+ * useAuth() — access auth state in any component.
+ *
+ * @returns {{ isAuthenticated: boolean, user: object|null, login: Function, logout: Function, loading: boolean, logoutReason: string|null }}
+ *
+ * @example
+ *   const { user, login, logout, isAuthenticated, loading } = useAuth();
+ *   if (loading) return <p>Loading...</p>;
+ *   if (!isAuthenticated) return <button onClick={login}>Login</button>;
+ *   return <p>Hello {user.email}! <button onClick={logout}>Logout</button></p>;
+ */
+export function useAuth() {
+    const ctx = useContext(AuthContext);
+    if (ctx === undefined) throw new Error('useAuth() must be inside <AuthProvider>');
+    return ctx;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+ *  Exports
+ * ═══════════════════════════════════════════════════════════ */
+
+export { AuthClient };
+export default AuthClient;

@@ -43,6 +43,7 @@ def _set_platform_sso_cookie(client, email: str, tenant_id: int, source_app_id: 
     token = create_access_token(
         {
             "sub": email,
+            "email": email,
             "tenant_id": tenant_id,
             "source_app_id": source_app_id,
             "type": "platform_sso",
@@ -101,7 +102,7 @@ def test_oauth_authorize_shows_explicit_login_when_sso_disabled(client, admin_to
             "response_type": "code",
             "state": "state123",
             "code_challenge": "challenge123",
-            "code_challenge_method": "plain",
+            "code_challenge_method": "S256",
         },
     )
 
@@ -142,7 +143,7 @@ def test_oauth_disabled_app_login_completes_without_consent_screen(client, admin
             "response_type": "code",
             "state": "disabled-direct",
             "code_challenge": "challenge123",
-            "code_challenge_method": "plain",
+            "code_challenge_method": "S256",
         },
     )
     assert authorize.status_code == 200
@@ -201,7 +202,7 @@ def test_oauth_authorize_with_only_admin_cookie_bootstraps_oauth_session(client,
             "response_type": "code",
             "state": "show-login",
             "code_challenge": "challenge123",
-            "code_challenge_method": "plain",
+            "code_challenge_method": "S256",
         },
         follow_redirects=False,
     )
@@ -250,7 +251,7 @@ def test_oauth_prompt_consent_keeps_sso_identity_but_forces_consent_ui(client, a
             "response_type": "code",
             "state": "prompt-consent",
             "code_challenge": "challenge123",
-            "code_challenge_method": "plain",
+            "code_challenge_method": "S256",
             "prompt": "consent",
         },
         follow_redirects=False,
@@ -290,7 +291,7 @@ def test_oauth_authorize_ignores_legacy_admin_portal_sso_cookie(client, admin_to
             "response_type": "code",
             "state": "legacy-cookie",
             "code_challenge": "challenge123",
-            "code_challenge_method": "plain",
+            "code_challenge_method": "S256",
         },
         follow_redirects=False,
     )
@@ -328,7 +329,7 @@ def test_oauth_authorize_with_platform_sso_goes_to_consent_then_silent_after_app
             "response_type": "code",
             "state": "silent-state",
             "code_challenge": "challenge123",
-            "code_challenge_method": "plain",
+            "code_challenge_method": "S256",
         },
         follow_redirects=False,
     )
@@ -366,7 +367,7 @@ def test_oauth_authorize_with_platform_sso_goes_to_consent_then_silent_after_app
             "response_type": "code",
             "state": "silent-state-2",
             "code_challenge": "challenge123",
-            "code_challenge_method": "plain",
+            "code_challenge_method": "S256",
         },
         follow_redirects=False,
     )
@@ -384,7 +385,7 @@ def test_oauth_authorize_with_platform_sso_goes_to_consent_then_silent_after_app
             "response_type": "code",
             "state": "silent-state-3",
             "code_challenge": "challenge123",
-            "code_challenge_method": "plain",
+            "code_challenge_method": "S256",
             "prompt": "consent",
         },
         follow_redirects=False,
@@ -425,7 +426,7 @@ def test_oauth_forgot_password_sends_reset_otp_for_passwordless_user(client, adm
             "response_type": "code",
             "state": "forgot-pwd",
             "code_challenge": "challenge123",
-            "code_challenge_method": "plain",
+            "code_challenge_method": "S256",
         },
     )
     assert authorize.status_code == 200
@@ -481,7 +482,7 @@ def test_oauth_login_passwordless_user_shows_reset_password_guidance(client, adm
             "response_type": "code",
             "state": "login-warning",
             "code_challenge": "challenge123",
-            "code_challenge_method": "plain",
+            "code_challenge_method": "S256",
         },
     )
     assert authorize.status_code == 200

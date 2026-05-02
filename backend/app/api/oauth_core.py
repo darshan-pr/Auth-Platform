@@ -113,7 +113,8 @@ def _issue_platform_sso_cookie_payload(user: User, app: App) -> dict:
     max_age = max(int((app.refresh_token_expiry_days or 1) * 86400), _MIN_SSO_COOKIE_AGE_SECONDS)
     token = create_access_token(
         {
-            "sub": user.email,
+            "sub": user.email,  # SSO cookie uses email as sub for cross-app identity resolution
+            "email": user.email,
             "tenant_id": app.tenant_id,
             "source_app_id": app.app_id,
             "type": "platform_sso",
@@ -222,7 +223,9 @@ def _resolve_sso_user_for_app(request: Request, db: Session, app: App) -> Option
     if payload.get("tenant_id") != app.tenant_id:
         return None
 
-    email = payload.get("sub")
+    # Read email from dedicated claim; fall back to sub for backward compat
+    # (old SSO cookies had sub=email, new ones have both sub=email and email=email)
+    email = payload.get("email") or payload.get("sub")
     if not email:
         return None
 
@@ -336,6 +339,7 @@ def authorize(
     redirect_uri: str,
     response_type: str = "code",
     state: str = None,
+    scope: Optional[str] = None,
     code_challenge: str = None,
     code_challenge_method: str = "S256",
     prompt: Optional[str] = None,
@@ -381,10 +385,19 @@ def authorize(
         error_ctx["error"] = "PKCE code_challenge is required. Public clients must use PKCE."
         return _with_no_cache_headers(templates.TemplateResponse(request, "auth.html", error_ctx))
 
+    # Only S256 is accepted — plain PKCE is insecure and deprecated.
+    if code_challenge_method != "S256":
+        error_ctx["error"] = "Only code_challenge_method=S256 is supported. Plain PKCE is not allowed."
+        return _with_no_cache_headers(templates.TemplateResponse(request, "auth.html", error_ctx))
+
     # State is mandatory for CSRF protection
     if not state:
         error_ctx["error"] = "state parameter is required for CSRF protection."
         return _with_no_cache_headers(templates.TemplateResponse(request, "auth.html", error_ctx))
+
+    # Scope: default to 'openid profile email' if not specified (RFC 6749 §3.3).
+    # This ensures every authorization request has an explicit, documented scope.
+    granted_scope = scope.strip() if scope else "openid profile email"
 
     # Create OAuth session in Redis
     session_id = create_oauth_session(
@@ -393,6 +406,7 @@ def authorize(
         state=state,
         code_challenge=code_challenge,
         code_challenge_method=code_challenge_method,
+        scope=granted_scope,
     )
 
     # Silent SSO: if a valid platform session cookie exists, authorize without prompting.
@@ -844,7 +858,9 @@ def _get_current_user_from_sso(request: Request, db: Session) -> Optional[tuple[
     """
     payload = _get_platform_sso_payload(request)
     if payload:
-        return (payload.get("sub"), payload.get("tenant_id"))
+        # Read email from dedicated claim; fall back to sub for backward compat
+        email = payload.get("email") or payload.get("sub")
+        return (email, payload.get("tenant_id"))
 
     return None
 
@@ -1571,6 +1587,7 @@ def _complete_auth(
         user_id=user.id,
         code_challenge=session["code_challenge"],
         code_challenge_method=session["code_challenge_method"],
+        scope=session.get("scope", "openid profile email"),
     )
 
     # Clean up the OAuth session
@@ -1623,7 +1640,7 @@ class TokenExchangeRequest(BaseModel):
     client_id: str
     redirect_uri: str
     code_verifier: str  # PKCE proof — proves this is the same client that started the flow
-    client_secret: Optional[str] = None  # Optional: for confidential clients (backend apps)
+    client_secret: str  # Required: authenticates the client application (injected by BFF proxy)
 
 
 @router.post("/token", dependencies=[Depends(_rl_oauth_token)])
@@ -1633,17 +1650,38 @@ def token_exchange(req: TokenExchangeRequest, request: Request = None, db: Sessi
     
     Exchanges an authorization code + PKCE code_verifier for access/refresh tokens.
     
-    Security:
+    Security (defense in depth — both mechanisms required):
+    - client_secret: authenticates the client application (RFC 6749 §2.3.1)
+    - PKCE code_verifier: proves the token requester started the flow (RFC 7636)
     - Authorization code is single-use (deleted from Redis on first use)
-    - PKCE code_verifier must match the code_challenge from the authorize request
-    - No app_secret required — PKCE replaces it for public clients (SPAs)
     - client_id and redirect_uri must match the original authorize request
+    
+    The BFF proxy injects client_secret server-side — it never reaches the browser.
     """
     if req.grant_type != "authorization_code":
         raise HTTPException(
             status_code=400,
             detail="Unsupported grant_type. Only 'authorization_code' is supported."
         )
+
+    # Get app for client authentication and token settings
+    app = db.query(App).filter(App.app_id == req.client_id).first()
+    if not app:
+        raise HTTPException(status_code=401, detail="Invalid client_id")
+
+    # --- Client Authentication (RFC 6749 §2.3.1) ---
+    # client_secret is required — the BFF proxy injects it server-side.
+    # This authenticates the *client application* (not the user).
+    import hashlib, hmac
+    if len(app.app_secret) == 64:
+        # Secret is stored as SHA-256 hash
+        provided_hash = hashlib.sha256(req.client_secret.encode()).hexdigest()
+        if not hmac.compare_digest(provided_hash, app.app_secret):
+            raise HTTPException(status_code=401, detail="Invalid client_secret")
+    else:
+        # Secret is stored in plaintext (legacy)
+        if not hmac.compare_digest(req.client_secret, app.app_secret):
+            raise HTTPException(status_code=401, detail="Invalid client_secret")
 
     # Validate code + PKCE
     code_data = validate_authorization_code(
@@ -1658,23 +1696,6 @@ def token_exchange(req: TokenExchangeRequest, request: Request = None, db: Sessi
             status_code=401,
             detail="Invalid or expired authorization code, or PKCE verification failed."
         )
-
-    # Get app for token expiry settings and tenant context
-    app = db.query(App).filter(App.app_id == req.client_id).first()
-    if not app:
-        raise HTTPException(status_code=401, detail="Invalid client_id")
-
-    # --- Client Authentication (confidential clients) ---
-    if req.client_secret:
-        # Use hash comparison for secrets
-        import hashlib, hmac
-        if len(app.app_secret) == 64:
-            provided_hash = hashlib.sha256(req.client_secret.encode()).hexdigest()
-            if not hmac.compare_digest(provided_hash, app.app_secret):
-                raise HTTPException(status_code=401, detail="Invalid client_secret")
-        else:
-            if app.app_secret != req.client_secret:
-                raise HTTPException(status_code=401, detail="Invalid client_secret")
 
     # Get user for this tenant and app
     user = db.query(User).filter(
@@ -1697,8 +1718,9 @@ def token_exchange(req: TokenExchangeRequest, request: Request = None, db: Sessi
             raise HTTPException(status_code=400, detail="Invalid DPoP proof")
         cnf_claim = {"jkt": dpop_result["jkt"]}
 
-    # Generate tokens (with optional DPoP binding)
-    access_token, refresh_token = generate_tokens_for_user(user, app, cnf=cnf_claim)
+    # Generate tokens (with optional DPoP binding and scope)
+    granted_scope = code_data.get("scope", "openid profile email")
+    access_token, refresh_token = generate_tokens_for_user(user, app, cnf=cnf_claim, scope=granted_scope)
 
     # Record login event
     if request and app:

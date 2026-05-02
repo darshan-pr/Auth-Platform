@@ -113,13 +113,18 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
     return jwt.encode(payload, SIGNING_KEY, algorithm=settings.JWT_ALGORITHM)
 
 def verify_token(token: str) -> Optional[dict]:
-    """Verify a token and return the payload"""
+    """Verify a token and return the payload.
+
+    Note: `aud` claim validation is skipped because the auth server itself is not
+    the audience — the `aud` claim (client_id) is for downstream app validation.
+    """
     try:
         payload = jwt.decode(
             token, 
             VERIFY_KEY, 
             algorithms=[settings.JWT_ALGORITHM],
-            issuer=settings.JWT_ISSUER
+            issuer=settings.JWT_ISSUER,
+            options={"verify_aud": False},  # aud is for client-side validation
         )
         # If this is a user token, check if admin has force-logged-out this user
         uid = payload.get("user_id")
@@ -154,13 +159,22 @@ def refresh_token(db, refresh_token_str: str) -> dict:
             from datetime import timedelta
             access_expires = timedelta(minutes=app.access_token_expiry_minutes)
     
-    # Create new access token with app-specific or default expiry
-    new_access_token = create_access_token({
-        "sub": payload["sub"],
+    # Create new access token with app-specific or default expiry.
+    # Propagate all identity claims from the refresh token.
+    new_token_data = {
+        "sub": payload["sub"],         # opaque user ID (usr_xxx)
         "user_id": payload.get("user_id"),
         "tenant_id": payload.get("tenant_id"),
-        "app_id": app_id
-    }, access_expires)
+        "app_id": app_id,
+    }
+    # Preserve email, audience, and scope claims from original token
+    if payload.get("email"):
+        new_token_data["email"] = payload["email"]
+    if payload.get("aud"):
+        new_token_data["aud"] = payload["aud"]
+    if payload.get("scope"):
+        new_token_data["scope"] = payload["scope"]
+    new_access_token = create_access_token(new_token_data, access_expires)
     
     return {
         "access_token": new_access_token,

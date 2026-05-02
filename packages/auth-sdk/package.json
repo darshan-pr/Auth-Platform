@@ -1,0 +1,67 @@
+{
+  "name": "auth-platform-sdk",
+  "version": "3.1.0",
+  "description": "Official SDK for Auth Platform — OAuth 2.0 + PKCE authentication for Next.js apps",
+  "author": "Auth Platform",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/client.js",
+  "types": "./dist/client.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    },
+    "./client": {
+      "import": "./dist/client.js",
+      "require": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    },
+    "./server": {
+      "import": "./dist/server.js",
+      "require": "./dist/server.js",
+      "types": "./dist/server.d.ts"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "client": ["./dist/client.d.ts"],
+      "server": ["./dist/server.d.ts"]
+    }
+  },
+  "files": [
+    "dist",
+    "client.js",
+    "client.d.ts",
+    "server.js",
+    "server.d.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "next": ">=14.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": false },
+    "next": { "optional": true }
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/react": "^19.0.0",
+    "@types/node": "^22.0.0",
+    "next": "^16.0.0",
+    "react": "^19.0.0"
+  },
+  "keywords": [
+    "auth",
+    "oauth",
+    "pkce",
+    "nextjs",
+    "authentication",
+    "sdk"
+  ]
+}
