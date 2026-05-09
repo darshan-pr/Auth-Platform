@@ -44,7 +44,7 @@
     <section id="overview" class="hero">
       <div class="hero-grid">
         <div>
-          <p class="eyebrow">Developer Docs</p>
+          <p class="eyebrow eyebrow-spacer" aria-hidden="true">&nbsp;</p>
           <h1>Ship secure auth fast, <span>without giving up control.</span></h1>
           <p class="lead">Production docs for Auth Platform and <code>auth-platform-sdk</code> <strong>v3.2.0</strong>. OAuth 2.0 + PKCE, HttpOnly token handling, session revocation streams, and multi-tenant admin controls.</p>
           <div class="hero-actions">
@@ -83,24 +83,25 @@
     <section id="quickstart" class="doc-section">
       <div class="section-head">
         <p class="section-label">Get Running</p>
-        <h2>Quickstart (Next.js)</h2>
+        <h2>Auth Platform Setup (Clean Next.js App Router)</h2>
       </div>
 
       <div class="steps-grid">
         <article class="step-card">
           <div class="step-num">1</div>
           <h3>Install SDK</h3>
-          <pre><code class="language-bash">npm install auth-platform-sdk</code></pre>
-          <p>Create an app in <a href="/dashboard/" class="dashboard-link">Admin Dashboard</a> and copy `Client ID` and `Client Secret`.</p>
+          <pre><code class="language-bash">cd test1
+npm install auth-platform-sdk</code></pre>
         </article>
 
         <article class="step-card">
           <div class="step-num">2</div>
-          <h3>Set Environment</h3>
+          <h3>Add Environment Variables</h3>
           <pre><code class="language-bash"># .env.local
 NEXT_PUBLIC_AUTH_SERVER=__AUTH_SERVER__
 NEXT_PUBLIC_CLIENT_ID=your-client-id
 NEXT_PUBLIC_REDIRECT_URI=http://localhost:3000/callback
+NEXT_PUBLIC_AUTH_PROXY_PATH=/api/auth
 
 # server-only
 AUTH_CLIENT_SECRET=your-client-secret
@@ -109,7 +110,8 @@ AUTH_CLIENT_TYPE=confidential</code></pre>
 
         <article class="step-card step-wide">
           <div class="step-num">3</div>
-          <h3>Add Route Proxy</h3>
+          <h3>Create Auth Proxy Route (Required Path)</h3>
+          <p>Create exactly <code>app/api/auth/[...path]/route.ts</code>. Do not use <code>app/api/route.ts</code> for this.</p>
           <pre><code class="language-typescript">import { createAuthProxy } from 'auth-platform-sdk/server';
 import type { NextRequest } from 'next/server';
 
@@ -129,18 +131,70 @@ export const POST = handler;</code></pre>
 
         <article class="step-card step-wide">
           <div class="step-num">4</div>
-          <h3>Wrap App and Use Hook</h3>
+          <h3>Wrap App with AuthProvider</h3>
+          <p>Keep the provider inside the <code>&lt;body&gt;</code> element.</p>
           <pre><code class="language-tsx">// app/layout.tsx
 import { AuthProvider } from 'auth-platform-sdk/client';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return &lt;html&gt;&lt;body&gt;&lt;AuthProvider&gt;{children}&lt;/AuthProvider&gt;&lt;/body&gt;&lt;/html&gt;;
-}
+  return (
+    &lt;html&gt;
+      &lt;body&gt;
+        &lt;AuthProvider&gt;{children}&lt;/AuthProvider&gt;
+      &lt;/body&gt;
+    &lt;/html&gt;
+  );
+}</code></pre>
+        </article>
 
-// any client component
+        <article class="step-card step-wide">
+          <div class="step-num">5</div>
+          <h3>Create Callback Page (Required)</h3>
+          <pre><code class="language-tsx">'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from 'auth-platform-sdk/client';
 
-const { user, login, logout, isAuthenticated, logoutReason } = useAuth();</code></pre>
+export default function CallbackPage() {
+  const router = useRouter();
+  const { authClient } = useAuth();
+
+  useEffect(() => {
+    (async () => {
+      await authClient?.handleCallback();
+      router.replace('/');
+    })();
+  }, [authClient, router]);
+
+  return &lt;p&gt;Signing you in...&lt;/p&gt;;
+}</code></pre>
+        </article>
+
+        <article class="step-card step-wide">
+          <div class="step-num">6</div>
+          <h3>Use Auth in Client Page</h3>
+          <p>In <code>app/page.tsx</code>:</p>
+          <ul>
+            <li>Add <code>'use client'</code>.</li>
+            <li>Use <code>useAuth()</code>.</li>
+            <li>Login button: <code>onClick={() =&gt; login()}</code>.</li>
+            <li>Render <code>user?.email</code> for signed-in state.</li>
+          </ul>
+        </article>
+
+        <article class="step-card">
+          <div class="step-num">7</div>
+          <h3>Run and Verify</h3>
+          <pre><code class="language-bash">npm run dev</code></pre>
+          <p>Flow to verify:</p>
+          <ul class="verify-list">
+            <li>Click Login</li>
+            <li>Complete auth</li>
+            <li>Redirects to <code>/callback</code></li>
+            <li>Callback handles code exchange</li>
+            <li>Returns to <code>/</code> as authenticated user</li>
+          </ul>
         </article>
       </div>
     </section>
@@ -315,9 +369,54 @@ Auth Platform -> proxy verifies/refreshes session -> browser receives auth statu
         });
       }
 
+      function addCopyButtons() {
+        document.querySelectorAll('pre').forEach(function (pre) {
+          if (pre.querySelector('.copy-code-btn')) return;
+          var codeEl = pre.querySelector('code');
+          if (!codeEl) return;
+
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'copy-code-btn';
+          btn.setAttribute('aria-label', 'Copy code');
+          btn.innerHTML = '<i class="fa-solid fa-copy" aria-hidden="true"></i>';
+          pre.classList.add('has-copy-btn');
+
+          btn.addEventListener('click', async function () {
+            var text = codeEl.textContent || '';
+
+            try {
+              if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+              } else {
+                var ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', '');
+                ta.style.position = 'absolute';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+              }
+              btn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i>';
+            } catch (_) {
+              btn.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+            }
+
+            setTimeout(function () {
+              btn.innerHTML = '<i class="fa-solid fa-copy" aria-hidden="true"></i>';
+            }, 1200);
+          });
+
+          pre.appendChild(btn);
+        });
+      }
+
       replacePlaceholders();
       updateLinks();
       hljs.highlightAll();
+      addCopyButtons();
 
       document.querySelectorAll('a[href^="#"]').forEach(function (anchor) {
         anchor.addEventListener('click', function (e) {
