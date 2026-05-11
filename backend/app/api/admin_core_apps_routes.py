@@ -247,20 +247,37 @@ def delete_app(
     ).first()
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
-    
-    # Delete passkey credentials for this app within the tenant
-    db.query(PasskeyCredential).filter(
-        PasskeyCredential.app_id == app_id,
-        PasskeyCredential.tenant_id == admin.tenant_id
-    ).delete()
-    # Delete all users associated with this app within the tenant
-    db.query(User).filter(
-        User.app_id == app_id,
-        User.tenant_id == admin.tenant_id
-    ).delete()
-    _cleanup_local_logo(app.logo_url)
-    db.delete(app)
-    db.commit()
+
+    logo_to_cleanup = app.logo_url
+    try:
+        # Remove consent rows first; they reference users and block user deletion.
+        db.query(OAuthConsent).filter(
+            OAuthConsent.client_id == app_id,
+            OAuthConsent.tenant_id == admin.tenant_id
+        ).delete()
+
+        # Delete passkey credentials for this app within the tenant.
+        db.query(PasskeyCredential).filter(
+            PasskeyCredential.app_id == app_id,
+            PasskeyCredential.tenant_id == admin.tenant_id
+        ).delete()
+
+        # Delete all users associated with this app within the tenant.
+        db.query(User).filter(
+            User.app_id == app_id,
+            User.tenant_id == admin.tenant_id
+        ).delete()
+
+        db.delete(app)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete application: {str(e)}"
+        )
+
+    _cleanup_local_logo(logo_to_cleanup)
     
     return {"message": "App and its associated data deleted successfully"}
 

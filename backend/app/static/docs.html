@@ -6,6 +6,18 @@
   <link rel="icon" type="image/png" href="/assets/logo.png">
   <script>(function(){var img=new Image();img.onload=function(){var c=document.createElement('canvas');c.width=c.height=64;var ctx=c.getContext('2d');ctx.beginPath();ctx.arc(32,32,32,0,Math.PI*2);ctx.clip();ctx.drawImage(img,0,0,64,64);var l=document.querySelector("link[rel='icon']");if(l)l.href=c.toDataURL();};img.src='/assets/logo.png';})();</script>
   <title>Auth Platform Docs</title>
+  <meta name="description" content="Auth Platform implementation docs for OAuth 2.0, PKCE, secure token handling, SDK setup, and production integration patterns.">
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <link rel="canonical" href="__PUBLIC_BASE_URL__/api/docs">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Auth Platform Docs">
+  <meta property="og:description" content="Implementation guide for integrating Auth Platform SDK and OAuth flows in production.">
+  <meta property="og:url" content="__PUBLIC_BASE_URL__/api/docs">
+  <meta property="og:image" content="__PUBLIC_BASE_URL__/assets/logo.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Auth Platform Docs">
+  <meta name="twitter:description" content="Implementation guide for integrating Auth Platform SDK and OAuth flows in production.">
+  <meta name="twitter:image" content="__PUBLIC_BASE_URL__/assets/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -25,7 +37,7 @@
         <a href="#quickstart">Quickstart</a>
         <a href="#sdk">SDK</a>
         <a href="/docs">OpenAPI</a>
-        <a href="/login" class="menu-login">Dashboard</a>
+        <a href="/dashboard/" class="menu-login">Dashboard</a>
       </nav>
       <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
         <svg class="icon-menu" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -36,7 +48,7 @@
       <a href="#quickstart">Quickstart</a>
       <a href="#sdk">SDK</a>
       <a href="/docs">OpenAPI</a>
-      <a href="/login" class="menu-login">Dashboard</a>
+      <a href="/dashboard/" class="menu-login">Dashboard</a>
     </nav>
   </header>
 

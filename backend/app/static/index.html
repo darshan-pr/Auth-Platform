@@ -9,6 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Auth Platform — Admin Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./style.css?v=20260325b">
     <!-- ====== MOBILE OVERRIDES (inline = cache-proof) ====== -->
     <style>
@@ -288,50 +291,137 @@
         <main class="main-content">
             <!-- ========== Dashboard ========== -->
             <section id="dashboardPage" class="page active">
-                <header class="page-header">
-                    <div>
-                        <h2>Dashboard</h2>
-                        <p class="page-desc">Overview of your auth platform</p>
-                    </div>
-                    <div class="page-actions">
-                        <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage()" title="Refresh">
-                            <i data-lucide="refresh-cw"></i>
-                        </button>
-                    </div>
-                </header>
+                <div class="dashboard-hero-shell">
+                    <header class="dashboard-hero-header">
+                        <div>
+                            <h2>Dashboard</h2>
+                        </div>
+                        <div class="page-actions">
+                            <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage()" title="Refresh">
+                                <i data-lucide="refresh-cw"></i>
+                            </button>
+                        </div>
+                    </header>
 
-                <div class="stats-grid">
-                    <div class="stat-card stat-purple">
-                        <div class="stat-icon-wrap"><i data-lucide="boxes"></i></div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="totalApps">-</span>
-                            <span class="stat-label">Applications</span>
+                    <div class="dashboard-hero">
+                        <div class="dashboard-hero-copy">
+                            <p id="dashboardHeroSummary">Manage apps, users, and auth activity from one unified control plane.</p>
+                            <div class="dashboard-hero-pills">
+                                <span id="dashboardTenantPill">Tenant: --</span>
+                                <span id="dashboardLastRefresh">Updated just now</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="stat-card stat-blue">
-                        <div class="stat-icon-wrap"><i data-lucide="users"></i></div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="totalUsers">-</span>
-                            <span class="stat-label">Total Users</span>
+
+                    <div class="stats-grid dashboard-hero-stats">
+                        <div class="stat-card stat-purple">
+                            <div class="stat-icon-wrap"><i data-lucide="boxes"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="totalApps">-</span>
+                                <span class="stat-label">Applications</span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="stat-card stat-green">
-                        <div class="stat-icon-wrap"><i data-lucide="user-check"></i></div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="activeUsers">-</span>
-                            <span class="stat-label">Active Users</span>
+                        <div class="stat-card stat-blue">
+                            <div class="stat-icon-wrap"><i data-lucide="users"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="totalUsers">-</span>
+                                <span class="stat-label">Total Users</span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="stat-card stat-online">
-                        <div class="stat-icon-wrap"><i data-lucide="wifi"></i></div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="onlineUsers">-</span>
-                            <span class="stat-label">Online Now</span>
+                        <div class="stat-card stat-green">
+                            <div class="stat-icon-wrap"><i data-lucide="user-check"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="activeUsers">-</span>
+                                <span class="stat-label">Active Users</span>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-online">
+                            <div class="stat-icon-wrap"><i data-lucide="wifi"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="onlineUsers">-</span>
+                                <span class="stat-label">Online Now</span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="dashboard-grid">
+                <div class="dashboard-insights-grid">
+                    <div class="card dashboard-insight-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="shield-check"></i> Security Coverage</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="coverage-grid">
+                                <div class="coverage-item">
+                                    <span>OAuth Enabled Apps</span>
+                                    <strong id="metricOauthEnabled">-</strong>
+                                </div>
+                                <div class="coverage-item">
+                                    <span>OTP Protected Apps</span>
+                                    <strong id="metricOtpEnabled">-</strong>
+                                </div>
+                                <div class="coverage-item">
+                                    <span>Passkey Ready Apps</span>
+                                    <strong id="metricPasskeyEnabled">-</strong>
+                                </div>
+                                <div class="coverage-item">
+                                    <span>Login Alert Apps</span>
+                                    <strong id="metricLoginAlerts">-</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card dashboard-insight-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="line-chart"></i> Growth Snapshot (7 Days)</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="coverage-grid">
+                                <div class="coverage-item">
+                                    <span>New Apps</span>
+                                    <strong id="metricNewApps7d">-</strong>
+                                </div>
+                                <div class="coverage-item">
+                                    <span>New Users</span>
+                                    <strong id="metricNewUsers7d">-</strong>
+                                </div>
+                                <div class="coverage-item">
+                                    <span>Inactive Users</span>
+                                    <strong id="metricInactiveUsers">-</strong>
+                                </div>
+                                <div class="coverage-item">
+                                    <span>Online Rate</span>
+                                    <strong id="metricOnlineRate">-</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card dashboard-insight-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="activity"></i> Recent Auth Events</h3>
+                        </div>
+                        <div class="card-body">
+                            <ul class="dashboard-list" id="dashboardEventsList">
+                                <li class="dashboard-list-empty">Loading events...</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="card dashboard-insight-card">
+                        <div class="card-header">
+                            <h3><i data-lucide="users-round"></i> Top Apps by Users</h3>
+                        </div>
+                        <div class="card-body">
+                            <ul class="dashboard-list" id="dashboardTopAppsList">
+                                <li class="dashboard-list-empty">Loading app distribution...</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid dashboard-grid-bottom">
                     <div class="card quick-actions">
                         <div class="card-header">
                             <h3><i data-lucide="zap"></i> Quick Actions</h3>
@@ -347,25 +437,22 @@
                                 <a onclick="window.open(window.location.origin + '/api/docs', '_blank')" class="btn btn-outline">
                                     <i data-lucide="file-text"></i> API Docs
                                 </a>
-
                                 <a onclick="window.open(window.location.origin + '/docs', '_blank')" class="btn btn-outline">
-                                    <i data-lucide="file-text"></i> Check API
+                                    <i data-lucide="square-terminal"></i> OpenAPI
                                 </a>
-
-                                
                             </div>
                         </div>
                     </div>
                     <div class="card info-card">
                         <div class="card-header">
-                            <h3><i data-lucide="info"></i> Getting Started</h3>
+                            <h3><i data-lucide="compass"></i> Integration Path</h3>
                         </div>
                         <div class="card-body">
                             <ol class="getting-started-list">
-                                <li>Create an application to get a <strong>Client ID</strong></li>
-                                <li>Set the <strong>Redirect URI</strong> for your app</li>
-                                <li>Integrate using the <code>auth.js</code> SDK</li>
-                                <li>Users sign in via the hosted login page</li>
+                                <li>Create an app to get a <strong>Client ID</strong> and secret.</li>
+                                <li>Register your <strong>Redirect URI</strong> and OAuth client type.</li>
+                                <li>Integrate with <code>auth-platform-sdk</code> in your app router.</li>
+                                <li>Verify login, callback, refresh, and revocation flows in production mode.</li>
                             </ol>
                         </div>
                     </div>

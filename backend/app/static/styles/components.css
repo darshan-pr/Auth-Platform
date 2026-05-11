@@ -618,9 +618,280 @@
 
 .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
 
+/* ====== Dashboard Hero ====== */
+.dashboard-hero {
+    position: relative;
+    overflow: visible;
+    color: #f8f9ff;
+    padding: 0;
+    margin-bottom: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    box-shadow: none;
+}
+
+.dashboard-hero-copy {
+    position: relative;
+    z-index: 1;
+}
+
+.dashboard-hero h3 {
+    font-family: var(--font-display);
+    font-size: clamp(1.9rem, 2.8vw, 2.3rem);
+    font-weight: 400;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    color: #ffffff;
+}
+
+.dashboard-hero p {
+    margin-top: 10px;
+    margin-bottom: 0;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.6;
+    max-width: 900px;
+}
+
+.dashboard-hero-pills {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.dashboard-hero-pills span {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border: 1px solid rgba(99, 102, 241, 0.28);
+    border-radius: 999px;
+    padding: 4px 10px;
+    background: rgba(99, 102, 241, 0.08);
+}
+
+.dashboard-hero-shell {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0;
+    border: none;
+    color: var(--text);
+    box-shadow: none;
+    padding: 40px 28px 24px;
+    margin-bottom: 24px;
+}
+
+.dashboard-hero-header {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.dashboard-hero-header h2 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 3.1vw, 2.4rem);
+    font-weight: 400;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin: 0;
+}
+
+.dashboard-hero-header .page-desc {
+    color: rgba(226, 231, 255, 0.82);
+    margin-top: 10px;
+    font-size: 0.94rem;
+    max-width: 760px;
+}
+
+.dashboard-hero-header .btn-secondary {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(148, 163, 184, 0.35);
+    color: var(--text-secondary);
+}
+
+.dashboard-hero-header .btn-secondary:hover {
+    background: #ffffff;
+    border-color: rgba(99, 102, 241, 0.38);
+    color: var(--primary-dark);
+}
+
+.dashboard-hero-shell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    
+    pointer-events: none;
+    z-index: 0;
+}
+
+.dashboard-hero-shell .dashboard-hero-copy,
+.dashboard-hero-shell .dashboard-hero-stats {
+    position: relative;
+    z-index: 1;
+}
+
+.dashboard-hero-shell .dashboard-hero-stats {
+    margin-top: 16px;
+    margin-bottom: 0;
+}
+
+.dashboard-hero-shell .stat-card {
+    background: rgba(255, 255, 255, 0.86);
+    border: 1px solid rgba(148, 163, 184, 0.26);
+    box-shadow: none;
+}
+
+.dashboard-hero-shell .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.26);
+}
+
+.dashboard-hero-shell .stat-value {
+    color: var(--text);
+}
+
+.dashboard-hero-shell .stat-label {
+    color: var(--text-secondary);
+}
+
+.dashboard-hero-shell .stat-purple .stat-icon-wrap {
+    background: rgba(128, 135, 255, 0.24);
+    color: #b4baff;
+}
+
+.dashboard-hero-shell .stat-blue .stat-icon-wrap {
+    background: rgba(96, 170, 255, 0.2);
+    color: #97c8ff;
+}
+
+.dashboard-hero-shell .stat-green .stat-icon-wrap {
+    background: rgba(52, 211, 153, 0.2);
+    color: #7aebbe;
+}
+
+.dashboard-hero-shell .stat-online .stat-icon-wrap {
+    background: rgba(251, 191, 36, 0.2);
+    color: #ffd17c;
+}
+
+.dashboard-insights-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+#dashboardPage .dashboard-hero-shell {
+    width: auto;
+    margin: -36px -36px 24px;
+    padding: 40px 36px 24px;
+}
+
+#dashboardPage {
+    overflow-x: hidden;
+}
+
+.dashboard-insight-card {
+    border-color: rgba(99, 102, 241, 0.14);
+}
+
+.coverage-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+}
+
+.coverage-item {
+    border-radius: 10px;
+    border: 1px solid #e6ebf5;
+    background: linear-gradient(150deg, #fcfdff 0%, #f4f8ff 100%);
+    padding: 10px 11px;
+}
+
+.coverage-item span {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.coverage-item strong {
+    font-size: 1rem;
+    letter-spacing: -0.02em;
+    color: var(--text);
+}
+
+.dashboard-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dashboard-list li {
+    border-radius: 10px;
+    border: 1px solid #e6ebf5;
+    background: linear-gradient(145deg, #ffffff 0%, #f8faff 100%);
+    padding: 9px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.dashboard-list-main {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.dashboard-list-main strong {
+    color: var(--text);
+    font-size: 0.84rem;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dashboard-list-main small {
+    color: var(--text-secondary);
+    font-size: 0.74rem;
+    line-height: 1.3;
+}
+
+.dashboard-list-meta {
+    font-size: 0.72rem;
+    color: #334155;
+    border-radius: 999px;
+    padding: 4px 8px;
+    background: #edf2ff;
+    border: 1px solid #d7e1ff;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.dashboard-list-empty {
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+    text-align: center;
+    justify-content: center;
+    padding: 16px 12px !important;
+}
+
 .getting-started-list {
     padding-left: 18px;
-    line-height: 2.1;
+    line-height: 1.85;
     font-size: 0.875rem;
     color: var(--text-secondary);
 }
@@ -631,6 +902,7 @@
     border-radius: 5px;
     font-size: 0.82rem;
     color: var(--primary);
+    font-family: var(--font-mono);
 }
 
 /* ====== Search ====== */
@@ -707,7 +979,7 @@
     border-radius: 5px;
     font-size: 0.78rem;
     color: var(--text);
-    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    font-family: var(--font-mono);
 }
 
 .data-table .app-name-cell { font-weight: 600; color: var(--text); }

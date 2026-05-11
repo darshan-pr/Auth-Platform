@@ -1,9 +1,10 @@
 from pathlib import Path
 from typing import Optional
 import logging
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -36,6 +37,41 @@ def _with_no_cache_headers(response):
     return response
 
 
+def _with_no_index_headers(response):
+    response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    return response
+
+
+def _normalize_base_url(url: str) -> str:
+    parsed = urlparse((url or "").strip())
+    if parsed.scheme and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+    return ""
+
+
+def _resolve_public_base_url(request: Request) -> str:
+    request_base_url = _normalize_base_url(str(request.base_url))
+    request_parts = urlparse(request_base_url)
+    request_host = request_parts.hostname or ""
+    request_netloc = request_parts.netloc
+    forwarded_proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+    request_scheme = forwarded_proto or request_parts.scheme
+    if request_netloc and request_host not in {"", "localhost", "127.0.0.1", "testserver"}:
+        if request_scheme != "https":
+            request_scheme = "https"
+        return f"{request_scheme}://{request_netloc}"
+
+    configured_url = _normalize_base_url(settings.AUTH_PLATFORM_URL)
+    if configured_url:
+        return configured_url
+    return request_base_url
+
+
+def _render_public_html(file_path: Path, public_base_url: str) -> str:
+    html = file_path.read_text(encoding="utf-8")
+    return html.replace("__PUBLIC_BASE_URL__", public_base_url.rstrip("/"))
+
+
 def _resolve_admin_login_warning(oauth_warning: Optional[str]) -> Optional[str]:
     warning_code = (oauth_warning or "").strip().lower()
     if warning_code == "retry_oauth":
@@ -44,35 +80,88 @@ def _resolve_admin_login_warning(oauth_warning: Optional[str]) -> Optional[str]:
 
 
 @router.get("/", response_class=HTMLResponse)
-async def public_landing_page():
+async def public_landing_page(request: Request):
     """Serve the public landing page."""
     landing_file = _STATIC_DIR / "landing.html"
     if landing_file.exists():
-        return HTMLResponse(content=landing_file.read_text(encoding="utf-8"))
+        base_url = _resolve_public_base_url(request)
+        return HTMLResponse(content=_render_public_html(landing_file, base_url))
     return RedirectResponse(url="/login")
 
 
 @router.get("/api/docs", response_class=HTMLResponse)
-async def api_documentation():
+async def api_documentation(request: Request):
     """Serve the custom API documentation page."""
     docs_file = _STATIC_DIR / "docs.html"
     if docs_file.exists():
-        return HTMLResponse(content=docs_file.read_text(encoding="utf-8"))
+        base_url = _resolve_public_base_url(request)
+        return HTMLResponse(content=_render_public_html(docs_file, base_url))
     return RedirectResponse(url="/docs")
+
+
+@router.get("/robots.txt", response_class=PlainTextResponse)
+async def robots_txt(request: Request):
+    """Serve robots rules for search crawlers."""
+    base_url = _resolve_public_base_url(request)
+    robots = "\n".join(
+        [
+            "User-agent: *",
+            "Allow: /",
+            "Allow: /api/docs",
+            "Disallow: /dashboard",
+            "Disallow: /login",
+            "Disallow: /admin",
+            "Disallow: /signin",
+            "Disallow: /reset-password",
+            "Disallow: /token",
+            "Disallow: /oauth",
+            "Disallow: /docs",
+            "Disallow: /redoc",
+            f"Sitemap: {base_url}/sitemap.xml",
+            "",
+        ]
+    )
+    return PlainTextResponse(content=robots)
+
+
+@router.get("/sitemap.xml")
+async def sitemap_xml(request: Request):
+    """Serve XML sitemap with indexable public pages."""
+    base_url = _resolve_public_base_url(request)
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"<url><loc>{base_url}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>"
+        f"<url><loc>{base_url}/api/docs</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>"
+        "</urlset>"
+    )
+    return Response(content=xml, media_type="application/xml")
 
 
 @router.get("/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request, oauth_warning: Optional[str] = None):
     """Serve the admin login/register page."""
-    return _with_no_cache_headers(
-        _templates.TemplateResponse(
-            request,
-            "admin_auth.html",
-            {
-                "request": request,
-                "redirect_url": "/dashboard",
-                "initial_warning": _resolve_admin_login_warning(oauth_warning),
-            },
+    token = request.cookies.get("admin_token")
+    if token:
+        try:
+            payload = verify_token(token)
+        except Exception:
+            payload = None
+
+        if payload and payload.get("type") == "admin_access":
+            return RedirectResponse(url="/dashboard", status_code=302)
+
+    return _with_no_index_headers(
+        _with_no_cache_headers(
+            _templates.TemplateResponse(
+                request,
+                "admin_auth.html",
+                {
+                    "request": request,
+                    "redirect_url": "/dashboard",
+                    "initial_warning": _resolve_admin_login_warning(oauth_warning),
+                },
+            )
         )
     )
 
@@ -94,7 +183,9 @@ async def admin_settings_page(request: Request):
         resp.delete_cookie("admin_token", path="/")
         return resp
 
-    return _with_no_cache_headers(_templates.TemplateResponse(request, "admin_settings.html", {"request": request}))
+    return _with_no_index_headers(
+        _with_no_cache_headers(_templates.TemplateResponse(request, "admin_settings.html", {"request": request}))
+    )
 
 
 @router.get("/reset-password", response_class=HTMLResponse)
@@ -118,33 +209,39 @@ async def reset_password_page(
 
     if not token or not email or not app_id:
         error_ctx["error"] = "This link is invalid or incomplete. Please check the link in your email."
-        return _with_no_cache_headers(_templates.TemplateResponse(request, "reset_password.html", error_ctx))
+        return _with_no_index_headers(
+            _with_no_cache_headers(_templates.TemplateResponse(request, "reset_password.html", error_ctx))
+        )
 
     app_obj = db.query(App).filter(App.app_id == app_id).first()
     if not app_obj:
         error_ctx["error"] = "The application associated with this link is no longer available."
-        return _with_no_cache_headers(_templates.TemplateResponse(request, "reset_password.html", error_ctx))
+        return _with_no_index_headers(
+            _with_no_cache_headers(_templates.TemplateResponse(request, "reset_password.html", error_ctx))
+        )
 
     app_name = app_obj.name or "Application"
     app_signin_url = infer_app_signin_url(app_obj.redirect_uris)
     server_signin_url = build_server_signin_url(app_id)
 
-    return _with_no_cache_headers(
-        _templates.TemplateResponse(
-            request,
-            "reset_password.html",
-            {
-                "request": request,
-                "token": token,
-                "email": email,
-                "app_id": app_id,
-                "app_name": app_name,
-                "app_logo_url": app_obj.logo_url or "/assets/logo.png",
-                "app_signin_url": app_signin_url,
-                "server_signin_url": server_signin_url,
-                "auth_platform_url": settings.AUTH_PLATFORM_URL,
-                "error": None,
-            },
+    return _with_no_index_headers(
+        _with_no_cache_headers(
+            _templates.TemplateResponse(
+                request,
+                "reset_password.html",
+                {
+                    "request": request,
+                    "token": token,
+                    "email": email,
+                    "app_id": app_id,
+                    "app_name": app_name,
+                    "app_logo_url": app_obj.logo_url or "/assets/logo.png",
+                    "app_signin_url": app_signin_url,
+                    "server_signin_url": server_signin_url,
+                    "auth_platform_url": settings.AUTH_PLATFORM_URL,
+                    "error": None,
+                },
+            )
         )
     )
 
