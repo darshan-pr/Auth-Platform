@@ -52,6 +52,7 @@ def _set_platform_sso_cookie(client, email: str, tenant_id: int):
             "tenant_id": tenant_id,
             "source_app_id": "tests",
             "type": "platform_sso",
+            "oauth_sso": True,
         },
         timedelta(days=1),
     )

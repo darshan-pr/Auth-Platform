@@ -47,6 +47,7 @@ def _set_platform_sso_cookie(client, email: str, tenant_id: int, source_app_id: 
             "tenant_id": tenant_id,
             "source_app_id": source_app_id,
             "type": "platform_sso",
+            "oauth_sso": True,
         },
         timedelta(days=1),
     )
@@ -167,6 +168,8 @@ def test_oauth_disabled_app_login_completes_without_consent_screen(client, admin
     assert "code=" in payload["redirect_url"]
     assert "state=disabled-direct" in payload["redirect_url"]
     assert "/oauth/consent" not in payload["redirect_url"]
+    login_set_cookie = " ".join(login.headers.get_list("set-cookie"))
+    assert "platform_sso=" not in login_set_cookie
 
 
 def test_admin_login_does_not_issue_platform_sso_cookie(client, admin_token):
@@ -501,3 +504,109 @@ def test_oauth_login_passwordless_user_shows_reset_password_guidance(client, adm
     assert login.status_code == 400
     detail = login.json().get("detail", "").lower()
     assert "reset your password" in detail
+
+
+def test_oauth_otp_is_scoped_to_app_and_session(client, admin_token, db):
+    _login_admin_session(client)
+
+    app_a = _create_app(
+        client,
+        {
+            "name": "OTP Scope App A",
+            "description": "OTP must not be reusable in another app session",
+            "oauth_enabled": False,
+            "otp_enabled": True,
+            "redirect_uris": "http://localhost:3000/callback",
+        },
+    )
+    app_b = _create_app(
+        client,
+        {
+            "name": "OTP Scope App B",
+            "description": "OTP must stay bound to originating app/session",
+            "oauth_enabled": False,
+            "otp_enabled": True,
+            "redirect_uris": "http://localhost:3000/callback",
+        },
+    )
+
+    for app_id in (app_a["app_id"], app_b["app_id"]):
+        user = User(
+            email="otp-scope@test.com",
+            tenant_id=admin_token["tenant_id"],
+            app_id=app_id,
+            password_hash=hash_password("OtpScopePass1!"),
+            is_active=True,
+        )
+        db.add(user)
+    db.commit()
+
+    authorize_a = client.get(
+        "/oauth/authorize",
+        params={
+            "client_id": app_a["app_id"],
+            "redirect_uri": "http://localhost:3000/callback",
+            "response_type": "code",
+            "state": "otp-scope-a",
+            "code_challenge": "challenge123",
+            "code_challenge_method": "S256",
+        },
+    )
+    assert authorize_a.status_code == 200
+    session_a = _extract_oauth_session_id_from_html(authorize_a.text)
+    assert session_a
+
+    login_a = client.post(
+        "/oauth/authenticate",
+        json={
+            "session_id": session_a,
+            "action": "login",
+            "email": "otp-scope@test.com",
+            "password": "OtpScopePass1!",
+        },
+    )
+    assert login_a.status_code == 200
+    assert login_a.json().get("action") == "show_otp"
+
+    otp_key = f"otp:otp-scope@test.com:oauth_{app_a['app_id']}_{session_a}_login"
+    otp_code = mock_redis_store.get(otp_key)
+    assert otp_code is not None
+
+    authorize_b = client.get(
+        "/oauth/authorize",
+        params={
+            "client_id": app_b["app_id"],
+            "redirect_uri": "http://localhost:3000/callback",
+            "response_type": "code",
+            "state": "otp-scope-b",
+            "code_challenge": "challenge123",
+            "code_challenge_method": "S256",
+        },
+    )
+    assert authorize_b.status_code == 200
+    session_b = _extract_oauth_session_id_from_html(authorize_b.text)
+    assert session_b
+
+    wrong_session_verify = client.post(
+        "/oauth/authenticate",
+        json={
+            "session_id": session_b,
+            "action": "verify_otp",
+            "email": "otp-scope@test.com",
+            "otp": otp_code,
+        },
+    )
+    assert wrong_session_verify.status_code == 401
+    assert "invalid or expired" in wrong_session_verify.json().get("detail", "").lower()
+
+    right_session_verify = client.post(
+        "/oauth/authenticate",
+        json={
+            "session_id": session_a,
+            "action": "verify_otp",
+            "email": "otp-scope@test.com",
+            "otp": otp_code,
+        },
+    )
+    assert right_session_verify.status_code == 200
+    assert right_session_verify.json().get("action") == "redirect"

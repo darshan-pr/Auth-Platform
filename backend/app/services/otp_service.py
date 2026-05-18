@@ -2,6 +2,7 @@ import random
 import secrets
 from app.redis import redis_client
 import logging
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -13,66 +14,85 @@ MAX_OTP_ATTEMPTS = 5
 OTP_LOCKOUT_SECONDS = 900  # 15 minutes
 
 
-def _get_otp_attempts_key(email: str) -> str:
+def _normalize_otp_context(context: Optional[str]) -> str:
+    if not context:
+        return ""
+    return context.replace(":", "_")
+
+
+def _get_otp_key(email: str, context: Optional[str] = None) -> str:
+    suffix = _normalize_otp_context(context)
+    if suffix:
+        return f"otp:{email}:{suffix}"
+    return f"otp:{email}"
+
+
+def _get_otp_attempts_key(email: str, context: Optional[str] = None) -> str:
+    suffix = _normalize_otp_context(context)
+    if suffix:
+        return f"otp_attempts:{email}:{suffix}"
     return f"otp_attempts:{email}"
 
 
-def _get_otp_lockout_key(email: str) -> str:
+def _get_otp_lockout_key(email: str, context: Optional[str] = None) -> str:
+    suffix = _normalize_otp_context(context)
+    if suffix:
+        return f"otp_lockout:{email}:{suffix}"
     return f"otp_lockout:{email}"
 
 
-def _check_otp_lockout(email: str) -> bool:
+def _check_otp_lockout(email: str, context: Optional[str] = None) -> bool:
     """Check if OTP verification is locked out for this email. Returns True if locked."""
     try:
-        lockout_key = _get_otp_lockout_key(email)
+        lockout_key = _get_otp_lockout_key(email, context)
         ttl = redis_client.ttl(lockout_key)
         return ttl is not None and ttl > 0
     except Exception:
         return False  # Redis down — fail open
 
 
-def _record_failed_otp_attempt(email: str):
+def _record_failed_otp_attempt(email: str, context: Optional[str] = None):
     """Record a failed OTP attempt. Deletes OTP and locks out after MAX_OTP_ATTEMPTS."""
     try:
-        attempts_key = _get_otp_attempts_key(email)
+        attempts_key = _get_otp_attempts_key(email, context)
         count = redis_client.incr(attempts_key)
         redis_client.expire(attempts_key, OTP_LOCKOUT_SECONDS)
         if count >= MAX_OTP_ATTEMPTS:
             # Lock out and delete the OTP (force re-generation)
-            lockout_key = _get_otp_lockout_key(email)
+            lockout_key = _get_otp_lockout_key(email, context)
             redis_client.setex(lockout_key, OTP_LOCKOUT_SECONDS, "1")
             redis_client.delete(attempts_key)
-            redis_client.delete(f"otp:{email}")
+            redis_client.delete(_get_otp_key(email, context))
             logger.warning(f"OTP verification locked out for {email} after {count} failed attempts")
     except Exception:
         pass  # Redis down — fail open
 
 
-def _clear_otp_attempts(email: str):
+def _clear_otp_attempts(email: str, context: Optional[str] = None):
     """Clear OTP attempt counter on successful verification."""
     try:
-        redis_client.delete(_get_otp_attempts_key(email))
-        redis_client.delete(_get_otp_lockout_key(email))
+        redis_client.delete(_get_otp_attempts_key(email, context))
+        redis_client.delete(_get_otp_lockout_key(email, context))
     except Exception:
         pass
 
 
-def generate_otp(email: str) -> str:
+def generate_otp(email: str, context: Optional[str] = None) -> str:
     """Generate a secure 6-digit OTP and store it in Redis"""
     otp = str(random.SystemRandom().randint(100000, 999999))
-    key = f"otp:{email}"
+    key = _get_otp_key(email, context)
     redis_client.setex(key, OTP_EXPIRY_SECONDS, otp)
     logger.info(f"OTP generated for {email}")
     return otp
 
-def verify_otp(email: str, otp: str) -> bool:
+def verify_otp(email: str, otp: str, context: Optional[str] = None) -> bool:
     """Verify the OTP against stored value with brute-force protection"""
     # Check lockout first
-    if _check_otp_lockout(email):
+    if _check_otp_lockout(email, context):
         logger.warning(f"OTP verification blocked — account locked for {email}")
         return False
 
-    key = f"otp:{email}"
+    key = _get_otp_key(email, context)
     stored = redis_client.get(key)
     
     if stored is None:
@@ -82,12 +102,12 @@ def verify_otp(email: str, otp: str) -> bool:
     if stored == otp:
         # Delete OTP after successful verification (one-time use)
         redis_client.delete(key)
-        _clear_otp_attempts(email)
+        _clear_otp_attempts(email, context)
         logger.info(f"OTP verified successfully for {email}")
         return True
     
     # Wrong OTP — record failed attempt
-    _record_failed_otp_attempt(email)
+    _record_failed_otp_attempt(email, context)
     logger.warning(f"Invalid OTP attempt for {email}")
     return False
 

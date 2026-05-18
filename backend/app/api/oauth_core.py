@@ -109,7 +109,17 @@ ADMIN_TOKEN_COOKIE = "admin_token"
 _MIN_SSO_COOKIE_AGE_SECONDS = 3600
 
 
+def _build_oauth_otp_context(session_id: str, client_id: str, purpose: str) -> str:
+    """Bind OTP verification to a specific OAuth session + app + action."""
+    return f"oauth:{client_id}:{session_id}:{purpose}"
+
+
 def _issue_platform_sso_cookie_payload(user: User, app: App) -> dict:
+    # Safety guard: platform_sso cookie must never be minted by non-SSO app flows.
+    # This prevents legacy (oauth_enabled=false) logins from silently upgrading to OAuth SSO later.
+    if not app or not app.oauth_enabled:
+        return {}
+
     max_age = max(int((app.refresh_token_expiry_days or 1) * 86400), _MIN_SSO_COOKIE_AGE_SECONDS)
     token = create_access_token(
         {
@@ -118,6 +128,8 @@ def _issue_platform_sso_cookie_payload(user: User, app: App) -> dict:
             "tenant_id": app.tenant_id,
             "source_app_id": app.app_id,
             "type": "platform_sso",
+            # Explicit marker so only purpose-built OAuth SSO cookies are accepted.
+            "oauth_sso": True,
         },
         timedelta(seconds=max_age),
     )
@@ -146,6 +158,11 @@ def _get_platform_sso_payload(request: Request) -> Optional[dict]:
         return None
 
     if not payload.get("sub") or not payload.get("tenant_id"):
+        return None
+
+    # Reject any legacy cookie that was not explicitly minted for OAuth SSO.
+    # This invalidates old cookies that could be created from non-SSO login flows.
+    if payload.get("oauth_sso") is not True:
         return None
 
     # Backward-compat safety: ignore legacy cookies that were issued by admin portal login.
@@ -1073,7 +1090,10 @@ def _handle_signup(req: AuthenticateRequest, session: dict, app: App, db: Sessio
     db.refresh(user)
 
     try:
-        otp = generate_otp(req.email)
+        otp = generate_otp(
+            req.email,
+            context=_build_oauth_otp_context(req.session_id, session["client_id"], "signup"),
+        )
         send_otp_email(req.email, otp, app.name or "Auth Platform", app.logo_url)
         return {
             "action": "show_signup_otp",
@@ -1132,7 +1152,10 @@ def _handle_login(req: AuthenticateRequest, session: dict, app: App, db: Session
     # Check if OTP is required
     if app.otp_enabled:
         try:
-            otp = generate_otp(req.email)
+            otp = generate_otp(
+                req.email,
+                context=_build_oauth_otp_context(req.session_id, session["client_id"], "login"),
+            )
             send_otp_email(req.email, otp, app.name or "Auth Platform", app.logo_url)
             return {
                 "action": "show_otp",
@@ -1153,7 +1176,11 @@ def _handle_verify_otp(req: AuthenticateRequest, session: dict, app: App, db: Se
     if not req.otp:
         raise HTTPException(status_code=400, detail="Verification code is required")
 
-    if not verify_otp(req.email, req.otp):
+    if not verify_otp(
+        req.email,
+        req.otp,
+        context=_build_oauth_otp_context(req.session_id, session["client_id"], "login"),
+    ):
         raise HTTPException(status_code=401, detail="Invalid or expired verification code")
 
     user = db.query(User).filter(
@@ -1172,7 +1199,11 @@ def _handle_verify_signup_otp(req: AuthenticateRequest, session: dict, app: App,
     if not req.otp:
         raise HTTPException(status_code=400, detail="Verification code is required")
 
-    if not verify_otp(req.email, req.otp):
+    if not verify_otp(
+        req.email,
+        req.otp,
+        context=_build_oauth_otp_context(req.session_id, session["client_id"], "signup"),
+    ):
         raise HTTPException(status_code=401, detail="Invalid or expired verification code")
 
     user = db.query(User).filter(
@@ -1610,8 +1641,10 @@ def _complete_auth(
     redirect_url = f"{redirect_uri}{separator}code={code}&state={session['state']}"
 
     result = {"action": "redirect", "redirect_url": redirect_url}
-    if app:
-        result["_platform_sso"] = _issue_platform_sso_cookie_payload(user, app)
+    if app and app.oauth_enabled:
+        sso_payload = _issue_platform_sso_cookie_payload(user, app)
+        if sso_payload:
+            result["_platform_sso"] = sso_payload
     return result
 
 
