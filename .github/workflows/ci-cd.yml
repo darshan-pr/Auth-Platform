@@ -39,10 +39,20 @@ jobs:
             cd "${{ secrets.EC2_APP_PATH }}"
             git fetch origin main
             git checkout main
-            git pull --ff-only origin main
+            git reset --hard origin/main
 
-            docker compose -f docker-compose.prod.yml -f docker-compose.ssl.yml -p auth-platform-prod build backend migrations nginx
-            docker compose -f docker-compose.prod.yml -f docker-compose.ssl.yml -p auth-platform-prod up -d postgres redis
-            docker compose -f docker-compose.prod.yml -f docker-compose.ssl.yml -p auth-platform-prod run --rm migrations
-            docker compose -f docker-compose.prod.yml -f docker-compose.ssl.yml -p auth-platform-prod up -d backend nginx
-            docker compose -f docker-compose.prod.yml -f docker-compose.ssl.yml -p auth-platform-prod ps
+            if [ ! -f .env ]; then
+              echo "ERROR: .env file is missing on EC2 at ${{ secrets.EC2_APP_PATH }}/.env"
+              exit 1
+            fi
+
+            COMPOSE_FILES="-f docker-compose.prod.yml"
+            if [ -f docker-compose.ssl.yml ]; then
+              COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.ssl.yml"
+            fi
+
+            docker compose $COMPOSE_FILES -p auth-platform-prod build backend migrations nginx
+            docker compose $COMPOSE_FILES -p auth-platform-prod up -d postgres redis
+            docker compose $COMPOSE_FILES -p auth-platform-prod run --rm migrations
+            docker compose $COMPOSE_FILES -p auth-platform-prod up -d backend nginx
+            docker compose $COMPOSE_FILES -p auth-platform-prod ps
