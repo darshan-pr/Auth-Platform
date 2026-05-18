@@ -46,6 +46,10 @@ jobs:
               exit 1
             fi
 
+            # Ensure we publish nginx on a standard web port unless explicitly overridden.
+            # This avoids "deployment succeeded but domain is unreachable" when only :8000 is exposed.
+            export NGINX_PORT="${NGINX_PORT:-80}"
+
             COMPOSE_FILES="-f docker-compose.prod.yml"
             if [ -f docker-compose.ssl.yml ]; then
               COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.ssl.yml"
@@ -56,3 +60,6 @@ jobs:
             docker compose $COMPOSE_FILES -p auth-platform-prod run --rm migrations
             docker compose $COMPOSE_FILES -p auth-platform-prod up -d backend nginx
             docker compose $COMPOSE_FILES -p auth-platform-prod ps
+
+            # Fast fail if nginx is not reachable on the expected host port
+            curl -fsS "http://127.0.0.1:${NGINX_PORT}/nginx-health"
