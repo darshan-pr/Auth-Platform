@@ -1,7 +1,7 @@
 // ==================== Admin Personal Auth Activity ====================
 
-async function loadMyAuthActivity() {
-    await Promise.all([loadAdminSessions(), loadAdminHistory()]);
+async function loadMyAuthActivity(options = {}) {
+    await Promise.all([loadAdminSessions(options), loadAdminHistory(options)]);
 }
 
 function getLocationLabel(record) {
@@ -35,23 +35,29 @@ function formatActivityType(eventType) {
         .join(' ');
 }
 
-async function loadAdminSessions() {
+async function loadAdminSessions(options = {}) {
+    const force = !!options.force;
     const tbody = document.getElementById('adminSessionsTableBody');
     if (!tbody) return;
 
     const container = tbody.closest('.table-container');
-    tbody.innerHTML = generateTableSkeleton(4, 6);
+    const initialLoad = !tbody.dataset.loaded;
+    if (initialLoad) tbody.innerHTML = generateTableSkeleton(4, 6);
     if (container) container.classList.add('refreshing');
 
     try {
-        const response = await fetch(`${API_URL}/admin/my-auth-activity/sessions`);
-        const data = await response.json();
+        const data = await fetchJsonCached(`${API_URL}/admin/my-auth-activity/sessions`, {
+            cacheKey: 'activity:sessions',
+            maxAgeMs: 8000,
+            force
+        });
         adminSessions = Array.isArray(data.sessions) ? data.sessions : [];
 
         const countEl = document.getElementById('adminSessionCount');
         if (countEl) countEl.textContent = String(adminSessions.length);
 
         if (container) container.classList.remove('refreshing');
+        tbody.dataset.loaded = '1';
 
         if (!adminSessions.length) {
             tbody.innerHTML = '<tr><td colspan="6" class="loading">No active sessions found.</td></tr>';
@@ -146,17 +152,22 @@ async function loadAdminSessions() {
     }
 }
 
-async function loadAdminHistory() {
+async function loadAdminHistory(options = {}) {
+    const force = !!options.force;
     const tbody = document.getElementById('adminHistoryTableBody');
     if (!tbody) return;
 
     const container = tbody.closest('.table-container');
-    tbody.innerHTML = generateTableSkeleton(6, 4);
+    const initialLoad = !tbody.dataset.loaded;
+    if (initialLoad) tbody.innerHTML = generateTableSkeleton(6, 4);
     if (container) container.classList.add('refreshing');
 
     try {
-        const response = await fetch(`${API_URL}/admin/my-auth-activity/history?per_page=80&page=1`);
-        const data = await response.json();
+        const data = await fetchJsonCached(`${API_URL}/admin/my-auth-activity/history?per_page=80&page=1`, {
+            cacheKey: 'activity:history',
+            maxAgeMs: 8000,
+            force
+        });
         adminHistory = Array.isArray(data.events) ? data.events : [];
 
         const total = Number(data.total || adminHistory.length || 0);
@@ -164,6 +175,7 @@ async function loadAdminHistory() {
         if (countEl) countEl.textContent = String(total);
 
         if (container) container.classList.remove('refreshing');
+        tbody.dataset.loaded = '1';
 
         if (!adminHistory.length) {
             tbody.innerHTML = '<tr><td colspan="4" class="loading">No personal activity recorded yet.</td></tr>';
@@ -267,7 +279,8 @@ function confirmRevokeAdminSession(sessionId, sessionLabel, isCurrentSession, se
                 if (data.current_session_revoked) {
                     setTimeout(() => { window.location.href = '/login'; }, 250);
                 } else {
-                    loadMyAuthActivity();
+                    invalidateCacheByPrefix('activity:');
+                    loadMyAuthActivity({ force: true });
                 }
             } else {
                 showToast(data.detail || 'Failed to revoke session', 'error');

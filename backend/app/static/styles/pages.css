@@ -199,27 +199,27 @@
         border-radius: 999px;
     }
     #dashboardPage .dashboard-hero-shell .dashboard-hero-stats .stat-card {
-        flex: 0 0 min(74vw, 280px);
-        min-width: min(74vw, 280px);
+        flex: 0 0 min(62vw, 220px);
+        min-width: min(62vw, 220px);
         scroll-snap-align: start;
-        padding: 12px 14px;
-        gap: 10px;
+        padding: 10px 12px;
+        gap: 8px;
     }
     #dashboardPage .dashboard-hero-shell .dashboard-hero-stats .stat-icon-wrap {
-        width: 34px;
-        height: 34px;
-        border-radius: 10px;
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
     }
     #dashboardPage .dashboard-hero-shell .dashboard-hero-stats .stat-icon-wrap svg {
-        width: 18px;
-        height: 18px;
+        width: 16px;
+        height: 16px;
     }
     #dashboardPage .dashboard-hero-shell .dashboard-hero-stats .stat-value {
-        font-size: 1rem;
+        font-size: 0.94rem;
         letter-spacing: -0.02em;
     }
     #dashboardPage .dashboard-hero-shell .dashboard-hero-stats .stat-label {
-        font-size: 0.72rem;
+        font-size: 0.68rem;
     }
 
     .page-header {
@@ -262,15 +262,8 @@
         -webkit-overflow-scrolling: touch;
         width: 100%;
         border-radius: var(--radius);
-        background:
-            linear-gradient(to right, var(--surface) 30%, rgba(255,255,255,0)),
-            linear-gradient(to right, rgba(255,255,255,0), var(--surface) 70%) right,
-            radial-gradient(farthest-side at 0 50%, rgba(99,102,241,0.12), transparent),
-            radial-gradient(farthest-side at 100% 50%, rgba(99,102,241,0.12), transparent) right;
-        background-repeat: no-repeat;
-        background-color: var(--surface);
-        background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
-        background-attachment: local, local, scroll, scroll;
+        background: transparent;
+        border: 1px solid transparent;
     }
 
     .data-table { font-size: 0.82rem; min-width: 560px; }
@@ -491,8 +484,8 @@
     .dashboard-hero h3 { font-size: 1.45rem; }
     .dashboard-hero p { font-size: 0.84rem; }
     #dashboardPage .dashboard-hero-shell .dashboard-hero-stats .stat-card {
-        flex-basis: 82vw;
-        min-width: 82vw;
+        flex-basis: 72vw;
+        min-width: 72vw;
     }
 }
 
@@ -502,18 +495,36 @@
 
 /* Page transition animations */
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.995);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 @keyframes fadeOut {
-    from { opacity: 1; transform: translateY(0); }
-    to { opacity: 0; transform: translateY(-8px); }
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.996);
+    }
 }
 
 @keyframes slideIn {
-    from { opacity: 0; transform: translateX(20px); }
-    to { opacity: 1; transform: translateX(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .page {
@@ -521,11 +532,11 @@
 }
 
 .page.active {
-    animation: fadeIn 0.2s ease forwards;
+    animation: fadeIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .page.transitioning-out {
-    animation: fadeOut 0.12s ease forwards;
+    animation: fadeOut 0.16s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 /* Content fade transitions */
@@ -606,11 +617,11 @@
 
 /* Table row transitions */
 .data-table tbody tr {
-    transition: background 0.12s ease, opacity 0.2s ease, transform 0.2s ease;
+    transition: opacity 0.22s ease, transform 0.22s ease, box-shadow 0.22s ease;
 }
 
 .data-table tbody tr.new-row {
-    animation: slideIn 0.3s ease forwards;
+    animation: slideIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .data-table tbody tr.removing {
@@ -666,11 +677,12 @@
 
 /* Smooth content updates */
 .table-container {
-    transition: opacity 0.15s ease;
+    transition: opacity 0.24s ease, transform 0.24s ease;
 }
 
 .table-container.refreshing {
-    opacity: 0.7;
+    opacity: 0.82;
+    transform: translateY(2px);
 }
 
 /* Toast animations */

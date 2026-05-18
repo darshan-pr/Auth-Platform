@@ -44,10 +44,10 @@
                 display: block !important;
                 background: #fff;
                 border: 1px solid #e2e8f0;
-                border-radius: 12px;
-                padding: 14px 16px;
-                margin-bottom: 12px;
-                box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+                border-radius: 10px;
+                padding: 10px 12px;
+                margin-bottom: 8px;
+                box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
                 position: relative;
             }
             .data-table tbody tr:nth-child(even) { background: #fff !important; }
@@ -57,11 +57,12 @@
                 display: flex !important;
                 justify-content: space-between;
                 align-items: flex-start;
-                padding: 8px 0 !important;
+                padding: 6px 0 !important;
+                border-right: none !important;
                 border-bottom: 1px solid #f1f5f9 !important;
                 text-align: right;
-                font-size: 0.85rem;
-                gap: 12px;
+                font-size: 0.81rem;
+                gap: 10px;
                 word-break: break-word;
             }
             .data-table td:last-child { border-bottom: none !important; }
@@ -69,14 +70,14 @@
             .data-table td::before {
                 content: attr(data-label);
                 font-weight: 700;
-                font-size: 0.7rem;
+                font-size: 0.66rem;
                 color: #475569;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
                 text-align: left;
                 flex-shrink: 0;
-                min-width: 85px;
-                padding-top: 3px;
+                min-width: 74px;
+                padding-top: 2px;
             }
 
             /* colspan cells (loading / empty messages) */
@@ -141,6 +142,11 @@
             }
             .redirect-uris { max-width: none !important; }
             .action-btns { justify-content: flex-end; }
+            .action-btns .btn-icon {
+                width: 28px;
+                height: 28px;
+                border-radius: 6px;
+            }
 
             /* ---------- MODALS → FULL-WIDTH BOTTOM SHEET ---------- */
             .modal {
@@ -297,7 +303,7 @@
                             <h2>Dashboard</h2>
                         </div>
                         <div class="page-actions">
-                            <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage()" title="Refresh">
+                            <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage({ force: true })" title="Refresh">
                                 <i data-lucide="refresh-cw"></i>
                             </button>
                         </div>
@@ -472,7 +478,7 @@
                                 <i data-lucide="search" class="search-icon"></i>
                                 <input type="text" id="appSearch" placeholder="Search apps..." class="search-input" oninput="filterApps()">
                             </div>
-                            <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage()" title="Refresh">
+                            <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage({ force: true })" title="Refresh">
                                 <i data-lucide="refresh-cw"></i>
                             </button>
                         </div>
@@ -517,7 +523,7 @@
                                 <i data-lucide="search" class="search-icon"></i>
                                 <input type="text" id="userSearch" placeholder="Search users..." class="search-input" oninput="filterUsers()">
                             </div>
-                            <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage()" title="Refresh">
+                            <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage({ force: true })" title="Refresh">
                                 <i data-lucide="refresh-cw"></i>
                             </button>
                         </div>
@@ -581,7 +587,7 @@
                         <button class="btn btn-danger-outline" onclick="confirmRevokeAllAdminSessions()">
                             <i data-lucide="shield-off"></i> Revoke All Sessions
                         </button>
-                        <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage()" title="Refresh">
+                        <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage({ force: true })" title="Refresh">
                             <i data-lucide="refresh-cw"></i>
                         </button>
                     </div>
@@ -657,7 +663,7 @@
                         <p class="page-desc">Manage your admin profile, passkeys, and MFA.</p>
                     </div>
                     <div class="page-actions">
-                        <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage()" title="Refresh">
+                        <button class="btn btn-icon-text btn-secondary" onclick="refreshCurrentPage({ force: true })" title="Refresh">
                             <i data-lucide="refresh-cw"></i>
                         </button>
                     </div>

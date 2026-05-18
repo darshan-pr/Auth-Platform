@@ -23,3 +23,5 @@ let _autoRefreshTimer = null;
 let adminSettingsProfile = null;
 let adminSettingsSecurity = null;
 let adminSettingsPendingMfaAction = 'enable';
+let _adminDataCache = new Map();
+let _adminInflightRequests = new Map();

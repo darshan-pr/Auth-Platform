@@ -1,6 +1,7 @@
 // ==================== Dashboard ====================
 
-async function loadDashboard() {
+async function loadDashboard(options = {}) {
+    const force = !!options.force;
     const appMap = {};
 
     try {
@@ -10,10 +11,10 @@ async function loadDashboard() {
             usersResult,
             eventsResult
         ] = await Promise.allSettled([
-            fetchJson(`${API_URL}/admin/stats`),
-            fetchJson(`${API_URL}/admin/apps`),
-            fetchUsersSnapshot(),
-            fetchJson(`${API_URL}/admin/login-events?page=1&per_page=6`)
+            fetchJsonCached(`${API_URL}/admin/stats`, { cacheKey: 'dashboard:stats', maxAgeMs: 15000, force }),
+            fetchJsonCached(`${API_URL}/admin/apps`, { cacheKey: 'admin:apps', maxAgeMs: 15000, force }),
+            fetchUsersSnapshot({ maxUsers: 100, force }),
+            fetchJsonCached(`${API_URL}/admin/login-events?page=1&per_page=6`, { cacheKey: 'dashboard:events', maxAgeMs: 15000, force })
         ]);
 
         const stats = statsResult.status === 'fulfilled' ? (statsResult.value || {}) : {};
@@ -67,34 +68,13 @@ async function loadDashboard() {
     }
 }
 
-async function fetchJson(url) {
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Request failed (${response.status}) for ${url}`);
-    }
-    return response.json();
-}
-
-async function fetchUsersSnapshot(maxUsers = 500) {
-    const pageSize = 100;
-    let offset = 0;
-    let total = 0;
-    const usersList = [];
-
-    while (offset === 0 || (offset < total && usersList.length < maxUsers)) {
-        const response = await fetchJson(`${API_URL}/admin/users?limit=${pageSize}&offset=${offset}`);
-        total = Number(response.total || 0);
-        const pageUsers = Array.isArray(response.users) ? response.users : [];
-        if (!pageUsers.length) break;
-        usersList.push(...pageUsers);
-        offset += pageSize;
-        if (pageUsers.length < pageSize) break;
-    }
-
-    if (usersList.length > maxUsers) {
-        usersList.length = maxUsers;
-    }
-
+async function fetchUsersSnapshot({ maxUsers = 100, force = false } = {}) {
+    const response = await fetchJsonCached(
+        `${API_URL}/admin/users?limit=${maxUsers}&offset=0`,
+        { cacheKey: `dashboard:users:${maxUsers}`, maxAgeMs: 15000, force }
+    );
+    const total = Number(response.total || 0);
+    const usersList = Array.isArray(response.users) ? response.users : [];
     return {
         users: usersList,
         total,

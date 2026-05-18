@@ -1,27 +1,36 @@
 // ==================== Users Management ====================
 
-async function loadUsers() {
+async function loadUsers(options = {}) {
+    const force = !!options.force;
     const tbody = document.getElementById('usersTableBody');
     const container = tbody.closest('.table-container');
-    
-    // Show skeleton loading (instant visual feedback)
-    tbody.innerHTML = generateTableSkeleton(5, 6);
+
+    const initialLoad = !tbody.dataset.loaded;
+    if (initialLoad) {
+        tbody.innerHTML = generateTableSkeleton(5, 6);
+    }
     if (container) container.classList.add('refreshing');
 
     try {
         let url = `${API_URL}/admin/users`;
         const params = [];
         if (selectedAppFilter) params.push(`app_id=${encodeURIComponent(selectedAppFilter)}`);
+        params.push('limit=100');
         if (params.length) url += '?' + params.join('&');
 
-        const response = await fetch(url);
-        const data = await response.json();
+        const cacheKey = `admin:users:${selectedAppFilter || 'all'}`;
+        const data = await fetchJsonCached(url, {
+            cacheKey,
+            maxAgeMs: 10000,
+            force
+        });
         users = Array.isArray(data) ? data : (data.users || []);
-        
+
         if (container) container.classList.remove('refreshing');
+        tbody.dataset.loaded = '1';
 
         if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="loading">No users found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="loading">No users found.</td></tr>';
             return;
         }
 
@@ -79,7 +88,8 @@ async function loadUsers() {
         renderIcons();
     } catch (error) {
         console.error('Error loading users:', error);
-        tbody.innerHTML = '<tr><td colspan="7" class="loading">Failed to load users</td></tr>';
+        if (container) container.classList.remove('refreshing');
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">Failed to load users</td></tr>';
     }
 }
 
@@ -110,8 +120,10 @@ function showCreateUserModal() {
 async function loadAppsForSelect() {
     const select = document.getElementById('userAppId');
     try {
-        const response = await fetch(`${API_URL}/admin/apps`);
-        const appsList = await response.json();
+        const appsList = await fetchJsonCached(`${API_URL}/admin/apps`, {
+            cacheKey: 'admin:apps',
+            maxAgeMs: 15000
+        });
         select.innerHTML = appsList.map(app =>
             `<option value="${app.app_id}">${escapeHtml(app.name)} (${app.app_id})</option>`
         ).join('');
@@ -181,8 +193,10 @@ async function saveUser() {
 
         if (response.ok) {
             closeModal('userModal');
-            loadUsers();
-            loadDashboard();
+            invalidateCacheByPrefix('admin:users');
+            invalidateCacheByPrefix('dashboard:');
+            loadUsers({ force: true });
+            loadDashboard({ force: true });
             showToast(editingUserId ? 'User updated' : 'User created', 'success');
             if (!editingUserId) {
                 resetCsvUploadState();
@@ -221,8 +235,10 @@ function confirmDeleteUser(userId, email) {
             const response = await fetch(`${API_URL}/admin/users/${userId}`, { method: 'DELETE' });
             if (response.ok) {
                 closeModal('deleteModal');
-                loadUsers();
-                loadDashboard();
+                invalidateCacheByPrefix('admin:users');
+                invalidateCacheByPrefix('dashboard:');
+                loadUsers({ force: true });
+                loadDashboard({ force: true });
                 showToast('User deleted', 'success');
             } else {
                 showToast('Failed to delete user', 'error');
@@ -260,8 +276,10 @@ function confirmForceLogout(userId, email) {
                 closeModal('forceLogoutModal');
                 const emailNote = data.email_sent ? ' (notification email sent)' : '';
                 showToast(`${email} has been forced offline${emailNote}`, 'success');
-                loadUsers();
-                loadDashboard();
+                invalidateCacheByPrefix('admin:users');
+                invalidateCacheByPrefix('dashboard:');
+                loadUsers({ force: true });
+                loadDashboard({ force: true });
             } else {
                 const data = await response.json();
                 showToast(data.detail || 'Failed to force logout', 'error');
@@ -390,8 +408,10 @@ async function executeBulkAction(action) {
             closeModal('bulkConfirmModal');
             showToast(`${processed} user${processed !== 1 ? 's' : ''} deleted (force logout done first)`, 'success');
             clearBulkSelection();
-            loadUsers();
-            loadDashboard();
+            invalidateCacheByPrefix('admin:users');
+            invalidateCacheByPrefix('dashboard:');
+            loadUsers({ force: true });
+            loadDashboard({ force: true });
             return;
         }
 
@@ -407,8 +427,10 @@ async function executeBulkAction(action) {
             const extra = data.emails_sent > 0 ? ` (${data.emails_sent} emails sent)` : '';
             showToast(`${data.processed} user${data.processed > 1 ? 's' : ''} — ${action} completed${extra}`, 'success');
             clearBulkSelection();
-            loadUsers();
-            loadDashboard();
+            invalidateCacheByPrefix('admin:users');
+            invalidateCacheByPrefix('dashboard:');
+            loadUsers({ force: true });
+            loadDashboard({ force: true });
         } else {
             showToast(data.detail || 'Bulk action failed', 'error');
         }
@@ -880,8 +902,10 @@ async function processCsvUploadQueue(defaultAppId) {
     syncCsvProgressUi();
 
     if (csvUploadState.added > 0) {
-        loadUsers();
-        loadDashboard();
+        invalidateCacheByPrefix('admin:users');
+        invalidateCacheByPrefix('dashboard:');
+        loadUsers({ force: true });
+        loadDashboard({ force: true });
     }
 
     if (csvUploadState.failed === 0) {
@@ -993,26 +1017,31 @@ function filterUsers() {
     });
 }
 
-async function loadAppFilterOptions() {
+async function loadAppFilterOptions(options = {}) {
+    const force = !!options.force;
     const select = document.getElementById('userAppFilter');
     if (!select) return;
     try {
-        const response = await fetch(`${API_URL}/admin/apps`);
-        apps = await response.json();
+        apps = await fetchJsonCached(`${API_URL}/admin/apps`, {
+            cacheKey: 'admin:apps',
+            maxAgeMs: 15000,
+            force
+        });
 
         if (apps.length === 0) {
             select.innerHTML = '<option value="">No apps available</option>';
+            selectedAppFilter = '';
             return;
         }
 
-        // Always default to first app if no filter is selected
-        if (!selectedAppFilter || !apps.find(a => a.app_id === selectedAppFilter)) {
-            selectedAppFilter = apps[0].app_id;
+        if (selectedAppFilter && !apps.find(a => a.app_id === selectedAppFilter)) {
+            selectedAppFilter = '';
         }
 
-        select.innerHTML = apps.map(app =>
+        const appOptions = apps.map(app =>
             `<option value="${escapeAttr(app.app_id)}"${app.app_id === selectedAppFilter ? ' selected' : ''}>${escapeHtml(app.name || 'Unnamed App')}</option>`
         ).join('');
+        select.innerHTML = `<option value="">All Applications</option>${appOptions}`;
     } catch (error) {
         console.error('Error loading apps for filter:', error);
     }
@@ -1020,5 +1049,5 @@ async function loadAppFilterOptions() {
 
 function onAppFilterChange() {
     selectedAppFilter = document.getElementById('userAppFilter').value;
-    loadUsers();
+    loadUsers({ force: true });
 }

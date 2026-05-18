@@ -1,18 +1,24 @@
 // ==================== Apps Management ====================
 
-async function loadApps() {
+async function loadApps(options = {}) {
+    const force = !!options.force;
     const tbody = document.getElementById('appsTableBody');
     const container = tbody.closest('.table-container');
-    
-    // Show skeleton loading (instant visual feedback)
-    tbody.innerHTML = generateTableSkeleton(5, 7);
+
+    const initialLoad = !tbody.dataset.loaded;
+    if (initialLoad) {
+        tbody.innerHTML = generateTableSkeleton(5, 7);
+    }
     if (container) container.classList.add('refreshing');
 
     try {
-        const response = await fetch(`${API_URL}/admin/apps`);
-        apps = await response.json();
-        
+        apps = await fetchJsonCached(`${API_URL}/admin/apps`, {
+            cacheKey: 'admin:apps',
+            maxAgeMs: 15000,
+            force
+        });
         if (container) container.classList.remove('refreshing');
+        tbody.dataset.loaded = '1';
 
         if (apps.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="loading">No applications yet. Create your first app.</td></tr>';
@@ -67,6 +73,7 @@ async function loadApps() {
         renderIcons();
     } catch (error) {
         console.error('Error loading apps:', error);
+        if (container) container.classList.remove('refreshing');
         tbody.innerHTML = '<tr><td colspan="8" class="loading">Failed to load applications</td></tr>';
     }
 }
@@ -275,6 +282,8 @@ async function saveApp() {
 
         if (response.ok) {
             closeModal('appModal');
+            invalidateCacheKey('admin:apps');
+            invalidateCacheByPrefix('dashboard:');
 
             if (!editingAppId && data.app_id && data.app_secret) {
                 document.getElementById('credAppId').textContent = data.app_id;
@@ -282,8 +291,8 @@ async function saveApp() {
                 openModal('credentialsModal');
             }
 
-            loadApps();
-            loadDashboard();
+            loadApps({ force: true });
+            loadDashboard({ force: true });
             showToast(editingAppId ? 'Application updated' : 'Application created', 'success');
         } else {
             showToast(data.detail || 'Operation failed', 'error');
@@ -329,12 +338,15 @@ function confirmDeleteApp(appId, appName) {
             const response = await fetch(`${API_URL}/admin/apps/${appId}`, { method: 'DELETE' });
             if (response.ok) {
                 closeModal('deleteModal');
-                loadApps();
-                loadDashboard();
+                invalidateCacheKey('admin:apps');
+                invalidateCacheByPrefix('dashboard:');
+                invalidateCacheByPrefix('admin:users');
+                loadApps({ force: true });
+                loadDashboard({ force: true });
                 // Refresh user list since users were cascade-deleted
                 if (currentPage === 'users' || selectedAppFilter === appId) {
                     selectedAppFilter = '';
-                    loadAppFilterOptions().then(() => loadUsers());
+                    loadAppFilterOptions({ force: true }).then(() => loadUsers({ force: true }));
                 }
                 showToast('Application and its users deleted', 'success');
             } else {

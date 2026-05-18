@@ -40,6 +40,57 @@ function renderIcons() {
     }, 16);
 }
 
+// ==================== Shared Data Cache ====================
+
+function getCachedData(cacheKey, maxAgeMs) {
+    const entry = _adminDataCache.get(cacheKey);
+    if (!entry) return null;
+    if (Date.now() - entry.ts > maxAgeMs) {
+        _adminDataCache.delete(cacheKey);
+        return null;
+    }
+    return entry.data;
+}
+
+function setCachedData(cacheKey, data) {
+    _adminDataCache.set(cacheKey, { ts: Date.now(), data });
+    return data;
+}
+
+function invalidateCacheByPrefix(prefix) {
+    Array.from(_adminDataCache.keys()).forEach((key) => {
+        if (key.startsWith(prefix)) _adminDataCache.delete(key);
+    });
+}
+
+function invalidateCacheKey(cacheKey) {
+    _adminDataCache.delete(cacheKey);
+}
+
+async function fetchJsonCached(url, { cacheKey = url, maxAgeMs = 15000, force = false } = {}) {
+    if (!force) {
+        const cached = getCachedData(cacheKey, maxAgeMs);
+        if (cached !== null) return cached;
+    }
+
+    if (_adminInflightRequests.has(cacheKey)) {
+        return _adminInflightRequests.get(cacheKey);
+    }
+
+    const requestPromise = fetch(url)
+        .then((response) => {
+            if (!response.ok) throw new Error(`Request failed (${response.status}) for ${url}`);
+            return response.json();
+        })
+        .then((payload) => setCachedData(cacheKey, payload))
+        .finally(() => {
+            _adminInflightRequests.delete(cacheKey);
+        });
+
+    _adminInflightRequests.set(cacheKey, requestPromise);
+    return requestPromise;
+}
+
 // ==================== Auth Gate ====================
 
 async function checkSession() {
@@ -68,7 +119,7 @@ function showApp() {
     setupModals();
     setupForms();
     checkApiHealth();
-    loadDashboard();
+    loadDashboard({ force: false });
     startAutoRefresh();
 
     // Show tenant name in sidebar
@@ -153,9 +204,6 @@ function navigateTo(page) {
     if (currentPageEl && newPageEl) {
         currentPageEl.classList.add('transitioning-out');
         
-        // Show skeleton loading immediately on new page
-        showPageSkeleton(page);
-        
         setTimeout(() => {
             currentPageEl.classList.remove('active', 'transitioning-out');
             newPageEl.classList.add('active');
@@ -164,9 +212,9 @@ function navigateTo(page) {
             // Clear bulk selection when leaving users page
             if (page !== 'users') clearBulkSelection();
             
-            refreshCurrentPage();
+            refreshCurrentPage({ force: false });
             startAutoRefresh();
-        }, 100); // Quick transition
+        }, 160); // Match page transition timing for smoother navigation
     } else {
         currentPage = page;
         document.querySelectorAll('.page').forEach(p => {
@@ -176,7 +224,7 @@ function navigateTo(page) {
         // Clear bulk selection when leaving users page
         if (page !== 'users') clearBulkSelection();
         
-        refreshCurrentPage();
+        refreshCurrentPage({ force: false });
         startAutoRefresh();
     }
 }
@@ -226,12 +274,12 @@ function generateTableSkeleton(rows, cols) {
     return html;
 }
 
-function refreshCurrentPage() {
+function refreshCurrentPage(options = {}) {
     switch (currentPage) {
-        case 'dashboard': loadDashboard(); break;
-        case 'apps':      loadApps();      break;
-        case 'users':     loadAppFilterOptions().then(() => loadUsers()); break;
-        case 'activity':  loadMyAuthActivity(); break;
+        case 'dashboard': loadDashboard(options); break;
+        case 'apps':      loadApps(options);      break;
+        case 'users':     loadAppFilterOptions(options).then(() => loadUsers(options)); break;
+        case 'activity':  loadMyAuthActivity(options); break;
         case 'settings':  loadAdminSettings(); break;
     }
 }
