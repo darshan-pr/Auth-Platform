@@ -23,6 +23,6 @@ CONTEXT.md
 packages/auth-sdk/dist
 packages/auth-sdk/node_modules
 packages/auth-sdk/.env
-packages/auth-sdk/auth-platform-sdk-3.1.0.tgz
+packages/auth-sdk/auth-platform-sdk-*.tgz
 next-test-app/node_modules
 next-test-app/.env

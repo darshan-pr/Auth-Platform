@@ -1,7 +1,7 @@
 # Auth Platform
 A production-minded, self-hosted authentication platform for modern apps, built with OAuth 2.0 + PKCE, multi-tenant isolation, passkeys (WebAuthn), and hosted auth screens.
 
-GitHub: https://github.com/darshan-pr/Auth-Platform
+GitHub: https://github.com/darshan-pr/auth-microservice
 LinkedIn:https://www.linkedin.com/feed/update/urn:li:activity:7433885576686256128/
 ## Tech Stack
 
@@ -84,7 +84,7 @@ backend/
   migrations/       # SQL schema migrations
   tests/            # automated backend tests
 
-next-app/           # sample client app integration
+next-test-app/      # sample Next.js client app integration
 frontend/           # additional frontend assets
 scripts/run.sh      # local/dev/prod-like service runner
 scripts/run-docker.sh # production docker runner

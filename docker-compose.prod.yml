@@ -149,7 +149,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: next-app/Dockerfile
+      dockerfile: next-test-app/Dockerfile
       args:
         NEXT_PUBLIC_AUTH_SERVER: ${NEXT_PUBLIC_AUTH_SERVER:-http://localhost:8000}
         NEXT_PUBLIC_CLIENT_ID: ${NEXT_PUBLIC_CLIENT_ID:-client-id-placeholder}
