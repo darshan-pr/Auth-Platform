@@ -1,9 +1,18 @@
 {
   "name": "auth-platform-sdk",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "Official SDK for Auth Platform — OAuth 2.0 + PKCE authentication for Next.js apps",
   "author": "Auth Platform",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/darshan-pr/Auth-Platform.git",
+    "directory": "packages/auth-sdk"
+  },
+  "homepage": "https://github.com/darshan-pr/Auth-Platform/tree/main/packages/auth-sdk",
+  "bugs": {
+    "url": "https://github.com/darshan-pr/Auth-Platform/issues"
+  },
   "type": "module",
   "main": "./dist/client.js",
   "types": "./dist/client.d.ts",
@@ -25,8 +34,12 @@
   },
   "typesVersions": {
     "*": {
-      "client": ["./dist/client.d.ts"],
-      "server": ["./dist/server.d.ts"]
+      "client": [
+        "./dist/client.d.ts"
+      ],
+      "server": [
+        "./dist/server.d.ts"
+      ]
     }
   },
   "files": [
@@ -46,8 +59,12 @@
     "next": ">=14.0.0"
   },
   "peerDependenciesMeta": {
-    "react": { "optional": false },
-    "next": { "optional": true }
+    "react": {
+      "optional": false
+    },
+    "next": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "typescript": "^5.4.0",
