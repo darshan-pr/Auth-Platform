@@ -1,7 +1,7 @@
 # Auth Platform
 A production-minded, self-hosted authentication platform for modern apps, built with OAuth 2.0 + PKCE, multi-tenant isolation, passkeys (WebAuthn), and hosted auth screens.
 
-GitHub: https://github.com/darshan-pr/auth-microservice
+GitHub: https://github.com/darshan-pr/Auth-Platform
 LinkedIn:https://www.linkedin.com/feed/update/urn:li:activity:7433885576686256128/
 ## Tech Stack
 
