@@ -1,0 +1,27 @@
+# ============================================================
+#  Auth Platform — Caddyfile (EC2 Host Reverse Proxy)
+# ============================================================
+#
+#  Architecture:
+#    Internet → Caddy (:80/:443, EC2 host)
+#      → Nginx Docker container (127.0.0.1:8000)
+#        → FastAPI/Gunicorn (internal Docker network)
+#
+#  Notes:
+#    - Caddy v2 with a pure reverse_proxy does NOT block
+#      dot-prefix paths (/.well-known/) by default.
+#      Dot-file protection only applies when using file_server.
+#    - TLS certificates are managed automatically by Caddy
+#      (Let's Encrypt / ZeroSSL).
+#    - The /.well-known/ fix lives in nginx/nginx.conf
+#      (location ^~ /.well-known/), not here.
+#
+#  Deploy:
+#    sudo cp caddy/Caddyfile /etc/caddy/Caddyfile
+#    sudo caddy validate --config /etc/caddy/Caddyfile
+#    sudo systemctl reload caddy
+# ============================================================
+
+auth-platform.darshan-pr.tech {
+    reverse_proxy 127.0.0.1:8000
+}
