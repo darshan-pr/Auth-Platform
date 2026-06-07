@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin, auth, health, oauth, token
+from app.api import admin, auth, discovery, health, oauth, token
 from app.bootstrap import bootstrap_database
 from app.config import settings
 from app.middleware.console_auth import ConsoleAuthMiddleware
@@ -35,6 +35,7 @@ app.add_middleware(ConsoleAuthMiddleware)
 app.add_middleware(CSRFMiddleware)
 
 app.include_router(health.router, tags=["Health"])
+app.include_router(discovery.router, tags=["Discovery"])
 app.include_router(admin.router, tags=["Admin"])
 app.include_router(auth.router, tags=["Auth"])
 app.include_router(token.router, prefix="/token", tags=["Token"])

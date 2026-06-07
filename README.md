@@ -139,6 +139,8 @@ RUN_DB_MIGRATIONS_ON_STARTUP=true
 | `DATABASE_URL` | PostgreSQL connection string |
 | `REDIS_URL` | Redis connection for OTP/rate limiting/state |
 | `JWT_SECRET` | JWT signing and security secret |
+| `JWT_ISSUER` | Token issuer URL; defaults to `AUTH_SERVER_URL` |
+| `JWT_KEY_ID` | Optional fixed JWT `kid`; defaults to the public-key thumbprint |
 | `SMTP_SERVER`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | Email delivery configuration |
 | `AUTH_SERVER_URL` | Public auth server base URL |
 | `AUTH_PLATFORM_URL` | Public platform URL used in templates/links |

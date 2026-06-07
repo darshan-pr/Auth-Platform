@@ -1,7 +1,12 @@
+import base64
+import hashlib
+import json
+
 import jwt
 from datetime import datetime, timedelta
 from typing import Optional
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
 from app.config import settings
 import os
@@ -88,6 +93,43 @@ PRIVATE_KEY, PUBLIC_KEY = _load_required_keys()
 SIGNING_KEY = PRIVATE_KEY
 VERIFY_KEY = PUBLIC_KEY
 
+
+def _b64url_uint(value: int) -> str:
+    byte_length = (value.bit_length() + 7) // 8
+    return base64.urlsafe_b64encode(value.to_bytes(byte_length, "big")).rstrip(b"=").decode("ascii")
+
+
+def _jwk_thumbprint(jwk: dict) -> str:
+    members = {key: jwk[key] for key in ("e", "kty", "n")}
+    canonical = json.dumps(members, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(hashlib.sha256(canonical).digest()).rstrip(b"=").decode("ascii")
+
+
+def get_public_jwk() -> dict:
+    """Return the active JWT signing public key as an RSA JWK."""
+    if not isinstance(PUBLIC_KEY, rsa.RSAPublicKey):
+        raise RuntimeError("JWKS currently supports RSA signing keys only.")
+
+    numbers = PUBLIC_KEY.public_numbers()
+    jwk = {
+        "kty": "RSA",
+        "use": "sig",
+        "alg": settings.JWT_ALGORITHM,
+        "n": _b64url_uint(numbers.n),
+        "e": _b64url_uint(numbers.e),
+    }
+    jwk["kid"] = (settings.JWT_KEY_ID or _jwk_thumbprint(jwk)).strip()
+    return jwk
+
+
+def get_jwks() -> dict:
+    """Return the public JWKS document for local token verification."""
+    return {"keys": [get_public_jwk()]}
+
+
+def get_signing_key_id() -> str:
+    return get_public_jwk()["kid"]
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a new access token"""
     payload = data.copy()
@@ -98,7 +140,12 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         "iss": settings.JWT_ISSUER,
     })
     payload.setdefault("type", "access")
-    return jwt.encode(payload, SIGNING_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(
+        payload,
+        SIGNING_KEY,
+        algorithm=settings.JWT_ALGORITHM,
+        headers={"kid": get_signing_key_id()},
+    )
 
 def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a new refresh token"""
@@ -110,7 +157,12 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
         "iss": settings.JWT_ISSUER,
     })
     payload.setdefault("type", "refresh")
-    return jwt.encode(payload, SIGNING_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(
+        payload,
+        SIGNING_KEY,
+        algorithm=settings.JWT_ALGORITHM,
+        headers={"kid": get_signing_key_id()},
+    )
 
 def verify_token(token: str) -> Optional[dict]:
     """Verify a token and return the payload.

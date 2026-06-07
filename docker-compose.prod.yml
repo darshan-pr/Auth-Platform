@@ -91,8 +91,8 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
 
       # URLs — update these with tunnel URL after first start
-      AUTH_SERVER_URL: ${AUTH_SERVER_URL:-http://localhost:80}
-      AUTH_PLATFORM_URL: ${AUTH_PLATFORM_URL:-http://localhost:80}
+      AUTH_SERVER_URL: ${AUTH_SERVER_URL:-https://auth-platform.darshan-pr.tech}
+      AUTH_PLATFORM_URL: ${AUTH_PLATFORM_URL:-https://auth-platform.darshan-pr.tech}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:80}
 
       # Gunicorn workers (default 4, tune based on CPU cores)

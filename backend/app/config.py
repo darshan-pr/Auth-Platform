@@ -54,8 +54,12 @@ class Settings:
 
     # JWT Configuration
     JWT_SECRET: str = os.getenv("JWT_SECRET", "")
-    JWT_ISSUER: str = "auth-platform"
+    JWT_ISSUER: str = os.getenv(
+        "JWT_ISSUER",
+        os.getenv("AUTH_SERVER_URL", "http://localhost:8000"),
+    ).rstrip("/")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "RS256")
+    JWT_KEY_ID: str = os.getenv("JWT_KEY_ID", "")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     JWT_PRIVATE_KEY_PEM: str = os.getenv("JWT_PRIVATE_KEY_PEM", "")
