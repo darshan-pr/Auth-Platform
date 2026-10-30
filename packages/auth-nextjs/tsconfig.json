@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.sdk.json",
+  "compilerOptions": {
+    "paths": {
+      "@authplatform/auth-core": ["packages/auth-core/dist/types/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

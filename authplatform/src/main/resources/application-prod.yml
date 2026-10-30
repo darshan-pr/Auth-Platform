@@ -1,0 +1,19 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+authplatform:
+  audit:
+    reads-enabled: false
+  security:
+    cookie-secure: true
+    docs-enabled: false
+    console-allowed-origins: ${CONSOLE_ALLOWED_ORIGINS}
+  jwt:
+    signing-keys: ${JWT_SIGNING_KEYS}
+    active-kid: ${JWT_ACTIVE_KID}

@@ -1,0 +1,31 @@
+{
+  "name": "@authplatform/auth-nextjs",
+  "version": "0.1.0",
+  "description": "Next.js BFF and server helpers for Auth Platform",
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./middleware": {
+      "types": "./dist/types/middleware.d.ts",
+      "import": "./dist/esm/middleware.js",
+      "require": "./dist/cjs/middleware.js"
+    }
+  },
+  "files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+  "sideEffects": false,
+  "dependencies": { "@authplatform/auth-core": "^0.1.0", "server-only": "^0.0.1" },
+  "peerDependencies": { "next": ">=14.2.0" },
+  "scripts": {
+    "build": "node ../../scripts/build-package.mjs auth-nextjs",
+    "pretest": "npm run build --workspace=@authplatform/auth-core && npm run build",
+    "test": "node --conditions=react-server --test --experimental-strip-types test/*.test.ts",
+    "pack": "npm pack --pack-destination ../../artifacts"
+  }
+}

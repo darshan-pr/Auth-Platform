@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-AuthplatformApplication<authplatform>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.authplatform.AuthplatformApplication",
+            "projectName": "authplatform",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}

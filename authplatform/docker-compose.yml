@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports: ["55432:5432"]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["1025:1025", "8025:8025"]
+  backend:
+    build: .
+    environment:
+      DB_URL: ${COMPOSE_DB_URL}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_URL: ${COMPOSE_REDIS_URL}
+      SMTP_HOST: ${COMPOSE_SMTP_HOST}
+      SMTP_PORT: ${COMPOSE_SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_AUTH: ${SMTP_AUTH}
+      SMTP_STARTTLS_ENABLE: ${SMTP_STARTTLS_ENABLE}
+      SMTP_STARTTLS_REQUIRED: ${SMTP_STARTTLS_REQUIRED}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL}
+      JWT_ACCOUNT_ACCESS_TTL: ${JWT_ACCOUNT_ACCESS_TTL:-30m}
+      JWT_ACCOUNT_REFRESH_TTL: ${JWT_ACCOUNT_REFRESH_TTL:-48h}
+      JWT_SIGNING_KEYS: ${JWT_SIGNING_KEYS}
+      JWT_ACTIVE_KID: ${JWT_ACTIVE_KID}
+      JWT_DEVELOPMENT_KEY_FILE: /var/lib/authplatform/dev-jwt-signing-key
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      authplatform_KEY_ENCRYPTION_SECRET: ${authplatform_KEY_ENCRYPTION_SECRET}
+      VERIFY_TOKEN_TTL: ${VERIFY_TOKEN_TTL}
+      RESET_TOKEN_TTL: ${RESET_TOKEN_TTL}
+      LOCKOUT_MAX_FAILURES: ${LOCKOUT_MAX_FAILURES}
+      LOCKOUT_WINDOW: ${LOCKOUT_WINDOW}
+      LOCKOUT_DURATION: ${LOCKOUT_DURATION}
+      CONSOLE_ALLOWED_ORIGINS: ${CONSOLE_ALLOWED_ORIGINS}
+      MAX_APPS_PER_ACCOUNT: ${MAX_APPS_PER_ACCOUNT}
+      MAX_ORIGINS_PER_APP: ${MAX_ORIGINS_PER_APP}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED}
+      RATE_LIMIT_LOGIN_CAPACITY: ${RATE_LIMIT_LOGIN_CAPACITY}
+      RATE_LIMIT_LOGIN_PERIOD: ${RATE_LIMIT_LOGIN_PERIOD}
+      RATE_LIMIT_SIGNUP_CAPACITY: ${RATE_LIMIT_SIGNUP_CAPACITY}
+      RATE_LIMIT_SIGNUP_PERIOD: ${RATE_LIMIT_SIGNUP_PERIOD}
+      RATE_LIMIT_GLOBAL_CAPACITY: ${RATE_LIMIT_GLOBAL_CAPACITY}
+      RATE_LIMIT_GLOBAL_PERIOD: ${RATE_LIMIT_GLOBAL_PERIOD}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_DOCS_ENABLED: ${AUTH_DOCS_ENABLED:-false}
+      AUDIT_READS_ENABLED: ${AUDIT_READS_ENABLED:-false}
+      SA_BOOTSTRAP_ENABLED: ${SA_BOOTSTRAP_ENABLED}
+      SA_BOOTSTRAP_EMAIL: ${SA_BOOTSTRAP_EMAIL}
+      SA_BOOTSTRAP_NAME: ${SA_BOOTSTRAP_NAME}
+      SA_BOOTSTRAP_PASSWORD: ${SA_BOOTSTRAP_PASSWORD}
+      PORT: ${BACKEND_PORT}
+    ports: ["8080:8080"]
+    volumes: [dev-jwt-keys:/var/lib/authplatform]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+  # Nginx is intentionally deferred for the current stage.
+volumes:
+  postgres-data:
+  dev-jwt-keys:

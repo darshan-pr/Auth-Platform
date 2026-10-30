@@ -1,0 +1,80 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  application:
+    name: authplatform
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  data.redis.url: ${REDIS_URL}
+  jpa:
+    open-in-view: false
+    hibernate.ddl-auto: validate
+    properties.hibernate.jdbc.batch_size: 25
+  flyway.enabled: true
+  jackson.deserialization.fail-on-unknown-properties: true
+  mail:
+    host: ${SMTP_HOST}
+    port: ${SMTP_PORT}
+    username: ${SMTP_USERNAME}
+    password: ${SMTP_PASSWORD}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS_ENABLE}
+      mail.smtp.starttls.required: ${SMTP_STARTTLS_REQUIRED}
+  threads.virtual.enabled: true
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: native
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-components: always
+      show-details: never
+springdoc:
+  api-docs.path: /v3/api-docs
+  swagger-ui.path: /swagger-ui.html
+authplatform:
+  audit:
+    reads-enabled: ${AUDIT_READS_ENABLED:false}
+  jwt:
+    issuer: ${JWT_ISSUER}
+    access-token-ttl: ${JWT_ACCESS_TTL}
+    refresh-token-ttl: ${JWT_REFRESH_TTL}
+    account-access-token-ttl: ${JWT_ACCOUNT_ACCESS_TTL:30m}
+    account-refresh-token-ttl: ${JWT_ACCOUNT_REFRESH_TTL:48h}
+    signing-keys: ${JWT_SIGNING_KEYS:}
+    active-kid: ${JWT_ACTIVE_KID:authplatform-dev}
+    development-key-file: ${JWT_DEVELOPMENT_KEY_FILE:${user.home}/.authplatform/dev-jwt-signing-key}
+  security:
+    key-encryption-secret: ${authplatform_KEY_ENCRYPTION_SECRET}
+    verify-token-ttl: ${VERIFY_TOKEN_TTL}
+    reset-token-ttl: ${RESET_TOKEN_TTL}
+    cookie-secure: ${AUTH_COOKIE_SECURE:false}
+    docs-enabled: ${AUTH_DOCS_ENABLED:true}
+    lockout-max-failures: ${LOCKOUT_MAX_FAILURES}
+    lockout-window: ${LOCKOUT_WINDOW}
+    lockout-duration: ${LOCKOUT_DURATION}
+    console-allowed-origins: ${CONSOLE_ALLOWED_ORIGINS}
+  limits.max-apps-per-account: ${MAX_APPS_PER_ACCOUNT}
+  limits.max-origins-per-app: ${MAX_ORIGINS_PER_APP}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED}
+    login-capacity: ${RATE_LIMIT_LOGIN_CAPACITY}
+    login-period: ${RATE_LIMIT_LOGIN_PERIOD}
+    signup-capacity: ${RATE_LIMIT_SIGNUP_CAPACITY}
+    signup-period: ${RATE_LIMIT_SIGNUP_PERIOD}
+    global-capacity: ${RATE_LIMIT_GLOBAL_CAPACITY}
+    global-period: ${RATE_LIMIT_GLOBAL_PERIOD}
+  sa:
+    bootstrap:
+      enabled: ${SA_BOOTSTRAP_ENABLED:false}
+      email: ${SA_BOOTSTRAP_EMAIL:}
+      name: ${SA_BOOTSTRAP_NAME:Platform SA}
+      password: ${SA_BOOTSTRAP_PASSWORD:}
+logging.pattern.level: "%5p [requestId=%X{requestId}]"

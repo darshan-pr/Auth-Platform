@@ -1,0 +1,5 @@
+{
+    "editor.scrollbar.ignoreHorizontalScrollbarInContentHeight": false,
+    "liveServer.settings.port": 5501,
+    "java.compile.nullAnalysis.mode": "automatic"
+}

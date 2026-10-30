@@ -1,0 +1,1119 @@
+.manager {
+  padding: 0;
+  overflow: hidden;
+}
+
+.permissionTransition {
+  transition: opacity 240ms cubic-bezier(.2, .75, .25, 1), transform 240ms cubic-bezier(.2, .75, .25, 1);
+}
+
+.permissionTransitionLoading {
+  opacity: .56;
+  transform: translateY(4px);
+}
+
+.permissionResult {
+  animation: permissionResultIn 220ms cubic-bezier(.2, .75, .25, 1) both;
+}
+
+.permissionLoading {
+  display: grid;
+  gap: 8px;
+}
+
+.permissionSkeleton {
+  display: grid;
+  gap: 9px;
+}
+
+.permissionSkeletonRow {
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(148, 163, 184, .08) 25%, rgba(148, 163, 184, .18) 50%, rgba(148, 163, 184, .08) 75%);
+  background-size: 200% 100%;
+  animation: permissionSkeletonShimmer 1.15s ease-in-out infinite;
+}
+
+.permissionSkeletonRow:nth-child(2) {
+  opacity: .78;
+}
+
+.permissionSkeletonRow:nth-child(3) {
+  opacity: .58;
+}
+
+@keyframes permissionResultIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes permissionSkeletonShimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.crudPermissionHint {
+  margin: 0;
+  padding: 10px 20px 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.manager :global(.roles-manager-grid) {
+  display: grid;
+  grid-template-columns: minmax(245px, .62fr) minmax(0, 1.38fr);
+  min-height: 500px;
+}
+
+.manager :global(.roles-manager-role-panel),
+.manager :global(.roles-manager-permission-panel) {
+  min-width: 0;
+  padding: 16px;
+}
+
+.manager :global(.roles-manager-role-panel) {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+}
+
+.manager :global(.roles-manager-permission-panel) {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.manager :global(.roles-manager-panel-heading) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+  margin-bottom: 12px;
+}
+
+.manager :global(.roles-manager-panel-heading h2) {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.manager :global(.roles-manager-panel-heading h2 > span) {
+  display: inline-flex;
+  min-width: 20px;
+  justify-content: center;
+  margin-left: 5px;
+  padding: 2px 6px;
+  color: var(--blue);
+  background: #e8f1ff;
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+.manager :global(.roles-manager-panel-heading p) {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.manager :global(.roles-manager-role-panel > .roles-manager-panel-heading) {
+  align-items: flex-start;
+}
+
+.manager :global(.roles-manager-role-info) {
+  margin: -8px 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.manager :global(.roles-manager-add-role),
+.manager :global(.roles-manager-settings) {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  color: var(--blue);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.manager :global(.roles-manager-add-role:hover:not(:disabled)),
+.manager :global(.roles-manager-settings:hover) {
+  background: #f3f7ff;
+  border-color: #a9c5ed;
+}
+
+.manager :global(.roles-manager-add-role:disabled) {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.manager :global(.roles-manager-search) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 34px;
+  padding: 0 9px;
+  color: var(--muted);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.manager :global(.roles-manager-search:focus-within) {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px #dceaff;
+}
+
+.manager :global(.roles-manager-search input) {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  color: var(--ink);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 12px;
+}
+
+.manager :global(.roles-manager-search input:disabled) {
+  cursor: not-allowed;
+}
+
+.manager :global(.roles-manager-role-list) {
+  display: grid;
+  max-height: min(45vh, 360px);
+  min-height: 0;
+  gap: 8px;
+  margin-top: 8px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.manager :global(.roles-manager-role-card) {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.manager :global(.roles-manager-role-card-active) {
+  padding: 9px;
+  background: #f7faff;
+  border: 2px solid var(--blue);
+}
+
+.manager :global(.roles-manager-role-select) {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0 8px 0 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.manager :global(.roles-manager-role-select:disabled) {
+  cursor: default;
+}
+
+.manager :global(.roles-manager-role-name) {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.manager :global(.roles-manager-role-select code) {
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.manager :global(.roles-manager-role-description) {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.manager :global(.roles-manager-role-meta) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.manager :global(.role-default-badge) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  color: var(--blue);
+  background: #e8f1ff;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.manager :global(.roles-manager-role-toggle) {
+  display: flex;
+  flex: 0 0 34px;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.manager :global(.roles-manager-role-toggle .toggle) {
+  transform: scale(.85);
+  transform-origin: top right;
+}
+
+.manager :global(.roles-manager-permission-heading) {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  min-height: 42px;
+}
+
+.manager :global(.roles-manager-permission-heading > .button) {
+  flex: 0 0 auto;
+}
+
+.manager :global(.roles-manager-permission-toolbar) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.manager :global(.roles-manager-permission-search) {
+  flex: 1;
+}
+
+.manager :global(.roles-manager-settings-active) {
+  background: #f2f6ff;
+  border-color: #bfd2f2;
+}
+
+.manager :global(.roles-manager-filter-toolbar) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.manager :global(.roles-manager-filter-tabs) {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.manager :global(.roles-manager-filter-tabs button) {
+  position: relative;
+  min-height: 31px;
+  padding: 0 9px 7px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.manager :global(.roles-manager-filter-tabs button:hover) {
+  color: var(--blue);
+}
+
+.manager :global(.roles-manager-filter-tabs button.roles-manager-filter-active) {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.manager :global(.roles-manager-filter-tabs button.roles-manager-filter-active::after) {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--blue);
+  content: "";
+}
+
+.manager :global(.roles-manager-filter-actions) {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding-bottom: 4px;
+}
+
+.manager :global(.roles-manager-filter-actions .button) {
+  min-height: 27px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.manager :global(.roles-manager-permission-list) {
+  min-width: 0;
+  max-height: min(45vh, 360px);
+  min-height: 0;
+  flex: 0 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.manager :global(.roles-manager-users-panel) {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.manager :global(.roles-manager-users-permission-select) {
+  display: flex;
+  max-width: 360px;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.manager :global(.roles-manager-users-permission-select select) {
+  min-height: 34px;
+  padding: 0 9px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.manager :global(.roles-manager-users-hint) {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.manager :global(.roles-manager-users-hint code) {
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+}
+
+.manager :global(.roles-manager-user-permission-list) {
+  min-width: 0;
+  max-height: min(45vh, 360px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.manager :global(.roles-manager-user-permission-row) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 34px;
+  gap: 12px;
+  align-items: center;
+  min-height: 54px;
+  padding: 7px 3px;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.manager :global(.roles-manager-user-link) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.manager :global(.roles-manager-user-link:hover strong) {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
+.manager :global(.roles-manager-user-link strong) {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manager :global(.roles-manager-user-link small) {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manager :global(.roles-manager-user-permission-row > .toggle) {
+  justify-self: end;
+  transform: scale(.85);
+  transform-origin: right center;
+}
+
+.manager :global(.roles-manager-permission-row) {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
+  gap: 9px;
+  align-items: center;
+  min-height: 53px;
+  padding: 8px 2px;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.manager :global(.roles-manager-permission-copy) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.manager :global(.roles-manager-permission-copy code) {
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.manager :global(.roles-manager-permission-copy small) {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.manager :global(.roles-manager-permission-enabled) {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.manager :global(.roles-manager-permission-checkbox) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.manager :global(.roles-manager-permission-checkbox input),
+.manager :global(.roles-manager-default-option input) {
+  accent-color: var(--blue);
+}
+
+.manager :global(.roles-manager-permission-actions) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.manager :global(.roles-manager-permission-actions button) {
+  display: inline-grid;
+  min-width: 24px;
+  min-height: 24px;
+  place-items: center;
+  padding: 4px 2px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.manager :global(.roles-manager-permission-actions button:hover:not(:disabled)) {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
+.manager :global(.roles-manager-permission-actions button:last-child:hover:not(:disabled)) {
+  color: #b1271f;
+}
+
+.manager :global(.roles-manager-permission-actions button:disabled) {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.manager :global(.roles-manager-hint),
+.manager :global(.roles-manager-footer-note) {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.manager :global(.roles-manager-save-bar) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.manager :global(.roles-manager-save-bar .button) {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.manager :global(.roles-manager-empty) {
+  padding: 16px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.manager :global(.roles-manager-flash) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px;
+  padding: 9px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.manager :global(.roles-manager-flash span) {
+  flex: 1;
+}
+
+.manager :global(.roles-manager-flash > button) {
+  display: inline-grid;
+  place-items: center;
+  padding: 2px;
+  color: currentColor;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.manager :global(.roles-manager-error) {
+  color: #9b3e38;
+  background: #fff1f0;
+  border: 1px solid #e9c5c3;
+}
+
+.manager :global(.roles-manager-success) {
+  color: #16794b;
+  background: #f0fbf5;
+  border: 1px solid #b7e5cb;
+}
+
+.manager :global(.field-error) {
+  color: #b1271f;
+  font-size: 12px;
+}
+
+.manager :global(.roles-manager-modal-backdrop) {
+  z-index: 50;
+}
+
+.manager :global(.roles-manager-modal) {
+  display: flex;
+  width: min(660px, calc(100vw - 32px));
+  max-height: min(90vh, 760px);
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.manager :global(.roles-manager-modal .modal-header) {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 20px;
+}
+
+.manager :global(.roles-manager-modal .modal-header h2) {
+  font-size: 15px;
+}
+
+.manager :global(.roles-manager-modal .modal-header p) {
+  max-width: 530px;
+  line-height: 17px;
+}
+
+.manager :global(.roles-manager-assign-modal .modal-header) {
+  border-bottom: 1px solid var(--line);
+}
+
+.manager :global(.roles-manager-modal-tabs) {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 18px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.manager :global(.roles-manager-modal-tabs button) {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 2px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.manager :global(.roles-manager-modal-tabs button span) {
+  padding: 2px 6px;
+  color: var(--blue);
+  background: #e8f1ff;
+  border-radius: 999px;
+  font-size: 10px;
+}
+
+.manager :global(.roles-manager-modal-tabs button.roles-manager-modal-tab-active) {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.manager :global(.roles-manager-modal-tabs button.roles-manager-modal-tab-active::after) {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--blue);
+  content: "";
+}
+
+.manager :global(.roles-manager-modal-body) {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.manager :global(.roles-manager-role-form) {
+  display: grid;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.manager :global(.roles-manager-role-form .field textarea),
+.manager :global(.roles-manager-modal-body > .field textarea) {
+  width: 100%;
+  min-height: 76px;
+  padding: 9px 10px;
+  resize: vertical;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fff;
+  font-size: 12px;
+}
+
+.manager :global(.roles-manager-role-form .field input),
+.manager :global(.roles-manager-modal-body > .field input) {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.manager :global(.roles-manager-role-form .field-label b),
+.manager :global(.roles-manager-composer-form .field-label b) {
+  color: #c62828;
+}
+
+.manager :global(.roles-manager-default-option) {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 13px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.manager :global(.roles-manager-default-option input) {
+  margin-top: 2px;
+}
+
+.manager :global(.roles-manager-default-option span) {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.manager :global(.roles-manager-default-option strong) {
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.manager :global(.roles-manager-default-option small) {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 15px;
+}
+
+.manager :global(.roles-manager-permission-composer) {
+  padding: 16px 20px;
+}
+
+.manager :global(.roles-manager-composer-heading),
+.manager :global(.roles-manager-staged-heading) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.manager :global(.roles-manager-composer-heading) {
+  margin-bottom: 9px;
+}
+
+.manager :global(.roles-manager-composer-heading strong),
+.manager :global(.roles-manager-staged-heading strong) {
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.manager :global(.roles-manager-composer-heading > span),
+.manager :global(.roles-manager-staged-heading > span) {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.manager :global(.roles-manager-composer-form) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px;
+  gap: 8px;
+  align-items: end;
+}
+
+.manager :global(.roles-manager-composer-form .field) {
+  min-width: 0;
+}
+
+.manager :global(.roles-manager-composer-form .field input) {
+  width: 100%;
+  height: 33px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+.manager :global(.roles-manager-permission-identifier) {
+  display: flex;
+  min-width: 0;
+  height: 33px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fff;
+}
+
+.manager :global(.roles-manager-permission-identifier:focus-within) {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px #dceaff;
+}
+
+.manager :global(.roles-manager-permission-identifier > span) {
+  flex: 0 0 auto;
+  padding-left: 9px;
+  color: var(--ink);
+  font-size: 11px;
+  white-space: pre;
+}
+
+.manager :global(.roles-manager-composer-form .roles-manager-permission-identifier input) {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 9px 0 4px;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.manager :global(.roles-manager-composer-form .button) {
+  width: 34px;
+  min-width: 34px;
+  height: 33px;
+  min-height: 33px;
+  padding: 0;
+}
+
+.manager :global(.roles-manager-staged-heading) {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.manager :global(.roles-manager-staged-heading strong) {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.manager :global(.roles-manager-staged-heading strong span) {
+  padding: 2px 6px;
+  color: var(--blue);
+  background: #e8f1ff;
+  border-radius: 999px;
+  font-size: 9px;
+  text-transform: lowercase;
+}
+
+.manager :global(.roles-manager-staged-list) {
+  margin: 7px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.manager :global(.roles-manager-staged-list li) {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.manager :global(.roles-manager-staged-list li:last-child) {
+  border-bottom: 0;
+}
+
+.manager :global(.roles-manager-staged-list li > div) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.manager :global(.roles-manager-staged-list code) {
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 6px;
+  color: var(--ink);
+  background: #f0f3f7;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.manager :global(.roles-manager-staged-list small) {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.manager :global(.roles-manager-staged-list button) {
+  display: inline-grid;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.manager :global(.roles-manager-staged-list button:hover) {
+  color: #b1271f;
+}
+
+.manager :global(.roles-manager-staged-empty) {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.manager :global(.roles-manager-modal-footer) {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.manager :global(.roles-manager-modal-footer > span) {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 15px;
+}
+
+.manager :global(.roles-manager-modal-footer > div) {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 7px;
+}
+
+.manager :global(.roles-manager-modal-footer .button) {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.manager :global(.roles-manager-assign-modal .roles-manager-modal-body) {
+  overflow: auto;
+}
+
+.manager :global(.roles-manager-edit-modal) {
+  width: min(500px, calc(100vw - 32px));
+}
+
+.manager :global(.roles-manager-edit-modal .roles-manager-modal-body > .field) {
+  margin: 16px 20px 0;
+}
+
+.manager :global(.roles-manager-edit-modal .roles-manager-modal-footer) {
+  margin-top: 18px;
+}
+
+@media (max-width: 899px) {
+  .manager :global(.roles-manager-grid) {
+    grid-template-columns: minmax(210px, .7fr) minmax(0, 1.3fr);
+  }
+
+  .manager :global(.roles-manager-role-panel),
+  .manager :global(.roles-manager-permission-panel) {
+    padding: 13px;
+  }
+
+  .manager :global(.roles-manager-permission-row) {
+    grid-template-columns: 20px minmax(0, 1fr) auto auto;
+  }
+
+  .manager :global(.roles-manager-permission-actions) {
+    grid-column: 4;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 720px) {
+  .manager :global(.roles-manager-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .manager :global(.roles-manager-role-panel) {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .manager :global(.roles-manager-role-list) {
+    grid-template-columns: repeat(auto-fit, minmax(205px, 1fr));
+  }
+
+  .manager :global(.roles-manager-filter-toolbar) {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .manager :global(.roles-manager-filter-actions) {
+    align-self: flex-end;
+  }
+
+  .manager :global(.roles-manager-permission-row) {
+    grid-template-columns: 20px minmax(0, 1fr) auto auto;
+    gap: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .permissionTransition,
+  .permissionResult,
+  .permissionSkeletonRow {
+    animation: none;
+    transition: none;
+  }
+
+  .manager :global(.roles-manager-permission-enabled) {
+    grid-column: 3;
+  }
+
+  .manager :global(.roles-manager-permission-actions) {
+    grid-column: 4;
+  }
+
+  .manager :global(.roles-manager-composer-form) {
+    grid-template-columns: minmax(0, 1fr) 34px;
+  }
+
+  .manager :global(.roles-manager-composer-form .field:nth-child(2)) {
+    grid-column: 1;
+  }
+
+  .manager :global(.roles-manager-composer-form .button) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .manager :global(.roles-manager-modal-footer) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .manager :global(.roles-manager-modal-footer > div) {
+    justify-content: flex-end;
+  }
+
+  .manager :global(.roles-manager-staged-heading) {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .manager :global(.roles-manager-modal) {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+  }
+}

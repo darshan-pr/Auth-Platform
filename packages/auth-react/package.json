@@ -1,0 +1,25 @@
+{
+  "name": "@authplatform/auth-react",
+  "version": "0.1.0",
+  "description": "Accessible React components for Auth Platform",
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+  "sideEffects": ["**/*.css"],
+  "peerDependencies": { "react": ">=18.2.0", "@authplatform/auth-core": "^0.1.0" },
+  "scripts": {
+    "build": "node ../../scripts/build-package.mjs auth-react",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "pack": "npm pack --pack-destination ../../artifacts"
+  }
+}

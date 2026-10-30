@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.sdk.json",
+  "compilerOptions": { "jsx": "react-jsx", "paths": { "@authplatform/auth-core": ["packages/auth-core/dist/types/index.d.ts"] } },
+  "include": ["src/**/*.tsx", "src/**/*.ts"]
+}
