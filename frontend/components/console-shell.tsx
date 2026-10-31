@@ -154,7 +154,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           {sectionsOpen && currentNav.map((item) => <Link key={item.href} href={item.href} className={`nav-item ${pathname === item.href || pathname.startsWith(`${item.href}/`) ? "nav-active" : ""}`} onClick={() => setMobileNav(false)}>{item.label}</Link>)}
           <div className="sidebar-rule" />
           <button className={`sidebar-section-label sidebar-section-toggle ${resourcesOpen ? "section-open" : ""}`} onClick={() => setResourcesOpen(!resourcesOpen)} type="button"><span>Resources</span></button>
-          {resourcesOpen && <><a className="nav-item" href="http://localhost:8080/swagger-ui/index.html" rel="noreferrer" target="_blank">API reference <Icon name="external" size={13} /></a>{!isConsole && <Link className="nav-item" href="/console/overview">Developer console <Icon name="chevronRight" size={13} /></Link>}</>}
+          {resourcesOpen && <><a className="nav-item" href="/docs" rel="noreferrer" target="_blank">Documentation <Icon name="external" size={13} /></a><a className="nav-item" href="http://localhost:8080/swagger-ui/index.html" rel="noreferrer" target="_blank">API reference <Icon name="external" size={13} /></a>{!isConsole && <Link className="nav-item" href="/console/overview">Developer console <Icon name="chevronRight" size={13} /></Link>}</>}
           <div className="sidebar-bottom"><div className="sa-chip"><span className="avatar avatar-small">D</span><div><strong>{isConsole ? "Developer session" : "SA session"}</strong><span>Authenticated</span></div><span className="online-dot" /></div></div>
         </>}
       </aside>

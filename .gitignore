@@ -2,3 +2,4 @@ node_modules
 .run/
 .vscode/
 artifacts/
+test-app/

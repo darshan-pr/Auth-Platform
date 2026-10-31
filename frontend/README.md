@@ -28,6 +28,7 @@ The console uses readable routes:
 - `/console/overview`
 - `/console/apps` and `/console/apps/:id`
 - `/console/account`
+- `/` (public landing page) and `/docs` (public documentation). Neither requires signing in.
 - `/accounts` and `/accounts/:id`
 - `/apps` and `/apps/:id`
 - `/users`
