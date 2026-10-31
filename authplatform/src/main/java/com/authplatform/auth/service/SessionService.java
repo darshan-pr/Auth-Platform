@@ -14,6 +14,7 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -24,6 +25,7 @@ public class SessionService {
   private final SecureTokenGenerator generator;
   private final TokenHasher hasher;
   private final StringRedisTemplate redis;
+  private final SessionReplayRevocationService replayRevocations;
   private final Duration ttl;
   private final Duration accessTtl;
   private final Duration accountTtl;
@@ -34,6 +36,7 @@ public class SessionService {
       SecureTokenGenerator generator,
       TokenHasher hasher,
       StringRedisTemplate redis,
+      SessionReplayRevocationService replayRevocations,
       @Value("${authplatform.jwt.refresh-token-ttl}") Duration ttl,
       @Value("${authplatform.jwt.access-token-ttl}") Duration accessTtl,
       @Value("${authplatform.jwt.account-refresh-token-ttl}") Duration accountTtl,
@@ -42,6 +45,7 @@ public class SessionService {
     this.generator = generator;
     this.hasher = hasher;
     this.redis = redis;
+    this.replayRevocations = replayRevocations;
     this.ttl = ttl;
     this.accessTtl = accessTtl;
     this.accountTtl = accountTtl;
@@ -108,7 +112,7 @@ public class SessionService {
     return new RotatedSession(session, next);
   }
 
-  @Transactional
+  @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
   public Session require(String raw) {
     String hash = hasher.hash(raw);
     Session session =
@@ -165,6 +169,25 @@ public class SessionService {
         .toList();
   }
 
+  @Transactional(readOnly = true)
+  public void restoreRevocationCache() {
+    Instant now = Instant.now();
+    Duration maxAccessTtl =
+        accessTtl.compareTo(accountAccessTtl) >= 0 ? accessTtl : accountAccessTtl;
+    if (maxAccessTtl.compareTo(Duration.ofDays(1)) < 0) maxAccessTtl = Duration.ofDays(1);
+    for (Session session : repository.findAllByRevokedAtAfter(now.minus(maxAccessTtl))) {
+      Duration remaining =
+          Duration.between(now, session.getRevokedAt().plus(accessTokenTtl(session)));
+      if (remaining.isNegative() || remaining.isZero()) continue;
+      redis
+          .opsForValue()
+          .set(
+              "authplatform:revoked:sid:" + session.getId(),
+              "1",
+              remaining.plusSeconds(1));
+    }
+  }
+
   @Transactional
   public void revokeAppUserSession(UUID appUserId, UUID sessionId) {
     Session session =
@@ -210,12 +233,14 @@ public class SessionService {
   private Session reuseSession(String hash) {
     Session session =
         repository
-            .findByPreviousRefreshHash(hash)
+            .findByUsedRefreshTokenHash(hash)
             .orElseThrow(() -> new ApiException(ErrorCode.TOKEN_INVALID));
-    if (session.getLastActiveAt().isAfter(Instant.now().minus(PREVIOUS_REFRESH_GRACE))) {
+    Instant now = Instant.now();
+    if (hash.equals(session.getPreviousRefreshHash())
+        && session.getLastActiveAt().isAfter(now.minus(PREVIOUS_REFRESH_GRACE))) {
       throw new ApiException(ErrorCode.REFRESH_IN_PROGRESS);
     }
-    revokeSession(session);
+    replayRevocations.revoke(session.getId(), accessTokenTtl(session));
     throw new ApiException(ErrorCode.TOKEN_INVALID, "Refresh token reuse detected");
   }
 

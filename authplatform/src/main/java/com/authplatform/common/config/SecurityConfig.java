@@ -61,6 +61,7 @@ public class SecurityConfig {
                     .requestMatchers("/api/console/mfa/**", "/api/sa/mfa/**", "/api/v1/auth/mfa/**")
                     .authenticated()
                     .requestMatchers(
+                        "/api/public/**",
                         "/api/console/auth/**",
                         "/api/sa/auth/**",
                         "/api/v1/auth/**",

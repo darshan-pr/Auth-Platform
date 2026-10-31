@@ -13,6 +13,8 @@ import com.authplatform.common.crypto.TokenHasher;
 import com.authplatform.common.exception.ApiException;
 import com.authplatform.common.exception.ErrorCode;
 import com.authplatform.common.security.RedirectUrlValidator;
+import com.authplatform.notification.EmailSender;
+import com.authplatform.notification.EmailTemplateService;
 import com.authplatform.sa.dto.SaDtos;
 import com.authplatform.user.entity.Account;
 import com.authplatform.user.entity.AppUser;
@@ -39,6 +41,8 @@ public class SaService {
   private final TokenHasher hasher;
   private final SessionService sessions;
   private final AuditService audit;
+  private final EmailSender email;
+  private final EmailTemplateService templates;
 
   public SaService(
       AccountRepository accounts,
@@ -49,7 +53,9 @@ public class SaService {
       SecureTokenGenerator generator,
       TokenHasher hasher,
       SessionService sessions,
-      AuditService audit) {
+      AuditService audit,
+      EmailSender email,
+      EmailTemplateService templates) {
     this.accounts = accounts;
     this.apps = apps;
     this.users = users;
@@ -59,6 +65,8 @@ public class SaService {
     this.hasher = hasher;
     this.sessions = sessions;
     this.audit = audit;
+    this.email = email;
+    this.templates = templates;
   }
 
   @Transactional(readOnly = true)
@@ -134,6 +142,7 @@ public class SaService {
       UUID id, SaDtos.UpdateAccountRequest request, UUID actorId, String ip) {
     Account account = findAccount(id);
     PlatformRole oldRole = account.getPlatformRole();
+    String oldStatus = account.getStatus();
     PlatformRole newRole = request.platformRole() == null ? oldRole : request.platformRole();
     String newStatus = request.status() == null ? account.getStatus() : request.status();
     validateStatus(newStatus);
@@ -148,6 +157,11 @@ public class SaService {
         newRole,
         request.password() == null ? null : passwords.hash(request.password()));
     if (newRole == PlatformRole.SA) account.markEmailVerified();
+    if (!oldStatus.equals(newStatus)) {
+      email.send(
+          templates.accountStatusChanged(
+              null, account.getEmail(), account.getName(), newStatus));
+    }
     if (!"ACTIVE".equals(newStatus) || oldRole != newRole || request.password() != null)
       sessions.revokeAllForAccount(id);
     audit.recordSa(
@@ -244,21 +258,32 @@ public class SaService {
   @Transactional
   public SaDtos.AppUserView updateUser(
       UUID appId, UUID userId, SaDtos.UpdateAppUserRequest request, UUID actorId, String ip) {
-    findApp(appId);
+    App app = findApp(appId);
     AppUser user =
         users
             .findByAppIdAndId(appId, userId)
             .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
+    String oldStatus = user.getStatus();
     String status = request.status() == null ? user.getStatus() : request.status();
     validateUserStatus(status);
     if (request.password() != null) validatePassword(request.password(), user.getEmail());
+    boolean emailVerificationChanged =
+        request.emailVerified() != null && request.emailVerified() != user.isEmailVerified();
+    boolean revokeSessions =
+        !"ACTIVE".equals(status)
+            || !status.equals(user.getStatus())
+            || emailVerificationChanged
+            || request.password() != null;
     user.updateBySa(
         request.name(),
         status,
         request.emailVerified(),
         request.password() == null ? null : passwords.hash(request.password()));
-    if (!"ACTIVE".equals(status) || request.password() != null)
-      sessions.revokeAllForAppUser(userId);
+    if (!oldStatus.equals(status)) {
+      email.send(
+          templates.accountStatusChanged(app, user.getEmail(), user.getName(), status));
+    }
+    if (revokeSessions) sessions.revokeAllForAppUser(userId);
     audit.recordSa(
         "SA_APP_USER_UPDATED",
         actorId,

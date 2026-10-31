@@ -5,9 +5,11 @@ import com.authplatform.auth.dto.MfaDtos;
 import com.authplatform.common.exception.ApiException;
 import com.authplatform.common.exception.ErrorCode;
 import com.authplatform.notification.EmailSender;
+import com.authplatform.notification.EmailTemplateService;
 import com.authplatform.user.entity.Account;
 import com.authplatform.user.entity.AppUser;
 import java.security.SecureRandom;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.UUID;
@@ -22,11 +24,14 @@ public class MfaService {
   private static final int MAX_RESENDS = 3;
   private final StringRedisTemplate redis;
   private final EmailSender email;
+  private final EmailTemplateService templates;
   private final SecureRandom random = new SecureRandom();
 
-  public MfaService(StringRedisTemplate redis, EmailSender email) {
+  public MfaService(
+      StringRedisTemplate redis, EmailSender email, EmailTemplateService templates) {
     this.redis = redis;
     this.email = email;
+    this.templates = templates;
   }
 
   public MfaDtos.Status accountStatus(Account account) {
@@ -39,11 +44,12 @@ public class MfaService {
   }
 
   public MfaDtos.OtpChallenge issueConsoleAccountOtp(Account account) {
-    return issue("CONSOLE_ACCOUNT", account.getId().toString(), account.getEmail());
+    return issue(
+        "CONSOLE_ACCOUNT", account.getId().toString(), account.getEmail(), account.getName(), null);
   }
 
   public MfaDtos.OtpChallenge issueSaAccountOtp(Account account) {
-    return issue("SA_ACCOUNT", account.getId().toString(), account.getEmail());
+    return issue("SA_ACCOUNT", account.getId().toString(), account.getEmail(), account.getName(), null);
   }
 
   public MfaDtos.OtpChallenge issueConsolePasswordResetOtp(Account account, String emailAddress) {
@@ -51,6 +57,8 @@ public class MfaService {
         "CONSOLE_PASSWORD_RESET",
         account == null ? UUID.randomUUID().toString() : account.getId().toString(),
         emailAddress,
+        account == null ? null : account.getName(),
+        null,
         account != null);
   }
 
@@ -59,136 +67,147 @@ public class MfaService {
         "SA_PASSWORD_RESET",
         account == null ? UUID.randomUUID().toString() : account.getId().toString(),
         emailAddress,
+        account == null ? null : account.getName(),
+        null,
         account != null);
   }
 
   public MfaDtos.OtpChallenge issueAppUserOtp(App app, AppUser user) {
-    return issue("APP_USER:" + app.getId(), user.getId().toString(), user.getEmail());
+    return issue(
+        "APP_USER:" + app.getId(),
+        user.getId().toString(),
+        user.getEmail(),
+        user.getName(),
+        app);
   }
 
   public MfaDtos.OtpChallenge issueAppUserPasswordResetOtp(
-      UUID appId, AppUser user, String emailAddress) {
+      App app, AppUser user, String emailAddress) {
     return issue(
-        "APP_USER_PASSWORD_RESET:" + appId,
+        "APP_USER_PASSWORD_RESET:" + app.getId(),
         user == null ? UUID.randomUUID().toString() : user.getId().toString(),
         emailAddress,
+        user == null ? null : user.getName(),
+        app,
         user != null);
   }
 
-  public MfaDtos.OtpChallenge resendAppUserOtp(UUID appId, String challengeId) {
-    return resend(challengeId, "APP_USER:" + appId);
+  public MfaDtos.OtpChallenge resendAppUserOtp(App app, String challengeId) {
+    return resend(challengeId, "APP_USER:" + app.getId(), app);
   }
 
-  public MfaDtos.OtpChallenge resendAppUserPasswordResetOtp(UUID appId, String challengeId) {
-    return resend(challengeId, "APP_USER_PASSWORD_RESET:" + appId);
+  public MfaDtos.OtpChallenge resendAppUserPasswordResetOtp(App app, String challengeId) {
+    return resend(challengeId, "APP_USER_PASSWORD_RESET:" + app.getId(), app);
   }
 
   public UUID verifyConsoleAccountOtp(String challengeId, String code) {
-    return verify("CONSOLE_ACCOUNT", null, challengeId, code);
+    return verify("CONSOLE_ACCOUNT", null, challengeId, code, null);
   }
 
   public UUID verifySaAccountOtp(String challengeId, String code) {
-    return verify("SA_ACCOUNT", null, challengeId, code);
+    return verify("SA_ACCOUNT", null, challengeId, code, null);
   }
 
   public UUID verifyConsolePasswordResetOtp(String challengeId, String code) {
-    return verify("CONSOLE_PASSWORD_RESET", null, challengeId, code);
+    return verify("CONSOLE_PASSWORD_RESET", null, challengeId, code, null);
   }
 
   public UUID verifySaPasswordResetOtp(String challengeId, String code) {
-    return verify("SA_PASSWORD_RESET", null, challengeId, code);
+    return verify("SA_PASSWORD_RESET", null, challengeId, code, null);
   }
 
   public MfaDtos.OtpChallenge resendConsoleAccountOtp(String challengeId) {
-    return resend(challengeId, "CONSOLE_ACCOUNT");
+    return resend(challengeId, "CONSOLE_ACCOUNT", null);
   }
 
   public MfaDtos.OtpChallenge resendSaAccountOtp(String challengeId) {
-    return resend(challengeId, "SA_ACCOUNT");
+    return resend(challengeId, "SA_ACCOUNT", null);
   }
 
   public MfaDtos.OtpChallenge resendConsolePasswordResetOtp(String challengeId) {
-    return resend(challengeId, "CONSOLE_PASSWORD_RESET");
+    return resend(challengeId, "CONSOLE_PASSWORD_RESET", null);
   }
 
   public MfaDtos.OtpChallenge resendSaPasswordResetOtp(String challengeId) {
-    return resend(challengeId, "SA_PASSWORD_RESET");
+    return resend(challengeId, "SA_PASSWORD_RESET", null);
   }
 
-  public UUID verifyAppUserOtp(UUID appId, String challengeId, String code) {
-    return verify("APP_USER:" + appId, null, challengeId, code);
+  public UUID verifyAppUserOtp(App app, String challengeId, String code) {
+    return verify("APP_USER:" + app.getId(), null, challengeId, code, app);
   }
 
-  public UUID verifyAppUserPasswordResetOtp(UUID appId, String challengeId, String code) {
-    return verify("APP_USER_PASSWORD_RESET:" + appId, null, challengeId, code);
-  }
-
-  private MfaDtos.OtpChallenge issue(String type, String subjectId, String address) {
-    return issue(type, subjectId, address, true);
+  public UUID verifyAppUserPasswordResetOtp(App app, String challengeId, String code) {
+    return verify("APP_USER_PASSWORD_RESET:" + app.getId(), null, challengeId, code, app);
   }
 
   private MfaDtos.OtpChallenge issue(
-      String type, String subjectId, String address, boolean deliver) {
+      String type, String subjectId, String address, String name, App app) {
+    return issue(type, subjectId, address, name, app, true);
+  }
+
+  private MfaDtos.OtpChallenge issue(
+      String type, String subjectId, String address, String name, App app, boolean deliver) {
     String challengeId = randomToken();
     String code = String.format("%06d", random.nextInt(1_000_000));
-    put(otpKey(challengeId), type + "|" + subjectId + "|" + (deliver ? address : "") + "|" + code);
-    if (deliver) sendCode(address, type, code);
+    ChallengeData challenge =
+        new ChallengeData(
+            type,
+            subjectId,
+            deliver ? address : "",
+            deliver && name != null ? name : "",
+            code);
+    put(otpKey(challengeId), serialize(challenge));
+    if (deliver) sendCode(address, type, code, app, name);
     return new MfaDtos.OtpChallenge(
         challengeId,
         OTP_TTL.toSeconds(),
         "If the account exists, a one-time password was sent to its email address.");
   }
 
-  private MfaDtos.OtpChallenge resend(String challengeId, String expectedType) {
+  private MfaDtos.OtpChallenge resend(String challengeId, String expectedType, App app) {
     if (challengeId == null || challengeId.isBlank()) throw new ApiException(ErrorCode.MFA_INVALID);
     String key = otpKey(challengeId);
     String value = get(key);
     if (value == null) throw new ApiException(ErrorCode.OTP_EXPIRED);
-    String[] parts = value.split("\\|", 4);
-    if (parts.length != 4 || !expectedType.equals(parts[0])) {
+    ChallengeData challenge = parse(value);
+    if (!expectedType.equals(challenge.type())) {
       throw new ApiException(ErrorCode.MFA_INVALID);
     }
     enforceResendLimit(challengeId);
     String code = String.format("%06d", random.nextInt(1_000_000));
-    put(key, parts[0] + "|" + parts[1] + "|" + parts[2] + "|" + code);
-    if (!parts[2].isBlank()) sendCode(parts[2], expectedType, code);
+    put(key, serialize(challenge.withCode(code)));
+    if (!challenge.address().isBlank()) {
+      sendCode(challenge.address(), expectedType, code, app, challenge.name());
+    }
     return new MfaDtos.OtpChallenge(
         challengeId,
         OTP_TTL.toSeconds(),
         "If the account exists, a one-time password was sent to its email address.");
   }
 
-  private void sendCode(String address, String type, String code) {
+  private void sendCode(String address, String type, String code, App app, String name) {
     boolean passwordReset = type.endsWith("PASSWORD_RESET");
-    email.sendText(
-        address,
-        passwordReset
-            ? "Your Auth Platform password reset code"
-            : "Your Auth Platform sign-in code",
-        "Your one-time password is "
-            + code
-            + ". It expires in 5 minutes. If you did not request this, you can ignore this email.");
+    email.send(templates.oneTimeCode(app, address, name, code, passwordReset));
   }
 
   private UUID verify(
-      String expectedType, String expectedSubject, String challengeId, String code) {
+      String expectedType, String expectedSubject, String challengeId, String code, App app) {
     if (challengeId == null || challengeId.isBlank() || code == null || !code.matches("\\d{6}")) {
       throw new ApiException(ErrorCode.MFA_INVALID);
     }
     String key = otpKey(challengeId);
     String value = get(key);
     if (value == null) throw new ApiException(ErrorCode.OTP_EXPIRED);
-    String[] parts = value.split("\\|", 4);
-    if ((parts.length != 3 && parts.length != 4)
-        || !expectedType.equals(parts[0])
-        || (expectedSubject != null && !expectedSubject.equals(parts[1]))) {
+    ChallengeData challenge = parse(value);
+    if (!expectedType.equals(challenge.type())
+        || (expectedSubject != null && !expectedSubject.equals(challenge.subjectId()))) {
       throw new ApiException(ErrorCode.MFA_INVALID);
     }
-    enforceAttempts(challengeId);
-    if (!parts[parts.length - 1].equals(code)) throw new ApiException(ErrorCode.MFA_INVALID);
+    enforceAttempts(challengeId, challenge, app);
+    if (!challenge.code().equals(code)) throw new ApiException(ErrorCode.MFA_INVALID);
     delete(key);
     delete(attemptKey(challengeId));
-    return UUID.fromString(parts[1]);
+    return UUID.fromString(challenge.subjectId());
   }
 
   private void enforceResendLimit(String challengeId) {
@@ -205,11 +224,18 @@ public class MfaService {
     }
   }
 
-  private void enforceAttempts(String challengeId) {
+  private void enforceAttempts(String challengeId, ChallengeData challenge, App app) {
     try {
       Long attempts = redis.opsForValue().increment(attemptKey(challengeId));
       redis.expire(attemptKey(challengeId), ATTEMPT_TTL);
-      if (attempts != null && attempts > 10) throw new ApiException(ErrorCode.ACCOUNT_LOCKED);
+      if (attempts != null && attempts > 10) {
+        if (attempts == 11 && !challenge.address().isBlank()) {
+          email.send(
+              templates.temporaryLock(
+                  app, challenge.address(), challenge.name(), ATTEMPT_TTL));
+        }
+        throw new ApiException(ErrorCode.ACCOUNT_LOCKED);
+      }
     } catch (ApiException ex) {
       throw ex;
     } catch (Exception ex) {
@@ -247,6 +273,38 @@ public class MfaService {
     return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
   }
 
+  private static String serialize(ChallengeData challenge) {
+    String encodedName =
+        Base64.getUrlEncoder()
+            .withoutPadding()
+            .encodeToString(challenge.name().getBytes(StandardCharsets.UTF_8));
+    return challenge.type()
+        + "|"
+        + challenge.subjectId()
+        + "|"
+        + challenge.address()
+        + "|"
+        + encodedName
+        + "|"
+        + challenge.code();
+  }
+
+  private static ChallengeData parse(String value) {
+    String[] parts = value.split("\\|", 5);
+    if (parts.length == 5) {
+      try {
+        String name =
+            new String(Base64.getUrlDecoder().decode(parts[3]), StandardCharsets.UTF_8);
+        return new ChallengeData(parts[0], parts[1], parts[2], name, parts[4]);
+      } catch (IllegalArgumentException ex) {
+        throw new ApiException(ErrorCode.MFA_INVALID);
+      }
+    }
+    if (parts.length == 4) return new ChallengeData(parts[0], parts[1], parts[2], "", parts[3]);
+    if (parts.length == 3) return new ChallengeData(parts[0], parts[1], "", "", parts[2]);
+    throw new ApiException(ErrorCode.MFA_INVALID);
+  }
+
   private String otpKey(String challengeId) {
     return "authplatform:mfa:otp:" + challengeId;
   }
@@ -257,5 +315,12 @@ public class MfaService {
 
   private String resendKey(String challengeId) {
     return "authplatform:mfa:resends:" + challengeId;
+  }
+
+  private record ChallengeData(
+      String type, String subjectId, String address, String name, String code) {
+    private ChallengeData withCode(String nextCode) {
+      return new ChallengeData(type, subjectId, address, name, nextCode);
+    }
   }
 }

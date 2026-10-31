@@ -248,6 +248,14 @@ public class App extends BaseEntity {
     return iconUrl;
   }
 
+  public byte[] getIconData() {
+    return iconData == null ? null : Arrays.copyOf(iconData, iconData.length);
+  }
+
+  public String getIconContentType() {
+    return iconContentType;
+  }
+
   public String getIconDataUrl() {
     if (iconData == null || iconContentType == null) return null;
     return "data:" + iconContentType + ";base64," + java.util.Base64.getEncoder().encodeToString(iconData);

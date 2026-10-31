@@ -36,16 +36,26 @@ public class LoginAttemptService {
     }
   }
 
-  public void recordFailure(String key) {
+  public boolean recordFailure(String key) {
     try {
       String countKey = "authplatform:lock:fail:" + key;
+      String lockKey = "authplatform:lock:" + key;
       Long count = redis.opsForValue().increment(countKey);
       redis.expire(countKey, window);
-      if (count != null && count >= maxFailures)
-        redis.opsForValue().set("authplatform:lock:" + key, "1", lockDuration);
+      if (count != null
+          && count >= maxFailures
+          && !Boolean.TRUE.equals(redis.hasKey(lockKey))) {
+        redis.opsForValue().set(lockKey, "1", lockDuration);
+        return true;
+      }
+      return false;
     } catch (Exception ex) {
       throw new ApiException(ErrorCode.RATE_LIMIT_UNAVAILABLE);
     }
+  }
+
+  public Duration lockDuration() {
+    return lockDuration;
   }
 
   public void clearFailures(String key) {

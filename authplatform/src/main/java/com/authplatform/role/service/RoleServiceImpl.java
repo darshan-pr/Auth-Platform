@@ -57,15 +57,16 @@ public class RoleServiceImpl implements RoleService {
         .ifPresent(
             role ->
                 jdbc.update(
-                    "insert into app_user_roles(app_user_id,role_id) values (?,?) on conflict do nothing",
+                    "insert into app_user_roles(app_user_id,role_id,app_id) values (?,?,?) on conflict do nothing",
                     userId,
-                    role.getId()));
+                    role.getId(),
+                    appId));
   }
 
   @Transactional(readOnly = true)
   public List<String> roleNames(UUID appId, UUID userId) {
     return jdbc.query(
-        "select r.name from roles r join app_user_roles ur on ur.role_id=r.id where ur.app_user_id=? and r.app_id=? and r.enabled=true",
+        "select r.name from roles r join app_user_roles ur on ur.role_id=r.id and ur.app_id=r.app_id where ur.app_user_id=? and ur.app_id=? and r.enabled=true",
         (rs, n) -> rs.getString(1),
         userId,
         appId);
@@ -91,14 +92,17 @@ public class RoleServiceImpl implements RoleService {
         """
         select r.id as role_id, p.key
         from roles r
-        join permissions p on p.role_id = r.id and p.enabled = true
+        join permissions p
+          on p.role_id = r.id and p.app_id = r.app_id and p.enabled = true
         left join app_user_role_permission_overrides uo
           on uo.app_user_id = ?
           and uo.role_id = r.id
           and uo.permission_id = p.id
+          and uo.app_id = r.app_id
         left join app_user_roles ur
           on ur.app_user_id = ?
           and ur.role_id = r.id
+          and ur.app_id = r.app_id
         where r.app_id = ?
           and r.enabled = true
           and ur.app_user_id is not null
@@ -240,13 +244,15 @@ public class RoleServiceImpl implements RoleService {
         select u.id, u.name, u.email, u.status,
                (p.enabled and coalesce(uo.granted, true)) as permission_enabled
         from app_user_roles ur
-        join app_users u on u.id = ur.app_user_id and u.app_id = ?
-        join permissions p on p.role_id = ur.role_id
+        join app_users u on u.id = ur.app_user_id and u.app_id = ur.app_id
+        join permissions p on p.role_id = ur.role_id and p.app_id = ur.app_id
         left join app_user_role_permission_overrides uo
           on uo.app_user_id = u.id
           and uo.role_id = ur.role_id
           and uo.permission_id = p.id
-        where ur.role_id = ?
+          and uo.app_id = ur.app_id
+        where ur.app_id = ?
+          and ur.role_id = ?
           and p.id = ?
         order by lower(u.name), lower(u.email)
         """,
@@ -421,7 +427,7 @@ public class RoleServiceImpl implements RoleService {
     requireUserExists(appId, userId);
     List<UUID> ids =
         jdbc.query(
-            "select role_id from app_user_roles ur join roles r on r.id=ur.role_id where ur.app_user_id=? and r.app_id=? and r.enabled=true",
+            "select role_id from app_user_roles ur join roles r on r.id=ur.role_id and r.app_id=ur.app_id where ur.app_user_id=? and ur.app_id=? and r.enabled=true",
             (rs, n) -> (UUID) rs.getObject(1),
             userId,
             appId);
@@ -436,9 +442,10 @@ public class RoleServiceImpl implements RoleService {
     if (!role.isEnabled())
       throw new ApiException(ErrorCode.VALIDATION_FAILED, "Disabled roles cannot be assigned");
     jdbc.update(
-        "insert into app_user_roles(app_user_id, role_id) values (?,?) on conflict do nothing",
+        "insert into app_user_roles(app_user_id, role_id, app_id) values (?,?,?) on conflict do nothing",
         userId,
-        roleId);
+        roleId,
+        appId);
     sessions.revokeAllForAppUser(userId);
   }
 
@@ -448,7 +455,11 @@ public class RoleServiceImpl implements RoleService {
     Role role = findRole(appId, roleId);
     if (role.isDefaultRole())
       throw new ApiException(ErrorCode.VALIDATION_FAILED, "The default role cannot be removed");
-    jdbc.update("delete from app_user_roles where app_user_id=? and role_id=?", userId, roleId);
+    jdbc.update(
+        "delete from app_user_roles where app_user_id=? and role_id=? and app_id=?",
+        userId,
+        roleId,
+        appId);
     sessions.revokeAllForAppUser(userId);
   }
 
@@ -470,10 +481,11 @@ public class RoleServiceImpl implements RoleService {
       RoleDtos.SetUserPermissionsRequest request) {
     requireUserExists(appId, userId);
     if (jdbc.queryForObject(
-            "select count(*) from app_user_roles where app_user_id=? and role_id=?",
+            "select count(*) from app_user_roles where app_user_id=? and role_id=? and app_id=?",
             Long.class,
             userId,
-            roleId)
+            roleId,
+            appId)
         == 0)
       throw new ApiException(
           ErrorCode.VALIDATION_FAILED, "Assign the role to the user before changing its permissions");
@@ -507,15 +519,16 @@ public class RoleServiceImpl implements RoleService {
       jdbc.update(
           """
           insert into app_user_role_permission_overrides(
-            app_user_id, role_id, permission_id, granted
+            app_user_id, role_id, permission_id, app_id, granted
           )
-          values (?, ?, ?, ?)
+          values (?, ?, ?, ?, ?)
           on conflict (app_user_id, role_id, permission_id)
           do update set granted = excluded.granted, updated_at = now()
           """,
           userId,
           roleId,
           permissionId,
+          appId,
           request.granted());
     }
     if (!permissionIds.isEmpty()) sessions.revokeAllForAppUser(userId);
@@ -529,10 +542,11 @@ public class RoleServiceImpl implements RoleService {
       RoleDtos.SetPermissionStatesRequest request) {
     requireUserExists(appId, userId);
     if (jdbc.queryForObject(
-            "select count(*) from app_user_roles where app_user_id=? and role_id=?",
+            "select count(*) from app_user_roles where app_user_id=? and role_id=? and app_id=?",
             Long.class,
             userId,
-            roleId)
+            roleId,
+            appId)
         == 0)
       throw new ApiException(
           ErrorCode.VALIDATION_FAILED, "Assign the role to the user before changing its permissions");
@@ -570,25 +584,28 @@ public class RoleServiceImpl implements RoleService {
         throw new ApiException(
             ErrorCode.VALIDATION_FAILED, "Enable the permission for the role before granting it");
     }
-    enabledIds.forEach(permissionId -> setUserPermissionOverride(userId, roleId, permissionId, true));
-    disabledIds.forEach(permissionId -> setUserPermissionOverride(userId, roleId, permissionId, false));
+    enabledIds.forEach(
+        permissionId -> setUserPermissionOverride(appId, userId, roleId, permissionId, true));
+    disabledIds.forEach(
+        permissionId -> setUserPermissionOverride(appId, userId, roleId, permissionId, false));
     if (!changedIds.isEmpty()) sessions.revokeAllForAppUser(userId);
   }
 
   private void setUserPermissionOverride(
-      UUID userId, UUID roleId, UUID permissionId, boolean granted) {
+      UUID appId, UUID userId, UUID roleId, UUID permissionId, boolean granted) {
     jdbc.update(
         """
         insert into app_user_role_permission_overrides(
-          app_user_id, role_id, permission_id, granted
+          app_user_id, role_id, permission_id, app_id, granted
         )
-        values (?, ?, ?, ?)
+        values (?, ?, ?, ?, ?)
         on conflict (app_user_id, role_id, permission_id)
         do update set granted = excluded.granted, updated_at = now()
         """,
         userId,
         roleId,
         permissionId,
+        appId,
         granted);
   }
 

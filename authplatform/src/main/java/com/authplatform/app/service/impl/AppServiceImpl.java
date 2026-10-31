@@ -13,6 +13,8 @@ import com.authplatform.common.crypto.TokenHasher;
 import com.authplatform.common.exception.ApiException;
 import com.authplatform.common.exception.ErrorCode;
 import com.authplatform.common.security.RedirectUrlValidator;
+import com.authplatform.notification.EmailSender;
+import com.authplatform.notification.EmailTemplateService;
 import com.authplatform.role.entity.Role;
 import com.authplatform.role.service.RoleService;
 import com.authplatform.user.entity.AppUser;
@@ -42,6 +44,8 @@ public class AppServiceImpl implements AppService {
   private final AppUserRepository users;
   private final PasswordHasher passwords;
   private final SessionService sessions;
+  private final EmailSender email;
+  private final EmailTemplateService templates;
   private final int maxApps;
   private final int maxOrigins;
 
@@ -54,6 +58,8 @@ public class AppServiceImpl implements AppService {
       AppUserRepository users,
       PasswordHasher passwords,
       SessionService sessions,
+      EmailSender email,
+      EmailTemplateService templates,
       @Value("${authplatform.limits.max-apps-per-account}") int maxApps,
       @Value("${authplatform.limits.max-origins-per-app}") int maxOrigins) {
     this.apps = apps;
@@ -64,6 +70,8 @@ public class AppServiceImpl implements AppService {
     this.users = users;
     this.passwords = passwords;
     this.sessions = sessions;
+    this.email = email;
+    this.templates = templates;
     this.maxApps = maxApps;
     this.maxOrigins = maxOrigins;
   }
@@ -285,17 +293,30 @@ public class AppServiceImpl implements AppService {
   @Transactional
   public AppDtos.AppUserView updateUser(
       UUID owner, UUID appId, UUID userId, AppDtos.UpdateAppUserRequest request) {
-    apps.findByIdAndOwnerAccountId(appId, owner)
+    App app =
+        apps.findByIdAndOwnerAccountId(appId, owner)
         .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
     AppUser user =
         users
             .findByAppIdAndId(appId, userId)
             .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
+    String oldStatus = user.getStatus();
+    boolean revokeSessions =
+        request.password() != null
+            || (request.status() != null && !request.status().equals(user.getStatus()))
+            || (request.emailVerified() != null
+                && request.emailVerified() != user.isEmailVerified())
+            || !"ACTIVE".equals(request.status() == null ? user.getStatus() : request.status());
     user.updateBySa(
         request.name(),
         request.status(),
         request.emailVerified(),
         request.password() == null ? null : passwords.hash(request.password()));
+    if (!oldStatus.equals(user.getStatus())) {
+      email.send(
+          templates.accountStatusChanged(app, user.getEmail(), user.getName(), user.getStatus()));
+    }
+    if (revokeSessions) sessions.revokeAllForAppUser(userId);
     audit.recordAppChange("APP_USER_UPDATED", owner, appId);
     return new AppDtos.AppUserView(
         user.getId(),

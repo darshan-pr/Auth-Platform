@@ -14,6 +14,7 @@ import com.authplatform.common.crypto.PasswordHasher;
 import com.authplatform.common.exception.ApiException;
 import com.authplatform.common.exception.ErrorCode;
 import com.authplatform.notification.EmailSender;
+import com.authplatform.notification.EmailTemplateService;
 import com.authplatform.user.entity.Account;
 import com.authplatform.user.entity.PlatformRole;
 import com.authplatform.user.repository.AccountRepository;
@@ -32,6 +33,7 @@ public class AccountAuthServiceImpl implements AccountAuthService {
   private final JwtService jwt;
   private final LoginAttemptService attempts;
   private final EmailSender email;
+  private final EmailTemplateService templates;
   private final AuditService audit;
   private final com.authplatform.auth.service.MfaService mfa;
   private final String dummyHash;
@@ -44,6 +46,7 @@ public class AccountAuthServiceImpl implements AccountAuthService {
       JwtService jwt,
       LoginAttemptService attempts,
       EmailSender email,
+      EmailTemplateService templates,
       AuditService audit,
       com.authplatform.auth.service.MfaService mfa) {
     this.accounts = accounts;
@@ -53,6 +56,7 @@ public class AccountAuthServiceImpl implements AccountAuthService {
     this.jwt = jwt;
     this.attempts = attempts;
     this.email = email;
+    this.templates = templates;
     this.audit = audit;
     this.mfa = mfa;
     this.dummyHash = passwords.hash("dummy-password-for-timing-only");
@@ -81,9 +85,11 @@ public class AccountAuthServiceImpl implements AccountAuthService {
     }
     String raw = tokens.issueAccount(account.getId(), EmailTokenType.VERIFY_EMAIL).rawToken();
     email.send(
-        normalized,
-        "Verify your Auth Platform account",
-        "http://localhost:8080/api/console/auth/verify-email?token=" + raw);
+        templates.emailVerification(
+            null,
+            normalized,
+            account.getName(),
+            "http://localhost:8080/api/console/auth/verify-email?token=" + raw));
     audit.recordAccount("SIGNUP", account.getId(), null);
     return new AuthDtos.SignupResponse(
         account.getId(),
@@ -99,7 +105,9 @@ public class AccountAuthServiceImpl implements AccountAuthService {
         accounts
             .findById(token.getAccountId())
             .orElseThrow(() -> new ApiException(ErrorCode.TOKEN_INVALID));
+    boolean wasVerified = account.isEmailVerified();
     account.markEmailVerified();
+    if (!wasVerified) email.send(templates.welcome(null, account.getEmail(), account.getName()));
     audit.recordAccount("EMAIL_VERIFIED", account.getId(), null);
     return new AuthDtos.VerifyResponse(true);
   }
@@ -112,9 +120,11 @@ public class AccountAuthServiceImpl implements AccountAuthService {
               String raw =
                   tokens.issueAccount(account.getId(), EmailTokenType.VERIFY_EMAIL).rawToken();
               email.send(
-                  account.getEmail(),
-                  "Verify your Auth Platform account",
-                  "http://localhost:8080/api/console/auth/verify-email?token=" + raw);
+                  templates.emailVerification(
+                      null,
+                      account.getEmail(),
+                      account.getName(),
+                      "http://localhost:8080/api/console/auth/verify-email?token=" + raw));
             });
   }
 
@@ -129,7 +139,11 @@ public class AccountAuthServiceImpl implements AccountAuthService {
             ? passwords.matches(request.password(), account.getPasswordHash())
             : passwords.matches(request.password(), dummyHash);
     if (!valid) {
-      attempts.recordFailure(key);
+      if (attempts.recordFailure(key) && account != null) {
+        email.send(
+            templates.temporaryLock(
+                null, account.getEmail(), account.getName(), attempts.lockDuration()));
+      }
       audit.recordAccount("LOGIN_FAILED", account == null ? null : account.getId(), ip);
       throw new ApiException(ErrorCode.INVALID_CREDENTIALS);
     }
@@ -170,6 +184,9 @@ public class AccountAuthServiceImpl implements AccountAuthService {
             null,
             accessTtl);
     audit.recordAccount("LOGIN_SUCCESS", account.getId(), ip);
+    email.send(
+        templates.loginDetected(
+            null, account.getEmail(), account.getName(), ip, agent, java.time.Instant.now()));
     return new AuthDtos.ConsoleLoginResult(
         access,
         accessTtl.toSeconds(),
@@ -238,6 +255,7 @@ public class AccountAuthServiceImpl implements AccountAuthService {
     account.changePassword(passwords.hash(request.newPassword()));
     sessions.revokeAllForAccount(account.getId());
     audit.recordAccount("PASSWORD_RESET_COMPLETED", account.getId(), null);
+    email.send(templates.passwordChanged(null, account.getEmail(), account.getName()));
   }
 
   @Transactional(readOnly = true)

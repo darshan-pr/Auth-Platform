@@ -68,11 +68,29 @@ Application permissions are defined per app and assigned to application roles. T
 
 Flyway migration V10 introduces user overrides, and V11 scopes them to application roles and migrates existing overrides. Both are applied when the backend starts with Flyway enabled.
 
+Flyway migration V19 stores the app ID on user-role assignments and user-role permission overrides, then applies composite foreign keys that require each user and role to belong to the same app. Migration V20 adds database triggers that fill the app ID for older application instances during a rolling deployment and reject cross-app relationships. If V19 finds existing cross-app assignments or overrides, it fails rather than silently changing them; resolve those rows before retrying the migration.
+
 ## Session management
 
 Authenticated console and SA accounts can list their active sessions with `GET /api/console/sessions` or `GET /api/sa/sessions`. Revoke one of their own sessions with `DELETE /api/console/sessions/{sessionId}` or `DELETE /api/sa/sessions/{sessionId}`. SDK app users use `GET /api/v1/users/me/sessions` and `DELETE /api/v1/users/me/sessions/{sessionId}` with their app key and access token. Session responses include device/IP metadata and a `current` flag, never refresh tokens.
 
 App administrators can inspect and revoke an app user's sessions at `/api/console/apps/{appId}/users/{userId}/sessions` or `/api/sa/apps/{appId}/users/{userId}/sessions`. `DELETE` on the sessions collection revokes all of that user's sessions. Permanently delete an app user with `DELETE /api/console/apps/{appId}/users/{userId}` or `DELETE /api/sa/apps/{appId}/users/{userId}`. Deletion revokes sessions before removing the user and dependent role assignments.
+
+## Transactional email
+
+The transactional email renderer provides nine message variants using three shared layouts:
+
+| Layout | Use cases |
+| --- | --- |
+| Action link | New-account email verification and resend; SDK password-reset link |
+| One-time code | SDK, console, and SA sign-in OTP; console, SA, and SDK password-reset OTP |
+| Notification | Verified-account welcome; password-change confirmation; successful sign-in alert; temporary sign-in lock; account status change |
+
+SDK emails use the app name as the sender display name and its configured icon. Icons are loaded from image URLs rather than embedded as MIME parts, so they do not appear as inline attachments. Uploaded app icons and the Auth Platform icon are served by the public email-asset endpoints; set `AUTH_PLATFORM_PUBLIC_BASE_URL` to the backend's public HTTPS origin for these icons to display in emails. URL-configured app icons are referenced directly. The in-email icon is displayed at 32 x 32 pixels. The `From` address remains the verified `SMTP_FROM` address, so the visible sender is `App Name <SMTP_FROM>` rather than allowing an app to spoof an arbitrary address. Console and SA account emails use the Auth Platform icon and blue-accented branding.
+
+OTP subjects and preheaders do not include the code, and the text alternative places it after a neutral preview message. The opened email still displays the code. Mail clients control notification snippets, so they may expose more of the message than the preheader; hiding previews completely requires the recipient to disable message previews in their mail client.
+
+Repeated failed sign-ins can temporarily lock a known account and send a notification. The IP-based rate limiter returns its normal `429` response without sending email: it only knows the request IP and route, not a verified account recipient.
 
 ## Gmail SMTP
 
@@ -87,6 +105,7 @@ SMTP_FROM=your-account@gmail.com
 SMTP_AUTH=true
 SMTP_STARTTLS_ENABLE=true
 SMTP_STARTTLS_REQUIRED=true
+AUTH_PLATFORM_PUBLIC_BASE_URL=https://api.example.com
 ```
 
 Docker Compose automatically reads `.env` for its variable interpolation, and direct IDE/Maven launches import the project `.env` automatically when started from this directory. Google documents Gmail SMTP on port 587 with STARTTLS and app-password requirements in its [Gmail SMTP settings](https://support.google.com/mail/answer/7104828) and [app-password guide](https://support.google.com/mail/answer/185833).

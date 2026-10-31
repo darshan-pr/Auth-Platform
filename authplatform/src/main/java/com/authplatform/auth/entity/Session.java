@@ -1,10 +1,16 @@
 package com.authplatform.auth.entity;
 
 import com.authplatform.common.domain.BaseEntity;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -21,6 +27,17 @@ public class Session extends BaseEntity {
 
   @Column(name = "previous_refresh_hash", length = 64)
   private String previousRefreshHash;
+
+  @ElementCollection
+  @CollectionTable(
+      name = "session_used_refresh_tokens",
+      joinColumns = @JoinColumn(name = "session_id", nullable = false),
+      uniqueConstraints =
+          @UniqueConstraint(
+              name = "uq_session_used_refresh_tokens_hash",
+              columnNames = "refresh_token_hash"))
+  @Column(name = "refresh_token_hash", nullable = false, length = 64)
+  private Set<String> usedRefreshTokenHashes = new HashSet<>();
 
   @Column(name = "ip_address")
   private String ipAddress;
@@ -75,6 +92,7 @@ public class Session extends BaseEntity {
 
   public void rotate(String oldHash, String newHash, Instant now) {
     previousRefreshHash = oldHash;
+    if (oldHash != null && !oldHash.isEmpty()) usedRefreshTokenHashes.add(oldHash);
     refreshTokenHash = newHash;
     lastActiveAt = now;
   }

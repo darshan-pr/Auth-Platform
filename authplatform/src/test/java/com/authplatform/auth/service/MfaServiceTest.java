@@ -10,7 +10,10 @@ import static org.mockito.Mockito.when;
 
 import com.authplatform.common.exception.ApiException;
 import com.authplatform.notification.EmailSender;
+import com.authplatform.notification.EmailTemplateService;
 import com.authplatform.user.entity.Account;
+import com.authplatform.user.entity.AppUser;
+import com.authplatform.app.entity.App;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -57,7 +60,7 @@ class MfaServiceTest {
           emailBody.set(message);
           emailsSent.incrementAndGet();
         };
-    mfa = new MfaService(redis, email);
+    mfa = new MfaService(redis, email, new EmailTemplateService(""));
   }
 
   @Test
@@ -65,14 +68,17 @@ class MfaServiceTest {
     UUID accountId = UUID.randomUUID();
     Account account = mock(Account.class);
     when(account.getId()).thenReturn(accountId);
+    when(account.getName()).thenReturn("Ada");
 
     var challenge = mfa.issueConsolePasswordResetOtp(account, "person@example.com");
+    assertThat(emailBody.get()).contains("Hello Ada,");
     String firstCode = codeFromEmail();
 
     assertThatThrownBy(() -> mfa.resendConsoleAccountOtp(challenge.challengeId()))
         .isInstanceOf(ApiException.class);
 
     mfa.resendConsolePasswordResetOtp(challenge.challengeId());
+    assertThat(emailBody.get()).contains("Hello Ada,");
     String resentCode = codeFromEmail();
 
     assertThat(mfa.verifyConsolePasswordResetOtp(challenge.challengeId(), resentCode))
@@ -88,6 +94,28 @@ class MfaServiceTest {
     assertThat(emailsSent).hasValue(0);
     mfa.resendConsolePasswordResetOtp(challenge.challengeId());
     assertThat(emailsSent).hasValue(0);
+  }
+
+  @Test
+  void appUserNameIsIncludedAndPreservedWhenResendingOtp() {
+    UUID appId = UUID.randomUUID();
+    App app = mock(App.class);
+    AppUser user = mock(AppUser.class);
+    when(app.getId()).thenReturn(appId);
+    when(app.getName()).thenReturn("Northstar");
+    when(user.getId()).thenReturn(UUID.randomUUID());
+    when(user.getEmail()).thenReturn("person@example.com");
+    when(user.getName()).thenReturn("Sam");
+
+    var challenge = mfa.issueAppUserOtp(app, user);
+    assertThat(emailBody.get()).contains("Hello Sam,");
+    assertThat(codeFromEmail()).matches("\\d{6}");
+
+    mfa.resendAppUserOtp(app, challenge.challengeId());
+
+    assertThat(emailBody.get()).contains("Hello Sam,");
+    assertThat(codeFromEmail()).matches("\\d{6}");
+    assertThat(emailsSent).hasValue(2);
   }
 
   private String codeFromEmail() {

@@ -2,6 +2,7 @@ package com.authplatform.auth.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -22,7 +23,11 @@ import com.authplatform.auth.service.MfaService;
 import com.authplatform.auth.service.OneTimeTokenService;
 import com.authplatform.auth.service.SessionService;
 import com.authplatform.common.crypto.PasswordHasher;
+import com.authplatform.common.exception.ApiException;
+import com.authplatform.common.exception.ErrorCode;
+import com.authplatform.notification.EmailMessage;
 import com.authplatform.notification.EmailSender;
+import com.authplatform.notification.EmailTemplateService;
 import com.authplatform.role.service.RoleService;
 import com.authplatform.user.entity.AppUser;
 import com.authplatform.user.repository.AppUserRepository;
@@ -32,6 +37,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class AppUserAuthServiceImplTest {
   private final UUID appId = UUID.randomUUID();
@@ -55,9 +61,21 @@ class AppUserAuthServiceImplTest {
   void setUp() {
     service =
         new AppUserAuthServiceImpl(
-            users, apps, passwords, tokens, sessions, jwt, attempts, email, roles, audit, mfa);
+            users,
+            apps,
+            passwords,
+            tokens,
+            sessions,
+            jwt,
+            attempts,
+            email,
+            new EmailTemplateService(""),
+            roles,
+            audit,
+            mfa);
     when(apps.findById(appId)).thenReturn(Optional.of(app));
     when(app.getStatus()).thenReturn("ACTIVE");
+    when(app.getName()).thenReturn("Test App");
     when(app.isMfaRequired()).thenReturn(true);
     when(app.isRequireEmailVerification()).thenReturn(false);
     when(app.getAccessTokenTtlSeconds()).thenReturn(null);
@@ -154,6 +172,78 @@ class AppUserAuthServiceImplTest {
   }
 
   @Test
+  void refreshRejectsBlockedUsersBeforeRotatingTheirToken() {
+    Session session = mock(Session.class);
+    when(sessions.require("refresh")).thenReturn(session);
+    when(session.getAppUserId()).thenReturn(userId);
+    when(users.findByAppIdAndId(appId, userId)).thenReturn(Optional.of(user));
+    when(user.getStatus()).thenReturn("BLOCKED");
+
+    ApiException error =
+        assertThrows(ApiException.class, () -> service.refresh(appId, "refresh"));
+
+    assertThat(error.code()).isEqualTo(ErrorCode.USER_BLOCKED);
+    verify(sessions, never()).rotate("refresh");
+  }
+
+  @Test
+  void refreshEnforcesTheAppsEmailVerificationPolicy() {
+    Session session = mock(Session.class);
+    when(sessions.require("refresh")).thenReturn(session);
+    when(session.getAppUserId()).thenReturn(userId);
+    when(users.findByAppIdAndId(appId, userId)).thenReturn(Optional.of(user));
+    when(app.isRequireEmailVerification()).thenReturn(true);
+    when(user.isEmailVerified()).thenReturn(false);
+
+    ApiException error =
+        assertThrows(ApiException.class, () -> service.refresh(appId, "refresh"));
+
+    assertThat(error.code()).isEqualTo(ErrorCode.EMAIL_NOT_VERIFIED);
+    verify(sessions, never()).rotate("refresh");
+  }
+
+  @Test
+  void currentRejectsBlockedUsers() {
+    when(users.findByAppIdAndId(appId, userId)).thenReturn(Optional.of(user));
+    when(user.getStatus()).thenReturn("SUSPENDED");
+
+    ApiException error = assertThrows(ApiException.class, () -> service.current(appId, userId));
+
+    assertThat(error.code()).isEqualTo(ErrorCode.USER_BLOCKED);
+  }
+
+  @Test
+  void currentEnforcesTheAppsEmailVerificationPolicy() {
+    when(users.findByAppIdAndId(appId, userId)).thenReturn(Optional.of(user));
+    when(app.isRequireEmailVerification()).thenReturn(true);
+    when(user.getStatus()).thenReturn("ACTIVE");
+    when(user.isEmailVerified()).thenReturn(false);
+
+    ApiException error = assertThrows(ApiException.class, () -> service.current(appId, userId));
+
+    assertThat(error.code()).isEqualTo(ErrorCode.EMAIL_NOT_VERIFIED);
+  }
+
+  @Test
+  void refreshRotatesTheTokenForAnEligibleUser() {
+    Session session = mock(Session.class);
+    when(sessions.require("old-refresh")).thenReturn(session);
+    when(session.getAppUserId()).thenReturn(userId);
+    when(users.findByAppIdAndId(appId, userId)).thenReturn(Optional.of(user));
+    when(sessions.rotate("old-refresh"))
+        .thenReturn(new SessionService.RotatedSession(session, "new-refresh"));
+    when(sessions.accessTokenTtl(session)).thenReturn(Duration.ofMinutes(15));
+    when(sessions.refreshTokenTtlSeconds(session)).thenReturn(300L);
+
+    AuthDtos.LoginResponse result = service.refresh(appId, "old-refresh");
+
+    assertThat(result.refreshToken()).isEqualTo("new-refresh");
+    assertThat(result.expiresIn()).isEqualTo(900);
+    verify(sessions).require("old-refresh");
+    verify(sessions).rotate("old-refresh");
+  }
+
+  @Test
   void signupUsesTheApplicationOriginForItsVerificationCallback() {
     AppUser registeredUser = mock(AppUser.class);
     when(app.getVerifyEmailUrl()).thenReturn(null);
@@ -172,10 +262,11 @@ class AppUserAuthServiceImplTest {
     service.register(
         appId, new AuthDtos.RegisterRequest("New User", "new@example.com", "SafePass123!"));
 
-    verify(email)
-        .send(
-            "new@example.com",
-            "Verify your email",
-            "http://localhost:3001/verify-email?token=verify-token");
+    ArgumentCaptor<EmailMessage> message = ArgumentCaptor.forClass(EmailMessage.class);
+    verify(email).send(message.capture());
+    assertThat(message.getValue().to()).isEqualTo("new@example.com");
+    assertThat(message.getValue().fromName()).isEqualTo("Test App");
+    assertThat(message.getValue().textBody())
+        .contains("http://localhost:3001/verify-email?token=verify-token");
   }
 }

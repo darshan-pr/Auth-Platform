@@ -2,9 +2,9 @@ package com.authplatform.role.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -21,12 +21,65 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
 class RoleServiceImplTest {
+  @Test
+  void assignsDefaultRoleWithItsApplicationId() {
+    UUID appId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID roleId = UUID.randomUUID();
+    JdbcTemplate jdbc = mock(JdbcTemplate.class);
+    RoleRepository roles = mock(RoleRepository.class);
+    Role role = mock(Role.class);
+    when(role.getId()).thenReturn(roleId);
+    when(roles.findByAppIdAndDefaultRoleTrue(appId)).thenReturn(Optional.of(role));
+
+    new RoleServiceImpl(roles, jdbc, mock(SessionService.class)).assignDefaultRole(appId, userId);
+
+    verify(jdbc)
+        .update(
+            contains("insert into app_user_roles(app_user_id,role_id,app_id)"),
+            eq(userId),
+            eq(roleId),
+            eq(appId));
+  }
+
+  @Test
+  void assignsRoleWithItsApplicationId() {
+    UUID appId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID roleId = UUID.randomUUID();
+    JdbcTemplate jdbc = mock(JdbcTemplate.class);
+    RoleRepository roles = mock(RoleRepository.class);
+    SessionService sessions = mock(SessionService.class);
+    Role role = mock(Role.class);
+    when(role.isEnabled()).thenReturn(true);
+    when(roles.findByIdAndAppId(roleId, appId)).thenReturn(Optional.of(role));
+    when(jdbc.queryForObject(
+            "select count(*) from app_users where id=? and app_id=?", Long.class, userId, appId))
+        .thenReturn(1L);
+    when(jdbc.query(
+            contains("select role_id from app_user_roles"),
+            any(RowMapper.class),
+            eq(userId),
+            eq(appId)))
+        .thenReturn(List.of());
+
+    new RoleServiceImpl(roles, jdbc, sessions).assignRole(appId, userId, roleId);
+
+    verify(jdbc)
+        .update(
+            contains("insert into app_user_roles(app_user_id, role_id, app_id)"),
+            eq(userId),
+            eq(roleId),
+            eq(appId));
+    verify(sessions).revokeAllForAppUser(userId);
+  }
+
   @Test
   void createsRoleWithRoleQualifiedCrudDefaultsWhenPermissionsAreOmitted() {
     UUID appId = UUID.randomUUID();
@@ -232,10 +285,11 @@ class RoleServiceImplTest {
             appId))
         .thenReturn(1L);
     when(jdbc.queryForObject(
-            "select count(*) from app_user_roles where app_user_id=? and role_id=?",
+            "select count(*) from app_user_roles where app_user_id=? and role_id=? and app_id=?",
             Long.class,
             userId,
-            roleId))
+            roleId,
+            appId))
         .thenReturn(1L);
     when(jdbc.queryForObject(
             contains("from permissions"),
@@ -254,6 +308,7 @@ class RoleServiceImplTest {
             eq(userId),
             eq(roleId),
             eq(permissionId),
+            eq(appId),
             eq(false));
     verify(sessions).revokeAllForAppUser(userId);
   }
@@ -277,10 +332,11 @@ class RoleServiceImplTest {
             appId))
         .thenReturn(1L);
     when(jdbc.queryForObject(
-            "select count(*) from app_user_roles where app_user_id=? and role_id=?",
+            "select count(*) from app_user_roles where app_user_id=? and role_id=? and app_id=?",
             Long.class,
             userId,
-            roleId))
+            roleId,
+            appId))
         .thenReturn(1L);
     when(jdbc.queryForObject(
             contains("from permissions"),
@@ -301,6 +357,7 @@ class RoleServiceImplTest {
             eq(userId),
             eq(roleId),
             eq(permissionId),
+            eq(appId),
             eq(true));
     verify(sessions, never()).revokeAllForAppUser(userId);
   }
@@ -324,10 +381,11 @@ class RoleServiceImplTest {
             appId))
         .thenReturn(1L);
     when(jdbc.queryForObject(
-            "select count(*) from app_user_roles where app_user_id=? and role_id=?",
+            "select count(*) from app_user_roles where app_user_id=? and role_id=? and app_id=?",
             Long.class,
             userId,
-            roleId))
+            roleId,
+            appId))
         .thenReturn(1L);
     when(jdbc.queryForObject(
             contains("from permissions"),
@@ -355,6 +413,7 @@ class RoleServiceImplTest {
             eq(userId),
             eq(roleId),
             eq(permissionId),
+            eq(appId),
             eq(true));
     verify(sessions, never()).revokeAllForAppUser(userId);
   }
@@ -403,10 +462,11 @@ class RoleServiceImplTest {
             appId))
         .thenReturn(1L);
     when(jdbc.queryForObject(
-            "select count(*) from app_user_roles where app_user_id=? and role_id=?",
+            "select count(*) from app_user_roles where app_user_id=? and role_id=? and app_id=?",
             Long.class,
             userId,
-            roleId))
+            roleId,
+            appId))
         .thenReturn(0L);
 
     assertThatThrownBy(
@@ -420,6 +480,7 @@ class RoleServiceImplTest {
             eq(userId),
             eq(roleId),
             eq(permissionId),
+            eq(appId),
             eq(true));
     verify(sessions, never()).revokeAllForAppUser(userId);
   }

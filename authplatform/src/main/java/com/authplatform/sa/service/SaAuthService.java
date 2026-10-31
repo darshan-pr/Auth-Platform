@@ -9,6 +9,8 @@ import com.authplatform.auth.service.SessionService;
 import com.authplatform.common.crypto.PasswordHasher;
 import com.authplatform.common.exception.ApiException;
 import com.authplatform.common.exception.ErrorCode;
+import com.authplatform.notification.EmailSender;
+import com.authplatform.notification.EmailTemplateService;
 import com.authplatform.sa.dto.SaDtos;
 import com.authplatform.user.entity.Account;
 import com.authplatform.user.entity.PlatformRole;
@@ -28,6 +30,8 @@ public class SaAuthService {
   private final JwtService jwt;
   private final LoginAttemptService attempts;
   private final AuditService audit;
+  private final EmailSender email;
+  private final EmailTemplateService templates;
   private final com.authplatform.auth.service.MfaService mfa;
   private final String dummyHash;
 
@@ -38,6 +42,8 @@ public class SaAuthService {
       JwtService jwt,
       LoginAttemptService attempts,
       AuditService audit,
+      EmailSender email,
+      EmailTemplateService templates,
       com.authplatform.auth.service.MfaService mfa) {
     this.accounts = accounts;
     this.passwords = passwords;
@@ -45,22 +51,28 @@ public class SaAuthService {
     this.jwt = jwt;
     this.attempts = attempts;
     this.audit = audit;
+    this.email = email;
+    this.templates = templates;
     this.mfa = mfa;
     this.dummyHash = passwords.hash("dummy-sa-password-for-timing-only");
   }
 
   @Transactional
   public SaDtos.LoginResponse login(SaDtos.LoginRequest request, String ip, String agent) {
-    String email = normalize(request.email());
-    String key = "SA:" + email;
+    String emailAddress = normalize(request.email());
+    String key = "SA:" + emailAddress;
     attempts.assertNotLocked(key);
-    Account account = accounts.findByEmailIgnoreCase(email).orElse(null);
+    Account account = accounts.findByEmailIgnoreCase(emailAddress).orElse(null);
     boolean valid =
         account != null
             ? passwords.matches(request.password(), account.getPasswordHash())
             : passwords.matches(request.password(), dummyHash);
     if (!valid || account == null || account.getPlatformRole() != PlatformRole.SA) {
-      attempts.recordFailure(key);
+      if (attempts.recordFailure(key) && account != null) {
+        email.send(
+            templates.temporaryLock(
+                null, account.getEmail(), account.getName(), attempts.lockDuration()));
+      }
       audit.recordAccount("SA_LOGIN_FAILED", account == null ? null : account.getId(), ip);
       throw new ApiException(ErrorCode.INVALID_CREDENTIALS);
     }
@@ -98,6 +110,9 @@ public class SaAuthService {
             AUDIENCE,
             accessTtl);
     audit.recordSa("SA_LOGIN_SUCCESS", account.getId(), null, ip, null);
+    email.send(
+        templates.loginDetected(
+            null, account.getEmail(), account.getName(), ip, agent, java.time.Instant.now()));
     return new SaDtos.LoginResponse(
         access,
         accessTtl.toSeconds(),

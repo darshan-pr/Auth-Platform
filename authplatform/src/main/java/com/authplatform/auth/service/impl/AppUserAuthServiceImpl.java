@@ -15,6 +15,7 @@ import com.authplatform.common.crypto.PasswordHasher;
 import com.authplatform.common.exception.ApiException;
 import com.authplatform.common.exception.ErrorCode;
 import com.authplatform.notification.EmailSender;
+import com.authplatform.notification.EmailTemplateService;
 import com.authplatform.role.service.RoleService;
 import com.authplatform.user.entity.AppUser;
 import com.authplatform.user.repository.AppUserRepository;
@@ -35,6 +36,7 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
   private final JwtService jwt;
   private final LoginAttemptService attempts;
   private final EmailSender email;
+  private final EmailTemplateService templates;
   private final RoleService roles;
   private final AuditService audit;
   private final com.authplatform.auth.service.MfaService mfa;
@@ -49,6 +51,7 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
       JwtService jwt,
       LoginAttemptService attempts,
       EmailSender email,
+      EmailTemplateService templates,
       RoleService roles,
       AuditService audit,
       com.authplatform.auth.service.MfaService mfa) {
@@ -60,6 +63,7 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
     this.jwt = jwt;
     this.attempts = attempts;
     this.email = email;
+    this.templates = templates;
     this.roles = roles;
     this.audit = audit;
     this.mfa = mfa;
@@ -87,7 +91,7 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
     }
     roles.assignDefaultRole(appId, user.getId());
     String raw = tokens.issueAppUser(user.getId(), EmailTokenType.VERIFY_EMAIL).rawToken();
-    email.send(user.getEmail(), "Verify your email", verificationLink(app, raw));
+    email.send(templates.emailVerification(app, user.getEmail(), user.getName(), verificationLink(app, raw)));
     audit.recordAppUser("SIGNUP", user.getId(), appId, null);
     return summary(appId, user);
   }
@@ -99,7 +103,10 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
         users
             .findByAppIdAndId(appId, token.getAppUserId())
             .orElseThrow(() -> new ApiException(ErrorCode.TOKEN_INVALID));
+    App app = apps.findById(appId).orElseThrow(() -> new ApiException(ErrorCode.INVALID_KEY));
+    boolean wasVerified = user.isEmailVerified();
     user.markEmailVerified();
+    if (!wasVerified) email.send(templates.welcome(app, user.getEmail(), user.getName()));
     audit.recordAppUser("EMAIL_VERIFIED", user.getId(), appId, null);
     return new AuthDtos.VerifyResponse(true);
   }
@@ -117,14 +124,15 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
                                   .issueAppUser(user.getId(), EmailTokenType.VERIFY_EMAIL)
                                   .rawToken();
                           email.send(
-                              user.getEmail(), "Verify your email", verificationLink(app, raw));
+                              templates.emailVerification(
+                                  app, user.getEmail(), user.getName(), verificationLink(app, raw)));
                         }));
   }
 
   @Transactional
   public AuthDtos.LoginResponse login(
       UUID appId, AuthDtos.LoginRequest request, String ip, String agent) {
-    activeApp(appId);
+    App app = activeApp(appId);
     String emailAddress = normalize(request.email());
     String key = "APP:" + appId + ":" + emailAddress;
     attempts.assertNotLocked(key);
@@ -134,12 +142,15 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
             ? passwords.matches(request.password(), user.getPasswordHash())
             : passwords.matches(request.password(), dummyHash);
     if (!valid) {
-      attempts.recordFailure(key);
+      if (attempts.recordFailure(key) && user != null) {
+        email.send(
+            templates.temporaryLock(
+                app, user.getEmail(), user.getName(), attempts.lockDuration()));
+      }
       audit.recordAppUser("LOGIN_FAILED", user == null ? null : user.getId(), appId, ip);
       throw new ApiException(ErrorCode.INVALID_CREDENTIALS);
     }
     attempts.clearFailures(key);
-    App app = activeApp(appId);
     if (app.isRequireEmailVerification() && !user.isEmailVerified())
       throw new ApiException(ErrorCode.INVALID_CREDENTIALS);
     if (!"ACTIVE".equals(user.getStatus())) throw new ApiException(ErrorCode.INVALID_CREDENTIALS);
@@ -176,6 +187,8 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
             permissionKeys,
             accessTtl);
     audit.recordAppUser("LOGIN_SUCCESS", user.getId(), appId, ip);
+    email.send(
+        templates.loginDetected(app, user.getEmail(), user.getName(), ip, agent, Instant.now()));
     return new AuthDtos.LoginResponse(
         access,
         started.rawRefreshToken(),
@@ -189,7 +202,7 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
   public AuthDtos.LoginResponse verifyOtp(
       UUID appId, String challengeId, String code, String ip, String agent) {
     App app = activeApp(appId);
-    UUID userId = mfa.verifyAppUserOtp(appId, challengeId, code);
+    UUID userId = mfa.verifyAppUserOtp(app, challengeId, code);
     AppUser user =
         users
             .findByAppIdAndId(appId, userId)
@@ -218,6 +231,8 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
             permissionKeys,
             accessTtl);
     audit.recordAppUser("LOGIN_SUCCESS", user.getId(), appId, ip);
+    email.send(
+        templates.loginDetected(app, user.getEmail(), user.getName(), ip, agent, Instant.now()));
     return new AuthDtos.LoginResponse(
         access,
         started.rawRefreshToken(),
@@ -229,18 +244,20 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
 
   public com.authplatform.auth.dto.MfaDtos.OtpChallenge resendLoginOtp(
       UUID appId, String challengeId) {
-    activeApp(appId);
-    return mfa.resendAppUserOtp(appId, challengeId);
+    App app = activeApp(appId);
+    return mfa.resendAppUserOtp(app, challengeId);
   }
 
   @Transactional
   public AuthDtos.LoginResponse refresh(UUID appId, String raw) {
-    activeApp(appId);
-    SessionService.RotatedSession rotated = sessions.rotate(raw);
+    App app = activeApp(appId);
+    UUID userId = sessions.require(raw).getAppUserId();
     AppUser user =
         users
-            .findByAppIdAndId(appId, rotated.session().getAppUserId())
+            .findByAppIdAndId(appId, userId)
             .orElseThrow(() -> new ApiException(ErrorCode.TOKEN_INVALID));
+    ensureSessionEligible(app, user);
+    SessionService.RotatedSession rotated = sessions.rotate(raw);
     List<String> roleNames = roles.roleNames(appId, user.getId());
     List<String> permissionKeys = roles.permissionKeys(appId, user.getId());
     var accessTtl = sessions.accessTokenTtl(rotated.session());
@@ -277,9 +294,11 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
                                   .issueAppUser(user.getId(), EmailTokenType.RESET_PASSWORD)
                                   .rawToken();
                           email.send(
-                              user.getEmail(),
-                              "Reset your password",
-                              link(app.getResetPasswordUrl(), raw, "reset-password"));
+                              templates.passwordReset(
+                                  app,
+                                  user.getEmail(),
+                                  user.getName(),
+                                  link(app.getResetPasswordUrl(), raw, "reset-password")));
                           audit.recordAppUser(
                               "PASSWORD_RESET_REQUESTED", user.getId(), appId, null);
                         }));
@@ -292,34 +311,37 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
         users
             .findByAppIdAndId(appId, token.getAppUserId())
             .orElseThrow(() -> new ApiException(ErrorCode.TOKEN_INVALID));
+    App app = apps.findById(appId).orElseThrow(() -> new ApiException(ErrorCode.INVALID_KEY));
     validatePassword(request.newPassword(), user.getEmail());
     user.changePassword(passwords.hash(request.newPassword()));
     sessions.revokeAllForAppUser(user.getId());
     audit.recordAppUser("PASSWORD_RESET_COMPLETED", user.getId(), appId, null);
+    email.send(templates.passwordChanged(app, user.getEmail(), user.getName()));
   }
 
   @Transactional
   public com.authplatform.auth.dto.MfaDtos.OtpChallenge forgotWithOtp(
       UUID appId, String emailAddress) {
-    activeApp(appId);
+    App app = activeApp(appId);
     String normalizedEmail = normalize(emailAddress);
     AppUser user = users.findByAppIdAndEmailIgnoreCase(appId, normalizedEmail).orElse(null);
     if (user != null) {
       audit.recordAppUser("PASSWORD_RESET_REQUESTED", user.getId(), appId, null);
     }
-    return mfa.issueAppUserPasswordResetOtp(appId, user, normalizedEmail);
+    return mfa.issueAppUserPasswordResetOtp(app, user, normalizedEmail);
   }
 
   public com.authplatform.auth.dto.MfaDtos.OtpChallenge resendPasswordResetOtp(
       UUID appId, String challengeId) {
-    activeApp(appId);
-    return mfa.resendAppUserPasswordResetOtp(appId, challengeId);
+    App app = activeApp(appId);
+    return mfa.resendAppUserPasswordResetOtp(app, challengeId);
   }
 
   @Transactional
   public void resetWithOtp(UUID appId, AuthDtos.OtpPasswordResetRequest request) {
-    activeApp(appId);
-    UUID userId = mfa.verifyAppUserPasswordResetOtp(appId, request.challengeId(), request.code());
+    App app = activeApp(appId);
+    UUID userId =
+        mfa.verifyAppUserPasswordResetOtp(app, request.challengeId(), request.code());
     AppUser user =
         users
             .findByAppIdAndId(appId, userId)
@@ -328,14 +350,18 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
     user.changePassword(passwords.hash(request.newPassword()));
     sessions.revokeAllForAppUser(user.getId());
     audit.recordAppUser("PASSWORD_RESET_COMPLETED", user.getId(), appId, null);
+    email.send(templates.passwordChanged(app, user.getEmail(), user.getName()));
   }
 
   @Transactional(readOnly = true)
   public AppUser current(UUID appId, UUID id) {
-    activeApp(appId);
-    return users
+    App app = activeApp(appId);
+    AppUser user =
+        users
         .findByAppIdAndId(appId, id)
         .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
+    ensureSessionEligible(app, user);
+    return user;
   }
 
   private AuthDtos.UserSummary summary(UUID appId, AppUser user) {
@@ -359,6 +385,12 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
     App app = apps.findById(id).orElseThrow(() -> new ApiException(ErrorCode.INVALID_KEY));
     if (!"ACTIVE".equals(app.getStatus())) throw new ApiException(ErrorCode.APP_SUSPENDED);
     return app;
+  }
+
+  private static void ensureSessionEligible(App app, AppUser user) {
+    if (!"ACTIVE".equals(user.getStatus())) throw new ApiException(ErrorCode.USER_BLOCKED);
+    if (app.isRequireEmailVerification() && !user.isEmailVerified())
+      throw new ApiException(ErrorCode.EMAIL_NOT_VERIFIED);
   }
 
   private static String normalize(String email) {
