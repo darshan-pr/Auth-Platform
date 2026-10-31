@@ -16,11 +16,17 @@ public class EmailTemplateService {
   private static final String PLATFORM_NAME = "Auth Platform";
   private static final DateTimeFormatter TIMESTAMP_FORMAT =
       DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a 'UTC'").withZone(ZoneOffset.UTC);
+  private static final String LOCAL_BACKEND_URL = "http://localhost:8080";
   private final String publicBaseUrl;
 
   public EmailTemplateService(
       @Value("${authplatform.email.public-base-url:}") String publicBaseUrl) {
     this.publicBaseUrl = normalizePublicBaseUrl(publicBaseUrl);
+  }
+
+  public String consoleEmailVerificationLink(String rawToken) {
+    String base = publicBaseUrl.isBlank() ? LOCAL_BACKEND_URL : publicBaseUrl;
+    return base + "/api/console/auth/verify-email?token=" + rawToken;
   }
 
   public EmailMessage emailVerification(App app, String to, String name, String link) {

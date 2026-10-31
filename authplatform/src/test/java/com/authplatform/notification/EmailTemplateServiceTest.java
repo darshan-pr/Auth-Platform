@@ -36,6 +36,20 @@ class EmailTemplateServiceTest {
   }
 
   @Test
+  void consoleVerificationLinkUsesTheConfiguredPublicBaseUrl() {
+    assertThat(templates.consoleEmailVerificationLink("tok"))
+        .isEqualTo("https://api.authplatform.example/api/console/auth/verify-email?token=tok");
+    assertThat(new EmailTemplateService("https://auth.example.com/").consoleEmailVerificationLink("tok"))
+        .isEqualTo("https://auth.example.com/api/console/auth/verify-email?token=tok");
+  }
+
+  @Test
+  void consoleVerificationLinkFallsBackToLocalBackendWhenNoPublicUrlIsConfigured() {
+    assertThat(new EmailTemplateService("").consoleEmailVerificationLink("tok"))
+        .isEqualTo("http://localhost:8080/api/console/auth/verify-email?token=tok");
+  }
+
+  @Test
   void loginAlertEscapesDynamicContentAndIncludesSignInContext() {
     App app = mock(App.class);
     when(app.getName()).thenReturn("Northstar");

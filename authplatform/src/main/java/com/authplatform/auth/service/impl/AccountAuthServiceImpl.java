@@ -89,7 +89,7 @@ public class AccountAuthServiceImpl implements AccountAuthService {
             null,
             normalized,
             account.getName(),
-            "http://localhost:8080/api/console/auth/verify-email?token=" + raw));
+            templates.consoleEmailVerificationLink(raw)));
     audit.recordAccount("SIGNUP", account.getId(), null);
     return new AuthDtos.SignupResponse(
         account.getId(),
@@ -124,7 +124,7 @@ public class AccountAuthServiceImpl implements AccountAuthService {
                       null,
                       account.getEmail(),
                       account.getName(),
-                      "http://localhost:8080/api/console/auth/verify-email?token=" + raw));
+                      templates.consoleEmailVerificationLink(raw)));
             });
   }
 
