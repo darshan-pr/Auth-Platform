@@ -1,0 +1,21 @@
+[Unit]
+Description=Auth Platform console (Next.js)
+After=network-online.target authplatform-backend.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=authplatform
+Group=authplatform
+WorkingDirectory=/opt/authplatform/src/frontend
+EnvironmentFile=/etc/authplatform/frontend.env
+ExecStart=/usr/local/bin/node node_modules/next/dist/bin/next start --port 3000 --hostname 0.0.0.0
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

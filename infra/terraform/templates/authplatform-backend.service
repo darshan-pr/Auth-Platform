@@ -1,0 +1,22 @@
+[Unit]
+Description=Auth Platform backend (Spring Boot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=authplatform
+Group=authplatform
+WorkingDirectory=/opt/authplatform/run
+EnvironmentFile=/etc/authplatform/backend.env
+ExecStart=/usr/bin/java -Xms256m -Xmx640m -XX:MaxMetaspaceSize=256m -Djava.security.egd=file:/dev/urandom -jar /opt/authplatform/app/backend.jar
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

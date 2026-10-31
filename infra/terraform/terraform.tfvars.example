@@ -1,0 +1,15 @@
+aws_account_id = "123456789012"
+domain_name    = "auth.example.com"
+
+# Commit SHA (preferred), tag or branch to deploy.
+app_git_ref = "0000000000000000000000000000000000000000"
+
+smtp_host     = "smtp.example.com"
+smtp_port     = 587
+smtp_username = "user@example.com"
+smtp_from     = "user@example.com"
+
+sa_bootstrap_enabled = true
+sa_bootstrap_email   = "admin@example.com"
+
+budget_email = "admin@example.com"

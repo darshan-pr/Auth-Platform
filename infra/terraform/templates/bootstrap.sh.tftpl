@@ -1,0 +1,56 @@
+#!/bin/bash
+# One-time instance bootstrap (cloud-init). Day-2 deploys use /opt/authplatform/deploy.sh.
+set -euo pipefail
+exec > >(tee -a /var/log/authplatform-bootstrap.log) 2>&1
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+echo "bootstrap started $(date -u +%FT%TZ)"
+
+if [ ! -f /swapfile ]; then
+  dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
+dnf install -y java-21-amazon-corretto-devel git jq tar xz gzip
+
+# Node.js from nodejs.org, verified against the published SHA-256 checksums.
+NODE_VERSION="${node_version}"
+NODE_TARBALL="node-$NODE_VERSION-linux-arm64.tar.xz"
+cd /tmp
+curl -fsSLO "https://nodejs.org/dist/$NODE_VERSION/$NODE_TARBALL"
+curl -fsSLO "https://nodejs.org/dist/$NODE_VERSION/SHASUMS256.txt"
+grep " $NODE_TARBALL\$" SHASUMS256.txt | sha256sum -c -
+mkdir -p /opt/node
+tar -xJf "$NODE_TARBALL" -C /opt/node --strip-components=1
+ln -sf /opt/node/bin/node /usr/local/bin/node
+ln -sf /opt/node/bin/npm /usr/local/bin/npm
+ln -sf /opt/node/bin/npx /usr/local/bin/npx
+rm -f "$NODE_TARBALL" SHASUMS256.txt
+
+id authplatform > /dev/null 2>&1 || useradd --system --home-dir /opt/authplatform --shell /sbin/nologin authplatform
+install -d -o authplatform -g authplatform /opt/authplatform /opt/authplatform/app /opt/authplatform/run
+install -d -o root -g root /opt/authplatform/certs
+
+cat > /opt/authplatform/deploy.sh <<'AUTHPLATFORM_DEPLOY_EOF'
+${deploy_script}
+AUTHPLATFORM_DEPLOY_EOF
+chmod 0750 /opt/authplatform/deploy.sh
+
+cat > /opt/authplatform/build.sh <<'AUTHPLATFORM_BUILD_EOF'
+${build_script}
+AUTHPLATFORM_BUILD_EOF
+chown root:authplatform /opt/authplatform/build.sh
+chmod 0750 /opt/authplatform/build.sh
+
+cat > /etc/systemd/system/authplatform-backend.service <<'AUTHPLATFORM_BACKEND_UNIT_EOF'
+${backend_unit}
+AUTHPLATFORM_BACKEND_UNIT_EOF
+
+cat > /etc/systemd/system/authplatform-frontend.service <<'AUTHPLATFORM_FRONTEND_UNIT_EOF'
+${frontend_unit}
+AUTHPLATFORM_FRONTEND_UNIT_EOF
+
+/opt/authplatform/deploy.sh
+echo "bootstrap finished $(date -u +%FT%TZ)"

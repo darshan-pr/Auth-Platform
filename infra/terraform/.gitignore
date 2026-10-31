@@ -1,0 +1,8 @@
+# Local state and variable files contain secrets (passwords, the JWT private key).
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+crash.log
+tfplan*

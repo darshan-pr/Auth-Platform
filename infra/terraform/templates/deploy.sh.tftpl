@@ -1,0 +1,131 @@
+#!/bin/bash
+# Idempotent deploy: re-reads config from SSM, builds the pinned git ref, restarts both services.
+# Run as root:  sudo /opt/authplatform/deploy.sh
+set -euo pipefail
+
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export AWS_DEFAULT_REGION="${region}"
+PREFIX="${ssm_prefix}"
+APP_DIR=/opt/authplatform
+SRC="$APP_DIR/src"
+CONF=/etc/authplatform
+REPO="${repo_ssh_url}"
+
+param() { aws ssm get-parameter --name "$PREFIX/$1" --with-decryption --query Parameter.Value --output text; }
+
+kv() {
+  case "$2" in
+    *'"'* | *'\'* | *$'\n'*) echo "refusing unsafe value for $1" >&2; exit 1 ;;
+  esac
+  printf '%s="%s"\n' "$1" "$2"
+}
+
+umask 077
+install -d -m 0750 "$CONF"
+
+# --- git: read-only deploy key, pinned GitHub host keys
+param github_deploy_key > "$CONF/deploy_key"
+chmod 600 "$CONF/deploy_key"
+curl -fsS https://api.github.com/meta | jq -r '.ssh_keys[] | "github.com " + .' > "$CONF/known_hosts"
+export GIT_SSH_COMMAND="ssh -i $CONF/deploy_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$CONF/known_hosts -o StrictHostKeyChecking=yes"
+git config --system --replace-all safe.directory "$SRC"
+
+REF="$(param git_ref)"
+[ -d "$SRC/.git" ] || git clone --no-checkout "$REPO" "$SRC"
+git -C "$SRC" fetch --prune --tags origin '+refs/heads/*:refs/remotes/origin/*'
+COMMIT="$(git -C "$SRC" rev-parse --verify "origin/$REF^{commit}" 2>/dev/null || git -C "$SRC" rev-parse --verify "$REF^{commit}")"
+git -C "$SRC" checkout --force --detach "$COMMIT"
+chown -R authplatform:authplatform "$SRC"
+echo "Deploying $COMMIT"
+
+# --- config files (secrets come from SSM and never touch the repo)
+RDS_CA="$APP_DIR/certs/rds-global-bundle.pem"
+[ -s "$RDS_CA" ] || curl -fsS https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o "$RDS_CA"
+chmod 644 "$RDS_CA"
+
+{
+  kv SPRING_PROFILES_ACTIVE prod
+  kv PORT 8080
+  kv DB_URL "jdbc:postgresql://${rds_address}:5432/${db_name}?sslmode=verify-full&sslrootcert=$RDS_CA"
+  kv DB_USER "${db_user}"
+  kv DB_PASSWORD "$(param db_password)"
+  kv REDIS_URL "rediss://${redis_user}:$(param redis_password)@${redis_address}:6379"
+  kv SMTP_HOST "${smtp_host}"
+  kv SMTP_PORT "${smtp_port}"
+  kv SMTP_USERNAME "${smtp_username}"
+  kv SMTP_PASSWORD "$(param smtp_password)"
+  kv SMTP_FROM "${smtp_from}"
+  kv SMTP_AUTH true
+  kv SMTP_STARTTLS_ENABLE true
+  kv SMTP_STARTTLS_REQUIRED true
+  kv JWT_ISSUER "${app_url}"
+  kv JWT_ACCESS_TTL 15m
+  kv JWT_REFRESH_TTL 30d
+  kv JWT_ACCOUNT_ACCESS_TTL 30m
+  kv JWT_ACCOUNT_REFRESH_TTL 48h
+  kv JWT_ACTIVE_KID "${jwt_kid}"
+  kv JWT_SIGNING_KEYS "$(param jwt_signing_keys)"
+  kv authplatform_KEY_ENCRYPTION_SECRET "$(param key_encryption_secret)"
+  kv VERIFY_TOKEN_TTL 24h
+  kv RESET_TOKEN_TTL 30m
+  kv LOCKOUT_MAX_FAILURES 5
+  kv LOCKOUT_WINDOW 15m
+  kv LOCKOUT_DURATION 15m
+  kv CONSOLE_ALLOWED_ORIGINS "${app_url}"
+  kv MAX_APPS_PER_ACCOUNT 10
+  kv MAX_ORIGINS_PER_APP 20
+  kv RATE_LIMIT_ENABLED true
+  kv RATE_LIMIT_LOGIN_CAPACITY 5
+  kv RATE_LIMIT_LOGIN_PERIOD 1m
+  kv RATE_LIMIT_SIGNUP_CAPACITY 5
+  kv RATE_LIMIT_SIGNUP_PERIOD 10m
+  kv RATE_LIMIT_GLOBAL_CAPACITY 1000
+  kv RATE_LIMIT_GLOBAL_PERIOD 1m
+  kv AUTH_COOKIE_SECURE true
+  kv AUTH_DOCS_ENABLED false
+  kv AUDIT_READS_ENABLED false
+  kv AUTH_PLATFORM_PUBLIC_BASE_URL "${app_url}"
+  kv SA_BOOTSTRAP_ENABLED "$(param sa_bootstrap_enabled)"
+  kv SA_BOOTSTRAP_EMAIL "${sa_bootstrap_email}"
+  kv SA_BOOTSTRAP_NAME "${sa_bootstrap_name}"
+  kv SA_BOOTSTRAP_PASSWORD "$(param sa_bootstrap_password)"
+  # Keep /actuator/health (the ALB check) dependent on Postgres and Redis only, not on Gmail.
+  kv MANAGEMENT_HEALTH_MAIL_ENABLED false
+} > "$CONF/backend.env.new"
+mv -f "$CONF/backend.env.new" "$CONF/backend.env"
+chmod 600 "$CONF/backend.env"
+
+{
+  kv NODE_ENV production
+  kv NEXT_TELEMETRY_DISABLED 1
+  kv NODE_OPTIONS --max-old-space-size=384
+} > "$CONF/frontend.env"
+chmod 600 "$CONF/frontend.env"
+
+# --- build only when the commit or the artifacts changed
+if [ "$(cat "$APP_DIR/.deployed_commit" 2>/dev/null || true)" != "$COMMIT" ] \
+   || [ ! -f "$APP_DIR/app/backend.jar" ] || [ ! -d "$SRC/frontend/.next" ]; then
+  runuser -u authplatform -- "$APP_DIR/build.sh"
+fi
+
+systemctl daemon-reload
+systemctl enable authplatform-backend authplatform-frontend
+systemctl restart authplatform-backend
+systemctl restart authplatform-frontend
+
+echo "Waiting for backend and frontend to become healthy..."
+ok=0
+for _ in $(seq 1 60); do
+  if curl -fsS http://127.0.0.1:8080/actuator/health > /dev/null 2>&1 \
+     && curl -fsS -o /dev/null http://127.0.0.1:3000/ 2>/dev/null; then ok=1; break; fi
+  sleep 5
+done
+if [ "$ok" -ne 1 ]; then
+  echo "Services did not become healthy in time" >&2
+  journalctl -u authplatform-backend -n 60 --no-pager >&2 || true
+  journalctl -u authplatform-frontend -n 30 --no-pager >&2 || true
+  exit 1
+fi
+
+echo "$COMMIT" > "$APP_DIR/.deployed_commit"
+echo "Deploy complete: $COMMIT"

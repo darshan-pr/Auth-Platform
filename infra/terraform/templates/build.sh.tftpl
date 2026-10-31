@@ -1,0 +1,22 @@
+#!/bin/bash
+# Builds the checked-out commit. Runs as the unprivileged authplatform user (invoked by deploy.sh).
+set -euo pipefail
+
+export HOME=/opt/authplatform
+export PATH=/usr/local/bin:/usr/bin:/bin
+export JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
+export MAVEN_OPTS="-Xmx768m"
+export NODE_OPTIONS="--max-old-space-size=1024"
+export NEXT_TELEMETRY_DISABLED=1
+
+SRC=/opt/authplatform/src
+
+cd "$SRC/authplatform"
+./mvnw -B -q -DskipTests package
+JAR="$(ls target/authplatform-*.jar | head -n 1)"
+install -m 0644 "$JAR" /opt/authplatform/app/backend.jar.new
+mv -f /opt/authplatform/app/backend.jar.new /opt/authplatform/app/backend.jar
+
+cd "$SRC/frontend"
+npm ci --no-audit --no-fund
+NEXT_PUBLIC_API_URL="${app_url}" npm run build
