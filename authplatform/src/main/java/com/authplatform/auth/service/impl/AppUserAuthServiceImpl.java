@@ -398,20 +398,7 @@ public class AppUserAuthServiceImpl implements AppUserAuthService {
   }
 
   private String verificationLink(App app, String token) {
-    String configured = app.getVerifyEmailUrl();
-    if (configured == null || configured.isBlank()) {
-      configured =
-          app.getAllowedOrigins().stream()
-              .findFirst()
-              .map(origin -> origin + "/verify-email")
-              .orElse(null);
-    }
-    if (configured == null) {
-      throw new ApiException(
-          ErrorCode.VALIDATION_FAILED,
-          "Configure a verify-email URL or an allowed application origin.");
-    }
-    return configured + "?token=" + token;
+    return templates.appVerificationLink(app, token);
   }
 
   private String link(String configured, String token, String suffix) {

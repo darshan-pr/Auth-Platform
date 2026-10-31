@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ApiError, api, consoleApi } from "../lib/api";
 import type { SessionInfo } from "../lib/types";
+import { GlobalSearch } from "./global-search";
 import { Icon } from "./icon";
 import { SessionDialog } from "./session-dialog";
 
@@ -136,7 +137,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
   return <div className="console-frame">
     <header className="topbar">
       <div className="brand"><img alt="" className="brand-logo" src="/auth-platform-icon-white.png" /><span>Auth<span className="brand-accent"> Platform</span></span></div>
-      <div className="global-search"><Icon name="search" size={17} /><span>Search resources</span><kbd>⌘ K</kbd></div>
+      <GlobalSearch nav={currentNav} scope={isConsole ? "console" : "sa"} />
       <div className="topbar-tools"><div className="account-wrap"><button aria-label={`Account menu for ${displayName}`} className="account-trigger" onClick={() => setAccountMenu(!accountMenu)} title={displayName} type="button"><span aria-hidden="true" className="account-avatar">{displayInitials}</span><span className="account-display-name">{displayName}</span></button>{accountMenu && <div className="account-menu"><div className="account-menu-name">{displayName}</div><div className="account-menu-role">darshanpr26@gmail.com</div><div className="account-menu-role">{isConsole ? "Developer workspace" : "Platform administration"}</div><Link className="account-menu-link" href={isConsole ? "/console/account" : "/account"} onClick={() => setAccountMenu(false)}>Account</Link><button onClick={signOut} type="button">Sign out</button></div>}</div></div>
     </header>
     <div className="contextbar">

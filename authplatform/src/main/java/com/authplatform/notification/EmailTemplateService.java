@@ -1,6 +1,8 @@
 package com.authplatform.notification;
 
 import com.authplatform.app.entity.App;
+import com.authplatform.common.exception.ApiException;
+import com.authplatform.common.exception.ErrorCode;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
@@ -16,7 +18,7 @@ public class EmailTemplateService {
   private static final String PLATFORM_NAME = "Auth Platform";
   private static final DateTimeFormatter TIMESTAMP_FORMAT =
       DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a 'UTC'").withZone(ZoneOffset.UTC);
-  private static final String LOCAL_BACKEND_URL = "http://localhost:8080";
+  private static final String LOCAL_CONSOLE_URL = "http://localhost:3000";
   private final String publicBaseUrl;
 
   public EmailTemplateService(
@@ -24,9 +26,45 @@ public class EmailTemplateService {
     this.publicBaseUrl = normalizePublicBaseUrl(publicBaseUrl);
   }
 
+  // Opens the console's verification page, which submits the token itself.
   public String consoleEmailVerificationLink(String rawToken) {
-    String base = publicBaseUrl.isBlank() ? LOCAL_BACKEND_URL : publicBaseUrl;
-    return base + "/api/console/auth/verify-email?token=" + rawToken;
+    String base = publicBaseUrl.isBlank() ? LOCAL_CONSOLE_URL : publicBaseUrl;
+    return base + "/verify-email?token=" + rawToken;
+  }
+
+  /** The application's verify-email page (or its first allowed origin) with the token attached. */
+  public String appVerificationLink(App app, String token) {
+    String configured = app.getVerifyEmailUrl();
+    if (configured == null || configured.isBlank()) {
+      configured =
+          app.getAllowedOrigins().stream()
+              .findFirst()
+              .map(origin -> origin + "/verify-email")
+              .orElse(null);
+    }
+    if (configured == null) {
+      throw new ApiException(
+          ErrorCode.VALIDATION_FAILED,
+          "Configure a verify-email URL or an allowed application origin.");
+    }
+    return configured + "?token=" + token;
+  }
+
+  public EmailMessage invitation(
+      App app, String to, String name, String temporaryPassword, String verificationLink) {
+    String application = brand(app).name();
+    return render(
+        app,
+        to,
+        "You have been invited",
+        "You have been invited to " + application,
+        "An account was created for you. Verify your email address, then sign in with the temporary password below.",
+        name,
+        null,
+        List.of(new Detail("Email", to), new Detail("Temporary password", temporaryPassword)),
+        "Verify email",
+        verificationLink,
+        "Change your password after signing in by using Forgot password. If you were not expecting this invitation, ignore this message.");
   }
 
   public EmailMessage emailVerification(App app, String to, String name, String link) {

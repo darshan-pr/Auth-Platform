@@ -615,7 +615,8 @@ The backend is configured entirely through environment variables. The important 
 | `AUTH_PLATFORM_PUBLIC_BASE_URL` | Public HTTPS URL used in email links and email icons |
 | `AUTH_COOKIE_SECURE`, `AUTH_DOCS_ENABLED` | Secure cookies and Swagger UI toggle |
 | `RATE_LIMIT_*`, `LOCKOUT_*` | Rate-limit capacities and periods, lockout thresholds |
-| `SMTP_*` | Mail server and sender |
+| `INVITES_PER_HOUR` | Invitations one developer can send per hour (default 200); stops the platform being used as a mail relay |
+| `SMTP_*` | Mail server and sender. `SMTP_CONNECTION_TIMEOUT_MS`, `SMTP_READ_TIMEOUT_MS` and `SMTP_WRITE_TIMEOUT_MS` tune the timeouts |
 | `SA_BOOTSTRAP_*` | One-time creation of the first platform admin |
 
 The console reads `NEXT_PUBLIC_API_URL` at **build time**. See [`authplatform/.env.example`](authplatform/.env.example) for the full list.

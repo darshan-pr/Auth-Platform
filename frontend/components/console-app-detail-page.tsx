@@ -2,9 +2,11 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import type { AppUser, ConsoleApp, Permission, Role, RotatedSecret } from "../lib/types";
+import type { ConsoleApp, Permission, Role, RotatedSecret } from "../lib/types";
 import { consoleApi } from "../lib/api";
 import { Button, Card, ConfirmModal, CopyButton, ErrorBanner, Field, Loading, PageHeader, Stack, StatusBadge } from "./ui";
+import { EndUsersTable } from "./end-users-table";
+import { InviteUsersModal } from "./invite-users-modal";
 import { RolesPermissionsManager } from "./roles-permissions-manager";
 import { Icon } from "./icon";
 import { AppIconPanel } from "./app-icon-panel";
@@ -26,7 +28,6 @@ export function ConsoleAppDetailPage() {
   const [activeTab, setActiveTab] = useState<AppTab>("configuration");
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [users, setUsers] = useState<AppUser[]>([]);
   const [editing, setEditing] = useState(false);
   const [secret, setSecret] = useState<RotatedSecret | null>(null);
   const [rotateConfirm, setRotateConfirm] = useState(false);
@@ -37,7 +38,6 @@ export function ConsoleAppDetailPage() {
     setApp(null);
     setRoles([]);
     setPermissions([]);
-    setUsers([]);
     setError("");
     consoleApi.app(id)
       .then((nextApp) => {
@@ -62,13 +62,6 @@ export function ConsoleAppDetailPage() {
       .catch((err) => {
         if (active) setError(err instanceof Error ? err.message : "Unable to load application roles and permissions");
       });
-    consoleApi.appUsers(app.id)
-      .then((nextUsers) => {
-        if (active) setUsers(nextUsers);
-      })
-      .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : "Unable to load application users");
-      });
     return () => { active = false; };
   }, [app?.id, id]);
 
@@ -89,7 +82,7 @@ export function ConsoleAppDetailPage() {
     <nav className="tabs app-feature-tabs" aria-label="Application features" role="tablist"><AppTabButton active={activeTab === "configuration"} onClick={() => setActiveTab("configuration")}>Configuration</AppTabButton><AppTabButton active={activeTab === "roles"} onClick={() => setActiveTab("roles")}>Roles &amp; permissions</AppTabButton><AppTabButton active={activeTab === "users"} onClick={() => setActiveTab("users")}>End users</AppTabButton><AppTabButton active={activeTab === "credentials"} onClick={() => setActiveTab("credentials")}>Credentials</AppTabButton><AppTabButton active={activeTab === "activity"} onClick={() => setActiveTab("activity")}>Activity</AppTabButton></nav>
     {activeTab === "configuration" && <ConfigurationPanel app={app} editing={editing} onEdit={() => setEditing(true)} onCancel={() => setEditing(false)} onSaved={(next) => { setApp(next); setEditing(false); }} onAppUpdated={setApp} />}
     {activeTab === "roles" && <RolesPermissionsManager appId={app.id} applicationName={app.name} mode="app" permissions={permissions} roles={roles} onPermissions={setPermissions} onRoles={setRoles} />}
-    {activeTab === "users" && <UsersPanel appId={app.id} users={users} />}
+    {activeTab === "users" && <UsersPanel appId={app.id} appName={app.name} />}
     {activeTab === "credentials" && <Card><div className="card-heading"><div><h2>Credentials</h2><p>Keys used by this application. Secrets are masked by default.</p></div><Button variant="danger" onClick={() => setRotateConfirm(true)}>Rotate secret</Button></div><div className="credential-grid"><div className="credential-row"><div><strong>Publishable key</strong><small>Safe to use in browser integrations.</small></div><CopyButton value={app.publishableKey} label="Copy key" /></div><div className="credential-row"><div><strong>Secret key</strong><small>Only shown after creation or rotation.</small></div><span className="credential-value">{app.secretKeyHint ?? "Stored securely"}</span></div></div></Card>}
     {activeTab === "activity" && <Card><div className="card-heading"><div><h2>Activity</h2><p>Application changes and credential events are recorded in the audit trail.</p></div></div><div className="inline-empty">Application activity will appear here as the activity API is connected.</div></Card>}
   </Stack>;
@@ -137,34 +130,12 @@ function ConfigurationPanel({ app, editing, onEdit, onCancel, onSaved, onAppUpda
   </>;
 }
 
-function UsersPanel({ appId, users }: { appId: string; users: AppUser[] }) {
-  const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [target, setTarget] = useState<AppUser | null>(null);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const filtered = users.filter((user) => `${user.name} ${user.email} ${user.status}`.toLowerCase().includes(query.toLowerCase()));
-
-  const revokeSessions = async () => {
-    if (!target) return;
-    setPending(true);
-    setError("");
-    setNotice("");
-    try {
-      await consoleApi.revokeAllAppUserSessions(appId, target.id);
-      setNotice(`Revoked active sessions for ${target.name}.`);
-      setTarget(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to revoke user sessions");
-    } finally {
-      setPending(false);
-    }
-  };
-
+function UsersPanel({ appId, appName }: { appId: string; appName: string }) {
+  const [inviting, setInviting] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   return <>
-    {target && <ConfirmModal busy={pending} title="Revoke this user's sessions?" description="This signs the user out on every device. They can sign in again unless their account is blocked." resourceName={target.email} confirmLabel="Revoke sessions" onCancel={() => setTarget(null)} onConfirm={revokeSessions} />}
-    <Card><div className="card-heading"><div><h2>End users ({filtered.length})</h2><p>Open a user to manage their details, roles, permissions, and history.</p></div></div>{error && <ErrorBanner message={error} />}{notice && <p className="session-success" role="status">{notice}</p>}<div className="users-toolbar"><label className="inline-search"><Icon name="search" size={16} /><input onChange={(event) => setQuery(event.target.value)} placeholder="Search users" value={query} /></label></div>{filtered.length ? <div className="app-user-table"><table><thead><tr><th>User</th><th>Email</th><th>Status</th><th>Action</th></tr></thead><tbody>{filtered.map((user) => <tr key={user.id}><td><button className="table-primary table-link-button" onClick={() => router.push(`/console/apps/${appId}/users/${user.id}`)} type="button">{user.name}</button></td><td>{user.email}</td><td><StatusBadge value={user.status} /></td><td><div className="table-actions"><button aria-label={`Revoke ${user.name}'s sessions`} className="table-icon-button" disabled={pending} onClick={() => setTarget(user)} title="Revoke active sessions" type="button"><Icon name="logout" size={16} /></button><Button variant="quiet" onClick={() => router.push(`/console/apps/${appId}/users/${user.id}`)}>View details</Button></div></td></tr>)}</tbody></table></div> : <div className="table-empty"><strong>No users found</strong><p>Registered application users will appear here.</p></div>}</Card>
+    {inviting && <InviteUsersModal appId={appId} appName={appName} onClose={() => setInviting(false)} onInvited={() => setReloadKey((key) => key + 1)} />}
+    <EndUsersTable mode="console" appId={appId} description="Open a user to manage their details, roles, permissions, and history." headerActions={<Button icon="plus" onClick={() => setInviting(true)}>Invite users</Button>} reloadKey={reloadKey} />
   </>;
 }
 

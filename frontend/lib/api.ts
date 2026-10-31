@@ -1,7 +1,18 @@
-import type { Account, AccountDetails, Analytics, App, AppUser, AppUserDetails, AuditLog, ConsoleAccount, ConsoleApp, PageResponse, RotatedSecret, MfaStatus, Role, Permission, LoginResponse, OtpChallenge } from "./types";
+import type { Account, AccountDetails, Analytics, App, AppUser, AppUserDetails, AuditLog, ConsoleAccount, ConsoleApp, InviteResponse, InviteeInput, PageResponse, RotatedSecret, MfaStatus, Role, Permission, LoginResponse, OtpChallenge, SearchResponse, UserListParams } from "./types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 type AuthScope = "sa" | "console";
+
+function listQuery(page: number, size: number, params: UserListParams = {}): string {
+  const query = new URLSearchParams({ page: String(page), size: String(params.size ?? size) });
+  if (params.q) query.set("q", params.q);
+  if (params.status) query.set("status", params.status);
+  if (params.sort) {
+    query.set("sort", params.sort);
+    query.set("direction", params.direction ?? "asc");
+  }
+  return query.toString();
+}
 
 export class ApiError extends Error {
   readonly status: number;
@@ -144,7 +155,7 @@ export async function apiFetch<T>(
 }
 
 export const api = {
-  health: () => apiFetch<{ status: string; components?: Record<string, { status: string }> }>("/actuator/health"),
+  health: () => apiFetch<{ status: string; components?: Record<string, { status: string }> }>("/api/sa/health"),
   login: (email: string, password: string) =>
     apiFetch<LoginResponse<Account>>("/api/sa/auth/login", {
       method: "POST",
@@ -190,7 +201,7 @@ export const api = {
     apiFetch<Account>("/api/sa/accounts", { method: "POST", body: JSON.stringify(payload) }),
   updateAccount: (id: string, payload: Record<string, unknown>) =>
     apiFetch<Account>(`/api/sa/accounts/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
-  apps: (page = 0) => apiFetch<PageResponse<App>>(`/api/sa/apps?page=${page}&size=20`),
+  apps: (page = 0, size = 20, params: UserListParams = {}) => apiFetch<PageResponse<App>>(`/api/sa/apps?${listQuery(page, size, params)}`),
   app: (id: string) => apiFetch<App>(`/api/sa/apps/${id}`),
   updateApp: (id: string, payload: Record<string, unknown>) =>
     apiFetch<App>(`/api/sa/apps/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
@@ -199,9 +210,12 @@ export const api = {
       `/api/sa/apps/${id}/credentials/rotate`,
       { method: "POST" },
     ),
-  users: (page = 0) => apiFetch<PageResponse<AppUser>>(`/api/sa/users?page=${page}&size=20`),
-  appUsers: (appId: string, page = 0) =>
-    apiFetch<PageResponse<AppUser>>(`/api/sa/apps/${appId}/users?page=${page}&size=20`),
+  users: (page = 0, params: UserListParams = {}) =>
+    apiFetch<PageResponse<AppUser>>(`/api/sa/users?${listQuery(page, 20, params)}`),
+  appUsers: (appId: string, page = 0, params: UserListParams = {}) =>
+    apiFetch<PageResponse<AppUser>>(`/api/sa/apps/${appId}/users?${listQuery(page, 20, params)}`),
+  search: (query: string, signal?: AbortSignal) =>
+    apiFetch<SearchResponse>(`/api/sa/search?q=${encodeURIComponent(query)}`, { signal }),
   updateUser: (appId: string, userId: string, payload: Record<string, unknown>) =>
     apiFetch<AppUser>(`/api/sa/apps/${appId}/users/${userId}`, {
       method: "PATCH",
@@ -215,8 +229,8 @@ export const api = {
     apiFetch<void>(`/api/sa/apps/${appId}/users/${userId}/sessions/${sessionId}`, { method: "DELETE" }),
   revokeAllAppUserSessions: (appId: string, userId: string) =>
     apiFetch<void>(`/api/sa/apps/${appId}/users/${userId}/sessions`, { method: "DELETE" }),
-  auditLogs: (page = 0) =>
-    apiFetch<PageResponse<AuditLog>>(`/api/sa/audit-logs?page=${page}&size=50`),
+  auditLogs: (page = 0, query = "") =>
+    apiFetch<PageResponse<AuditLog>>(`/api/sa/audit-logs?page=${page}&size=50${query ? `&q=${encodeURIComponent(query)}` : ""}`),
   mfaStatus: () => apiFetch<MfaStatus>("/api/sa/mfa/status"),
   roles: (appId: string) => apiFetch<Role[]>(`/api/sa/apps/${appId}/roles`),
   permissions: (appId: string) => apiFetch<Permission[]>(`/api/sa/apps/${appId}/permissions`),
@@ -275,6 +289,11 @@ export const consoleApi = {
       method: "POST",
       body: JSON.stringify({ email }),
     }, "console"),
+  verifyEmail: (token: string) =>
+    apiFetch<{ emailVerified: boolean }>("/api/console/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }, "console"),
   signup: (payload: { name: string; email: string; password: string }) =>
     apiFetch<{ id: string; email: string; emailVerified: boolean; message: string }>("/api/console/auth/signup", {
       method: "POST",
@@ -288,6 +307,7 @@ export const consoleApi = {
   revokeSession: (id: string) => apiFetch<void>(`/api/console/sessions/${id}`, { method: "DELETE" }, "console"),
   me: () => apiFetch<ConsoleAccount>("/api/console/me", {}, "console"),
   apps: () => apiFetch<ConsoleApp[]>("/api/console/apps", {}, "console"),
+  appsPage: (page = 0, params: UserListParams = {}) => apiFetch<PageResponse<ConsoleApp>>(`/api/console/apps/page?${listQuery(page, 20, params)}`, {}, "console"),
   app: (id: string) => apiFetch<ConsoleApp>(`/api/console/apps/${id}`, {}, "console"),
   createApp: (payload: { name: string; allowedOrigins: string[]; verifyEmailUrl?: string; resetPasswordUrl?: string; mfaRequired?: boolean; accessTokenTtlSeconds?: number; refreshTokenTtlSeconds?: number }) =>
     apiFetch<ConsoleApp & { secretKey: string }>("/api/console/apps", { method: "POST", body: JSON.stringify(payload) }, "console"),
@@ -296,7 +316,17 @@ export const consoleApi = {
   rotateSecret: (id: string) =>
     apiFetch<RotatedSecret>(`/api/console/apps/${id}/credentials/rotate`, { method: "POST" }, "console"),
   appUsers: (id: string) => apiFetch<import("./types").AppUser[]>(`/api/console/apps/${id}/users`, {}, "console"),
+  endUsers: (appId: string, page = 0, params: UserListParams = {}) =>
+    apiFetch<PageResponse<AppUser>>(`/api/console/apps/${appId}/end-users?${listQuery(page, 20, params)}`, {}, "console"),
+  inviteUsers: (appId: string, users: InviteeInput[]) =>
+    apiFetch<InviteResponse>(`/api/console/apps/${appId}/end-users/invitations`, { method: "POST", body: JSON.stringify({ users }) }, "console"),
+  resendInvitation: (appId: string, userId: string) =>
+    apiFetch<AppUser>(`/api/console/apps/${appId}/end-users/${userId}/invitation`, { method: "POST" }, "console"),
+  search: (query: string, signal?: AbortSignal) =>
+    apiFetch<SearchResponse>(`/api/console/search?q=${encodeURIComponent(query)}`, { signal }, "console"),
   appUserDetails: (appId: string, userId: string) => apiFetch<AppUserDetails>(`/api/console/apps/${appId}/users/${userId}/details`, {}, "console"),
+  appUserActivity: (appId: string, userId: string, page = 0, query = "") =>
+    apiFetch<PageResponse<AuditLog>>(`/api/console/apps/${appId}/users/${userId}/activity?page=${page}&size=50${query ? `&q=${encodeURIComponent(query)}` : ""}`, {}, "console"),
   updateUser: (appId: string, userId: string, payload: Record<string, unknown>) => apiFetch<import("./types").AppUser>(`/api/console/apps/${appId}/users/${userId}`, { method: "PATCH", body: JSON.stringify(payload) }, "console"),
   deleteUser: (appId: string, userId: string) => apiFetch<void>(`/api/console/apps/${appId}/users/${userId}`, { method: "DELETE" }, "console"),
   appUserSessions: (appId: string, userId: string) => apiFetch<import("./types").SessionInfo[]>(`/api/console/apps/${appId}/users/${userId}/sessions`, {}, "console"),

@@ -2,12 +2,15 @@ package com.authplatform.app.controller;
 
 import com.authplatform.app.dto.AppDtos;
 import com.authplatform.app.repository.AppRepository;
-import com.authplatform.audit.AuditLogRepository;
+import com.authplatform.audit.AuditLog;
+import com.authplatform.audit.AuditQueryService;
 import com.authplatform.auth.service.SessionService;
+import com.authplatform.common.dto.PageResult;
 import com.authplatform.common.exception.ApiException;
 import com.authplatform.common.exception.ErrorCode;
 import com.authplatform.common.security.AuthenticatedPrincipal;
 import com.authplatform.role.service.RoleService;
+import com.authplatform.sa.dto.SaDtos;
 import com.authplatform.user.entity.AppUser;
 import com.authplatform.user.repository.AppUserRepository;
 import java.util.List;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Detail view used by the console user-management workflow. */
@@ -27,19 +31,19 @@ public class AppUserDetailsController {
   private final AppRepository apps;
   private final AppUserRepository users;
   private final RoleService roles;
-  private final AuditLogRepository auditLogs;
+  private final AuditQueryService auditQueries;
   private final SessionService sessions;
 
   public AppUserDetailsController(
       AppRepository apps,
       AppUserRepository users,
       RoleService roles,
-      AuditLogRepository auditLogs,
+      AuditQueryService auditQueries,
       SessionService sessions) {
     this.apps = apps;
     this.users = users;
     this.roles = roles;
-    this.auditLogs = auditLogs;
+    this.auditQueries = auditQueries;
     this.sessions = sessions;
   }
 
@@ -60,20 +64,8 @@ public class AppUserDetailsController {
             user.isEmailVerified(),
             user.getStatus(),
             user.getLastLoginAt(),
-            user.getCreatedAt());
-    var history =
-        auditLogs.findAllByActorAppUserIdOrderByCreatedAtDesc(userId).stream()
-            .map(
-                log ->
-                    new AppDtos.UserActivityView(
-                        log.getId(),
-                        log.getAction(),
-                        log.getActorType(),
-                        log.getIpAddress(),
-                        log.getRequestId(),
-                        log.getCreatedAt(),
-                        log.getMetadata()))
-            .toList();
+            user.getCreatedAt(),
+            user.isInvited());
     var userRoles = roles.userRoles(appId, userId).roles();
     var userRolePermissions = roles.userRolePermissions(appId, userId);
     var effectivePermissions =
@@ -86,8 +78,35 @@ public class AppUserDetailsController {
         view,
         userRoles,
         userRolePermissions,
-        effectivePermissions,
-        history);
+        effectivePermissions);
+  }
+
+  /** The same searchable, paged history as the SA audit log, limited to this user's events. */
+  @GetMapping("/activity")
+  PageResult<SaDtos.AuditLogView> activity(
+      @PathVariable UUID appId,
+      @PathVariable UUID userId,
+      @RequestParam(defaultValue = "") String q,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "20") int size,
+      Authentication authentication) {
+    authorizeUser(appId, userId, authentication);
+    return PageResult.of(
+        auditQueries.search(q, userId, page, size).map(AppUserDetailsController::auditView));
+  }
+
+  private static SaDtos.AuditLogView auditView(AuditLog log) {
+    return new SaDtos.AuditLogView(
+        log.getId(),
+        log.getAppId(),
+        log.getActorAccountId(),
+        log.getActorAppUserId(),
+        log.getActorType(),
+        log.getAction(),
+        log.getIpAddress(),
+        log.getRequestId(),
+        log.getCreatedAt(),
+        log.getMetadata());
   }
 
   @GetMapping("/sessions")

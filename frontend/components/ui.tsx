@@ -22,7 +22,7 @@ export function Card({ children, className = "", ...props }: React.HTMLAttribute
 
 export function StatusBadge({ value }: { value: string }) {
   const normalized = value.toLowerCase();
-  const tone = normalized === "active" || normalized === "verified" || normalized === "operational" || normalized === "protected" ? "success" : normalized === "suspended" || normalized === "blocked" || normalized === "pending" ? "warning" : "neutral";
+  const tone = normalized === "active" || normalized === "verified" || normalized === "operational" || normalized === "protected" ? "success" : normalized === "suspended" || normalized === "blocked" || normalized === "pending" ? "warning" : normalized === "invited" ? "info" : "neutral";
   const label = value.toLowerCase().replace(/(^|[_\s-])\S/g, (letter) => letter.toUpperCase());
   return <span className={`status status-${tone}`}><span className="status-dot" />{label}</span>;
 }
@@ -139,7 +139,7 @@ export function TablePreferences({ tableId = "table", columns = [] }: { tableId?
     } catch { /* localStorage may be unavailable in private browsing. */ }
   }, [storageKey]);
   const close = () => { setDraft(saved); setOpen(false); };
-  const confirm = () => { try { window.localStorage.setItem(storageKey, JSON.stringify(draft)); } catch { /* best effort */ } setSaved(draft); setOpen(false); };
+  const confirm = () => { try { window.localStorage.setItem(storageKey, JSON.stringify(draft)); window.dispatchEvent(new Event("authplatform:table-preferences")); } catch { /* best effort */ } setSaved(draft); setOpen(false); };
   return <><button aria-label="Preferences" className="table-icon-button" onClick={() => setOpen(true)} type="button" title="Preferences"><Icon name="settings" size={20} /></button>{open && <div className="modal-backdrop"><div className="modal preferences-modal" role="dialog" aria-modal="true" aria-labelledby="preferences-title"><div className="modal-header"><div><h2 id="preferences-title">Preferences</h2><p>Choose how this table is displayed.</p></div><button aria-label="Close preferences" className="icon-button" onClick={close} type="button"><Icon name="close" /></button></div><div className="preference-list"><fieldset><legend>Page size</legend>{[10, 20, 50].map((size) => <label className="preference-option" key={size}><input checked={draft.pageSize === size} name={`${tableId}-page-size`} onChange={() => setDraft({ ...draft, pageSize: size })} type="radio" />{size} rows</label>)}</fieldset><label className="preference-option"><input checked={draft.wrapLines} onChange={(event) => setDraft({ ...draft, wrapLines: event.target.checked })} type="checkbox" /> Wrap lines</label><fieldset><legend>Visible columns</legend>{columnOptions.map((column) => <label className="preference-option" key={column}><input checked={draft.visibleColumns.includes(column)} onChange={(event) => setDraft({ ...draft, visibleColumns: event.target.checked ? [...draft.visibleColumns, column] : draft.visibleColumns.filter((item) => item !== column) })} type="checkbox" />{column}</label>)}</fieldset></div><div className="modal-actions"><Button onClick={close} type="button" variant="quiet">Cancel</Button><Button onClick={confirm} type="button">Confirm</Button></div></div></div>}</>;
 }
 

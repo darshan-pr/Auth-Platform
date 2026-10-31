@@ -9,6 +9,9 @@ import com.authplatform.common.exception.ApiException;
 import com.authplatform.common.exception.ErrorCode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -45,6 +48,21 @@ public class OneTimeTokenService {
   public Issued issueAppUser(UUID id, EmailTokenType type) {
     repository.deleteAllByAppUserIdAndType(id, type);
     return issue(EmailToken.forAppUser(id, type, "", expiry(type)));
+  }
+
+  /** Issues one verification token per freshly created user (who cannot have older tokens). */
+  @Transactional
+  public Map<UUID, String> issueVerificationForNewAppUsers(Collection<UUID> appUserIds) {
+    Map<UUID, String> raw = new LinkedHashMap<>();
+    java.util.List<EmailToken> tokens = new java.util.ArrayList<>(appUserIds.size());
+    Instant expires = expiry(EmailTokenType.VERIFY_EMAIL);
+    for (UUID id : appUserIds) {
+      String value = generator.generate();
+      raw.put(id, value);
+      tokens.add(EmailToken.forAppUser(id, EmailTokenType.VERIFY_EMAIL, hasher.hash(value), expires));
+    }
+    repository.saveAll(tokens);
+    return raw;
   }
 
   private Issued issue(EmailToken token) {

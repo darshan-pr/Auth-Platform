@@ -101,6 +101,8 @@ public class AccountAuthServiceImpl implements AccountAuthService {
   @Transactional
   public AuthDtos.VerifyResponse verify(String raw) {
     EmailToken token = tokens.consume(raw, EmailTokenType.VERIFY_EMAIL);
+    // An end user's token (issued for an application) must not be accepted, or crash, here.
+    if (token.getAccountId() == null) throw new ApiException(ErrorCode.TOKEN_INVALID);
     Account account =
         accounts
             .findById(token.getAccountId())

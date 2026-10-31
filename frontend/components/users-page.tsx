@@ -1,41 +1,26 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { App, AppUser } from "../lib/types";
+import type { App } from "../lib/types";
 import { api } from "../lib/api";
-import { Button, Card, ConfirmModal, ErrorBanner, Field, InfoLink, Loading, PageHeader, Pagination, SortHeader, StatusBadge, TableControls } from "./ui";
-import { Icon } from "./icon";
+import { Button, ErrorBanner, PageHeader } from "./ui";
+import { EndUsersTable } from "./end-users-table";
 
 export function UsersPage() {
-  const [users, setUsers] = useState<AppUser[]>([]); const [apps, setApps] = useState<App[]>([]); const [appId, setAppId] = useState("all"); const [page, setPage] = useState(0); const [totalPages, setTotalPages] = useState(1); const [filter, setFilter] = useState(""); const [sortKey, setSortKey] = useState<"name" | "appId" | "status" | "emailVerified" | "lastLoginAt">("name"); const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc"); const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [loading, setLoading] = useState(true); const [editing, setEditing] = useState<AppUser | null>(null); const [revokeTarget, setRevokeTarget] = useState<AppUser | null>(null); const [revoking, setRevoking] = useState(false);
-  useEffect(() => { api.apps(0).then((result) => setApps(result.items)).catch((err) => setError(err.message)); }, []);
-  const load = (next = page, selected = appId) => { setLoading(true); setError(""); const request = selected === "all" ? api.users(next) : api.appUsers(selected, next); request.then((result) => { setUsers(result.items); setPage(result.page); setTotalPages(result.totalPages); }).catch((err) => setError(err.message)).finally(() => setLoading(false)); }; useEffect(() => { load(0, appId); }, [appId]);
-  const visible = users.filter((user) => `${user.name} ${user.email} ${user.status}`.toLowerCase().includes(filter.toLowerCase())).sort((a, b) => compare(a[sortKey], b[sortKey], sortDirection));
-  const toggleSort = (key: typeof sortKey) => { if (sortKey === key) setSortDirection(sortDirection === "asc" ? "desc" : "asc"); else { setSortKey(key); setSortDirection("asc"); } };
-  const revokeUserSessions = async () => {
-    if (!revokeTarget) return;
-    setRevoking(true);
-    setError("");
-    setNotice("");
-    try {
-      await api.revokeAllAppUserSessions(revokeTarget.appId, revokeTarget.id);
-      setNotice(`Revoked active sessions for ${revokeTarget.name}.`);
-      setRevokeTarget(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to revoke user sessions");
-      setNotice("");
-      setRevokeTarget(null);
-    } finally {
-      setRevoking(false);
-    }
-  };
-  return <><PageHeader title="End users" description="Inspect and update users across every application." actions={<Button variant="secondary" icon="refresh" onClick={() => load()}>Refresh</Button>} />{error && <ErrorBanner message={error} />}{notice && <p className="session-success" role="status">{notice}</p>}{revokeTarget && <ConfirmModal busy={revoking} title="Revoke this user's sessions?" description="This signs the user out on every device. They can sign in again unless their account is blocked." resourceName={revokeTarget.email} confirmLabel="Revoke sessions" onCancel={() => setRevokeTarget(null)} onConfirm={revokeUserSessions} />}{editing && <UserEditor user={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} /> }<Card><div className="table-heading"><div><div className="table-title"><h2>End users ({filter ? visible.length : users.length})</h2><InfoLink /></div><p>Inspect and update users across every application.</p></div></div><div className="toolbar"><div className="filter-group"><label className="select-filter"><span>Application</span><select onChange={(e) => { setAppId(e.target.value); setPage(0); }} value={appId}><option value="all">All applications</option>{apps.map((app) => <option key={app.id} value={app.id}>{app.name}</option>)}</select></label></div><div className="table-toolbar-actions"><label className="inline-search"><Icon name="search" size={16} /><input onChange={(e) => { setFilter(e.target.value); setPage(0); }} placeholder="Filter users" value={filter} /></label><Pagination page={page} totalPages={totalPages} pageSize={20} onChange={load} /><TableControls /></div></div>{loading ? <Loading label="Loading end users" /> : <div className="table-wrap"><table><thead><tr><th><SortHeader label="User" active={sortKey === "name"} direction={sortDirection} onClick={() => toggleSort("name")} /></th><th><SortHeader label="Application" active={sortKey === "appId"} direction={sortDirection} onClick={() => toggleSort("appId")} /></th><th><SortHeader label="Status" active={sortKey === "status"} direction={sortDirection} onClick={() => toggleSort("status")} /></th><th><SortHeader label="Verification" active={sortKey === "emailVerified"} direction={sortDirection} onClick={() => toggleSort("emailVerified")} /></th><th><SortHeader label="Last login" active={sortKey === "lastLoginAt"} direction={sortDirection} onClick={() => toggleSort("lastLoginAt")} /></th><th>Actions</th></tr></thead><tbody>{visible.map((user) => <tr key={user.id}><td><span className="table-primary">{user.name}</span><span className="table-secondary">{user.email}</span></td><td><span className="mono">{user.appId.slice(0, 12)}…</span></td><td><StatusBadge value={user.status} /></td><td>{user.emailVerified ? <span className="verified-mark">Verified</span> : <span className="muted">Pending</span>}</td><td className="muted">{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : "Never"}</td><td><button aria-label={`Revoke ${user.name}'s sessions`} className="table-icon-button" disabled={revoking} onClick={() => setRevokeTarget(user)} title="Revoke active sessions" type="button"><Icon name="logout" size={16} /></button></td></tr>)}{visible.length === 0 && <tr><td colSpan={6}><div className="table-empty">No users match this filter.</div></td></tr>}</tbody></table></div>}</Card></>;
-}
+  const params = useSearchParams();
+  const [apps, setApps] = useState<App[]>([]);
+  const [appId, setAppId] = useState(params.get("appId") ?? "all");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [error, setError] = useState("");
+  const initialQuery = params.get("q") ?? "";
 
-function compare(left: unknown, right: unknown, direction: "asc" | "desc") { const a = String(left ?? "").toLowerCase(); const b = String(right ?? "").toLowerCase(); const result = a.localeCompare(b, undefined, { numeric: true }); return direction === "asc" ? result : -result; }
+  useEffect(() => { setAppId(params.get("appId") ?? "all"); }, [params]);
+  useEffect(() => { api.apps(0, 100).then((result) => setApps(result.items)).catch((err) => setError(err.message)); }, []);
 
-function UserEditor({ user, onClose, onSaved }: { user: AppUser; onClose: () => void; onSaved: () => void }) {
-  const [name, setName] = useState(user.name); const [status, setStatus] = useState(user.status); const [verified, setVerified] = useState(user.emailVerified); const [password, setPassword] = useState(""); const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
-  const submit = async (event: React.FormEvent) => { event.preventDefault(); setSaving(true); setError(""); const payload: Record<string, unknown> = { name, status, emailVerified: verified }; if (password) payload.password = password; try { await api.updateUser(user.appId, user.id, payload); onSaved(); } catch (err) { setError(err instanceof Error ? err.message : "Unable to update user"); } finally { setSaving(false); } };
-  return <div className="modal-backdrop"><div className="modal"><div className="modal-header"><div><div className="eyebrow">USER ACCESS</div><h2>Edit {user.name}</h2><p>{user.email}</p></div><button className="icon-button" onClick={onClose}><Icon name="close" /></button></div>{error && <ErrorBanner message={error} />}<form onSubmit={submit}><div className="form-grid"><Field label="Full name" onChange={(e) => setName(e.target.value)} value={name} /><label className="field"><span className="field-label">Status</span><select onChange={(e) => setStatus(e.target.value)} value={status}><option>ACTIVE</option><option>SUSPENDED</option><option>BLOCKED</option></select></label><label className="field checkbox-field span-2"><input checked={verified} onChange={(e) => setVerified(e.target.checked)} type="checkbox" /><span><strong>Email verified</strong><small>Allow this user to pass email verification checks.</small></span></label><Field className="span-2" hint="Leave blank to keep the current password" label="New password" onChange={(e) => setPassword(e.target.value)} type="password" value={password} /></div><div className="modal-actions"><Button onClick={onClose} type="button" variant="quiet">Cancel</Button><Button disabled={saving} type="submit">{saving ? "Saving…" : "Save changes"}</Button></div></form></div></div>;
+  return <>
+    <PageHeader title="End users" description="Inspect and update users across every application." actions={<Button variant="secondary" icon="refresh" onClick={() => setReloadKey((key) => key + 1)}>Refresh</Button>} />
+    {error && <ErrorBanner message={error} />}
+    <EndUsersTable mode="sa" appId={appId} apps={apps} onAppChange={setAppId} initialQuery={initialQuery} description="Inspect and update users across every application." reloadKey={reloadKey} />
+  </>;
 }

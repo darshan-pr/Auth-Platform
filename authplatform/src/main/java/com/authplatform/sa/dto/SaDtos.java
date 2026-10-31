@@ -195,7 +195,8 @@ public final class SaDtos {
       boolean emailVerified,
       String status,
       Instant lastLoginAt,
-      Instant createdAt) {}
+      Instant createdAt,
+      boolean invited) {}
 
   public record UpdateAppUserRequest(
       @Size(max = 120) String name,

@@ -23,6 +23,9 @@ spring:
       mail.smtp.auth: ${SMTP_AUTH}
       mail.smtp.starttls.enable: ${SMTP_STARTTLS_ENABLE}
       mail.smtp.starttls.required: ${SMTP_STARTTLS_REQUIRED}
+      mail.smtp.connectiontimeout: ${SMTP_CONNECTION_TIMEOUT_MS:5000}
+      mail.smtp.timeout: ${SMTP_READ_TIMEOUT_MS:15000}
+      mail.smtp.writetimeout: ${SMTP_WRITE_TIMEOUT_MS:15000}
   threads.virtual.enabled: true
 server:
   port: ${PORT:8080}
@@ -64,6 +67,7 @@ authplatform:
     console-allowed-origins: ${CONSOLE_ALLOWED_ORIGINS}
   limits.max-apps-per-account: ${MAX_APPS_PER_ACCOUNT}
   limits.max-origins-per-app: ${MAX_ORIGINS_PER_APP}
+  limits.invites-per-hour: ${INVITES_PER_HOUR:200}
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED}
     login-capacity: ${RATE_LIMIT_LOGIN_CAPACITY}

@@ -44,6 +44,17 @@ public class AppController {
     return service.list(principal.subjectId(), page, size);
   }
 
+  @GetMapping("/page")
+  com.authplatform.common.dto.PageResult<AppDtos.AppResponse> search(
+      @AuthenticationPrincipal AuthenticatedPrincipal principal,
+      @RequestParam(defaultValue = "") String q,
+      @RequestParam(defaultValue = "") String sort,
+      @RequestParam(defaultValue = "asc") String direction,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "20") int size) {
+    return service.search(principal.subjectId(), q, sort, direction, page, size);
+  }
+
   @GetMapping("/{id}")
   AppDtos.AppResponse get(
       @AuthenticationPrincipal AuthenticatedPrincipal principal, @PathVariable UUID id) {

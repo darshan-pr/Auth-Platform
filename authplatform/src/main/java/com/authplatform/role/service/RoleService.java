@@ -10,6 +10,8 @@ public interface RoleService {
 
   void assignDefaultRole(UUID appId, UUID userId);
 
+  void assignDefaultRole(UUID appId, java.util.Collection<UUID> userIds);
+
   List<String> roleNames(UUID appId, UUID userId);
 
   List<String> permissionKeys(UUID appId, UUID userId);

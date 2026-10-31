@@ -1,5 +1,7 @@
 package com.authplatform.audit;
 
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -9,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Service
 public class AuditService {
@@ -39,6 +43,12 @@ public class AuditService {
   }
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void recordAppChange(
+      String action, UUID accountId, UUID appId, Map<String, Object> metadata) {
+    save(action, "ACCOUNT", accountId, null, appId, null, metadata);
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void recordSa(
       String action, UUID saAccountId, UUID appId, String ipAddress, Map<String, Object> metadata) {
     if (!readAuditingEnabled && action.startsWith("SA_VIEW_")) return;
@@ -54,9 +64,21 @@ public class AuditService {
       String ipAddress,
       Map<String, Object> metadata) {
     String requestId = MDC.get("requestId");
+    HttpServletRequest request =
+        RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes
+            ? attributes.getRequest()
+            : null;
+    String source = ipAddress != null || request == null ? ipAddress : request.getRemoteAddr();
     repository.save(
         AuditLog.create(
-            action, actorType, accountId, appUserId, appId, ipAddress, requestId, metadata));
+            action,
+            actorType,
+            accountId,
+            appUserId,
+            appId,
+            source,
+            requestId,
+            details(request, metadata)));
     log.info(
         "audit action={} actorType={} subject={} appId={} ip={}",
         action,
@@ -64,5 +86,21 @@ public class AuditService {
         accountId == null ? appUserId : accountId,
         appId,
         ipAddress);
+  }
+
+  // Without this, most events (logins, refreshes, verifications) were stored with empty details.
+  private static Map<String, Object> details(
+      HttpServletRequest request, Map<String, Object> metadata) {
+    Map<String, Object> details = new LinkedHashMap<>();
+    if (request != null) {
+      details.put("method", request.getMethod());
+      details.put("path", request.getRequestURI());
+      String userAgent = request.getHeader("User-Agent");
+      if (userAgent != null && !userAgent.isBlank()) {
+        details.put("userAgent", userAgent.length() > 255 ? userAgent.substring(0, 255) : userAgent);
+      }
+    }
+    if (metadata != null) details.putAll(metadata);
+    return details.isEmpty() ? null : details;
   }
 }

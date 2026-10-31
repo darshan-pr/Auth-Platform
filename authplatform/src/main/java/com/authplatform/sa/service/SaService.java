@@ -4,6 +4,7 @@ import com.authplatform.app.entity.App;
 import com.authplatform.app.repository.AppRepository;
 import com.authplatform.audit.AuditLog;
 import com.authplatform.audit.AuditLogRepository;
+import com.authplatform.audit.AuditQueryService;
 import com.authplatform.audit.AuditService;
 import com.authplatform.auth.service.SessionService;
 import com.authplatform.app.service.TokenLifetimePolicy;
@@ -21,6 +22,9 @@ import com.authplatform.user.entity.AppUser;
 import com.authplatform.user.entity.PlatformRole;
 import com.authplatform.user.repository.AccountRepository;
 import com.authplatform.user.repository.AppUserRepository;
+import com.authplatform.app.service.AppDirectory;
+import com.authplatform.user.service.AppUserDirectory;
+import com.authplatform.user.service.Like;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -43,6 +47,9 @@ public class SaService {
   private final AuditService audit;
   private final EmailSender email;
   private final EmailTemplateService templates;
+  private final AppDirectory appDirectory;
+  private final AppUserDirectory directory;
+  private final AuditQueryService auditQueries;
 
   public SaService(
       AccountRepository accounts,
@@ -55,7 +62,9 @@ public class SaService {
       SessionService sessions,
       AuditService audit,
       EmailSender email,
-      EmailTemplateService templates) {
+      EmailTemplateService templates,
+      AppDirectory appDirectory) {
+    this.appDirectory = appDirectory;
     this.accounts = accounts;
     this.apps = apps;
     this.users = users;
@@ -67,6 +76,8 @@ public class SaService {
     this.audit = audit;
     this.email = email;
     this.templates = templates;
+    this.directory = new AppUserDirectory(users);
+    this.auditQueries = new AuditQueryService(auditLogs);
   }
 
   @Transactional(readOnly = true)
@@ -178,10 +189,11 @@ public class SaService {
   }
 
   @Transactional(readOnly = true)
-  public SaDtos.PageResponse<SaDtos.AppView> apps(int page, int size, UUID actorId, String ip) {
-    Page<App> result = apps.findAll(pageRequest(page, size));
+  public SaDtos.PageResponse<SaDtos.AppView> apps(
+      int page, int size, String query, String sort, String direction, UUID actorId, String ip) {
+    Page<SaDtos.AppView> result = appDirectory.search(query, sort, direction, page, size);
     audit.recordSa("SA_VIEW_APPS", actorId, null, ip, Map.of("page", page, "size", size));
-    return pageResponse(result.map(this::appView));
+    return pageResponse(result);
   }
 
   @Transactional(readOnly = true)
@@ -231,28 +243,34 @@ public class SaService {
 
   @Transactional(readOnly = true)
   public SaDtos.PageResponse<SaDtos.AppUserView> users(
-      int page, int size, UUID actorId, String ip) {
-    Page<AppUser> result = users.findAll(pageRequest(page, size));
+      int page,
+      int size,
+      String query,
+      String status,
+      String sort,
+      String direction,
+      UUID actorId,
+      String ip) {
+    Page<AppUser> result = directory.search(null, query, status, sort, direction, page, size);
     audit.recordSa("SA_VIEW_USERS", actorId, null, ip, Map.of("page", page, "size", size));
     return pageResponse(result.map(this::userView));
   }
 
   @Transactional(readOnly = true)
   public SaDtos.PageResponse<SaDtos.AppUserView> appUsers(
-      UUID appId, int page, int size, UUID actorId, String ip) {
+      UUID appId,
+      int page,
+      int size,
+      String query,
+      String status,
+      String sort,
+      String direction,
+      UUID actorId,
+      String ip) {
     findApp(appId);
-    List<AppUser> all = users.findAllByAppIdOrderByCreatedAtDesc(appId);
-    int safePage = Math.max(page, 0);
-    int safeSize = Math.min(Math.max(size, 1), 100);
-    int from = Math.min(safePage * safeSize, all.size());
-    int to = Math.min(from + safeSize, all.size());
+    Page<AppUser> result = directory.search(appId, query, status, sort, direction, page, size);
     audit.recordSa("SA_VIEW_APP_USERS", actorId, appId, ip, Map.of("appId", appId.toString()));
-    return new SaDtos.PageResponse<>(
-        all.subList(from, to).stream().map(this::userView).toList(),
-        safePage,
-        safeSize,
-        all.size(),
-        (int) Math.ceil(all.size() / (double) safeSize));
+    return pageResponse(result.map(this::userView));
   }
 
   @Transactional
@@ -312,8 +330,8 @@ public class SaService {
 
   @Transactional(readOnly = true)
   public SaDtos.PageResponse<SaDtos.AuditLogView> auditLogs(
-      int page, int size, UUID actorId, String ip) {
-    Page<AuditLog> result = auditLogs.findAllByOrderByCreatedAtDesc(pageRequest(page, size));
+      int page, int size, String query, UUID actorId, String ip) {
+    Page<AuditLog> result = auditQueries.search(query, null, page, size);
     audit.recordSa("SA_VIEW_AUDIT_LOGS", actorId, null, ip, Map.of("page", page, "size", size));
     return pageResponse(result.map(this::auditView));
   }
@@ -367,7 +385,8 @@ public class SaService {
         user.isEmailVerified(),
         user.getStatus(),
         user.getLastLoginAt(),
-        user.getCreatedAt());
+        user.getCreatedAt(),
+        user.isInvited());
   }
 
   private SaDtos.AuditLogView auditView(AuditLog log) {

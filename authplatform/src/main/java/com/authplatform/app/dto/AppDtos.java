@@ -144,23 +144,30 @@ public final class AppDtos {
       boolean emailVerified,
       String status,
       Instant lastLoginAt,
-      Instant createdAt) {}
-
-  public record UserActivityView(
-      Long id,
-      String action,
-      String actorType,
-      String ipAddress,
-      String requestId,
       Instant createdAt,
-      Map<String, Object> metadata) {}
+      boolean invited) {}
+
+  public record InviteeRequest(
+      @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 320)
+          String email,
+      @jakarta.validation.constraints.Size(max = 120) String name) {}
+
+  public record InviteUsersRequest(
+      @jakarta.validation.constraints.NotEmpty
+          @jakarta.validation.constraints.Size(max = 50)
+          List<@jakarta.validation.Valid InviteeRequest> users) {}
+
+  /** outcome is one of INVITED, ALREADY_EXISTS, DUPLICATE or INVALID. */
+  public record InviteResult(String email, String outcome, String message) {}
+
+  public record InviteUsersResponse(
+      int requested, int invited, int skipped, List<InviteResult> results) {}
 
   public record AppUserDetailsView(
       AppUserView user,
       List<RoleDtos.RoleView> roles,
       List<RoleDtos.UserRolePermissionsView> userRolePermissions,
-      List<String> permissions,
-      List<UserActivityView> history) {}
+      List<String> permissions) {}
 
   public record UpdateAppUserRequest(
       @Size(max = 120) String name,

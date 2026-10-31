@@ -75,9 +75,13 @@ public class SaController {
   SaDtos.PageResponse<SaDtos.AppView> apps(
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size,
+      @RequestParam(defaultValue = "") String q,
+      @RequestParam(defaultValue = "") String sort,
+      @RequestParam(defaultValue = "asc") String direction,
       @AuthenticationPrincipal AuthenticatedPrincipal principal,
       HttpServletRequest request) {
-    return service.apps(page, size, principal.subjectId(), request.getRemoteAddr());
+    return service.apps(
+        page, size, q, sort, direction, principal.subjectId(), request.getRemoteAddr());
   }
 
   @GetMapping("/apps/{id}")
@@ -109,9 +113,14 @@ public class SaController {
   SaDtos.PageResponse<SaDtos.AppUserView> users(
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size,
+      @RequestParam(defaultValue = "") String q,
+      @RequestParam(defaultValue = "") String status,
+      @RequestParam(defaultValue = "") String sort,
+      @RequestParam(defaultValue = "asc") String direction,
       @AuthenticationPrincipal AuthenticatedPrincipal principal,
       HttpServletRequest request) {
-    return service.users(page, size, principal.subjectId(), request.getRemoteAddr());
+    return service.users(
+        page, size, q, status, sort, direction, principal.subjectId(), request.getRemoteAddr());
   }
 
   @GetMapping("/apps/{appId}/users")
@@ -119,9 +128,22 @@ public class SaController {
       @PathVariable UUID appId,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size,
+      @RequestParam(defaultValue = "") String q,
+      @RequestParam(defaultValue = "") String status,
+      @RequestParam(defaultValue = "") String sort,
+      @RequestParam(defaultValue = "asc") String direction,
       @AuthenticationPrincipal AuthenticatedPrincipal principal,
       HttpServletRequest request) {
-    return service.appUsers(appId, page, size, principal.subjectId(), request.getRemoteAddr());
+    return service.appUsers(
+        appId,
+        page,
+        size,
+        q,
+        status,
+        sort,
+        direction,
+        principal.subjectId(),
+        request.getRemoteAddr());
   }
 
   @PatchMapping("/apps/{appId}/users/{userId}")
@@ -148,8 +170,9 @@ public class SaController {
   SaDtos.PageResponse<SaDtos.AuditLogView> auditLogs(
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "50") int size,
+      @RequestParam(defaultValue = "") String q,
       @AuthenticationPrincipal AuthenticatedPrincipal principal,
       HttpServletRequest request) {
-    return service.auditLogs(page, size, principal.subjectId(), request.getRemoteAddr());
+    return service.auditLogs(page, size, q, principal.subjectId(), request.getRemoteAddr());
   }
 }

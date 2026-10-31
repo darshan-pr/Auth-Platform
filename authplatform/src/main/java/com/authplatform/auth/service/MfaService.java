@@ -13,12 +13,15 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 /** Email one-time passwords used as the first MFA method. */
 @Service
 public class MfaService {
+  private static final Logger log = LoggerFactory.getLogger(MfaService.class);
   private static final Duration OTP_TTL = Duration.ofMinutes(5);
   private static final Duration ATTEMPT_TTL = Duration.ofMinutes(5);
   private static final int MAX_RESENDS = 3;
@@ -158,6 +161,7 @@ public class MfaService {
             code);
     put(otpKey(challengeId), serialize(challenge));
     if (deliver) sendCode(address, type, code, app, name);
+    log.info("One-time code issued type={} delivered={}", type.split(":")[0], deliver);
     return new MfaDtos.OtpChallenge(
         challengeId,
         OTP_TTL.toSeconds(),

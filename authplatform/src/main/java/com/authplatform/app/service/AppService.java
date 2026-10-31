@@ -9,6 +9,9 @@ public interface AppService {
 
   List<AppDtos.AppResponse> list(UUID owner, int page, int size);
 
+  com.authplatform.common.dto.PageResult<AppDtos.AppResponse> search(
+      UUID owner, String query, String sort, String direction, int page, int size);
+
   List<AppDtos.AppUserView> listUsers(UUID owner, UUID appId, int page, int size);
 
   AppDtos.AppResponse get(UUID owner, UUID id);

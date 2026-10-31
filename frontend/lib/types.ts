@@ -45,7 +45,34 @@ export type AppUser = {
   status: string;
   lastLoginAt: string | null;
   createdAt: string;
+  invited: boolean;
 };
+
+export type UserListParams = {
+  q?: string;
+  status?: string;
+  sort?: string;
+  direction?: "asc" | "desc";
+  size?: number;
+};
+
+export type InviteeInput = { email: string; name?: string };
+export type InviteOutcome = "INVITED" | "ALREADY_EXISTS" | "DUPLICATE" | "INVALID";
+export type InviteResult = { email: string; outcome: InviteOutcome; message: string };
+export type InviteResponse = { requested: number; invited: number; skipped: number; results: InviteResult[] };
+
+export type SearchType = "ACCOUNT" | "APPLICATION" | "END_USER" | "AUDIT_EVENT";
+export type SearchHit = {
+  type: SearchType;
+  id: string;
+  title: string;
+  subtitle: string | null;
+  status: string | null;
+  appId: string | null;
+  appName: string | null;
+};
+export type SearchGroup = { type: SearchType; items: SearchHit[]; hasMore: boolean };
+export type SearchResponse = { query: string; groups: SearchGroup[] };
 
 export type SessionInfo = {
   id: string;
@@ -57,22 +84,11 @@ export type SessionInfo = {
   current: boolean;
 };
 
-export type AppUserActivity = {
-  id: number;
-  action: string;
-  actorType: string;
-  ipAddress: string | null;
-  requestId: string | null;
-  createdAt: string;
-  metadata: Record<string, unknown> | null;
-};
-
 export type AppUserDetails = {
   user: AppUser;
   roles: Role[];
   userRolePermissions?: UserRolePermissions[];
   permissions: string[];
-  history: AppUserActivity[];
 };
 
 export type Analytics = {

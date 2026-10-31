@@ -63,6 +63,24 @@ public class RoleServiceImpl implements RoleService {
                     appId));
   }
 
+  @Transactional
+  public void assignDefaultRole(UUID appId, java.util.Collection<UUID> userIds) {
+    if (userIds.isEmpty()) return;
+    roles
+        .findByAppIdAndDefaultRoleTrue(appId)
+        .ifPresent(
+            role ->
+                jdbc.batchUpdate(
+                    "insert into app_user_roles(app_user_id,role_id,app_id) values (?,?,?) on conflict do nothing",
+                    userIds,
+                    100,
+                    (statement, userId) -> {
+                      statement.setObject(1, userId);
+                      statement.setObject(2, role.getId());
+                      statement.setObject(3, appId);
+                    }));
+  }
+
   @Transactional(readOnly = true)
   public List<String> roleNames(UUID appId, UUID userId) {
     return jdbc.query(

@@ -393,7 +393,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
               ["Applications", "List and create applications."],
               ["Application: Configuration", "Name, allowed origins, verify and reset URLs, MFA, token lifetimes and icon."],
               ["Application: Roles & permissions", "Create roles and permissions and set which permissions each role has."],
-              ["Application: End users", "Search users and open a user. You can revoke a user's sessions from the list."],
+              ["Application: End users", "Search, filter by status, sort and page through every user, and open a user. Revoke a user's sessions from the list. Use Invite users to add many people at once: paste emails, upload a CSV (email, optional name) or add them one by one. Each person gets one email with a temporary password and a verification link, and shows as Invited until their first sign-in. You can resend an invitation to anyone who has not signed in yet."],
+              ["Search", "Press Ctrl+K (⌘K on Mac) or / anywhere in the console to find your applications and end users, or jump to a page."],
               ["User page", "See a user's details and active sessions, revoke sessions, manage the user's roles and permission overrides, or delete the user permanently."],
               ["Application: Credentials", "See the publishable key and rotate the secret key."],
               ["Application: Activity", "A placeholder for per-application activity. Changes and credential events are already recorded in the audit log."],
@@ -407,8 +408,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
               ["Overview", "Platform analytics: accounts, applications, end users and operational health."],
               ["Accounts", "All developer accounts. Open one to view its details and set it Active or Suspended."],
               ["Applications", "Every application across the platform, including suspension and secret rotation."],
-              ["End users", "End users across all applications."],
-              ["Audit logs", "An append-only record of sign-ins, failures, password resets, key rotations and administrator reads."],
+              ["End users", "End users across all applications, with server-side search, status filter, sorting and paging."],
+              ["Audit logs", "An append-only record of sign-ins, failures, password resets, key rotations and administrator reads. The filter searches the whole history by action, actor, IP address or request ID."],
+              ["Search", "Press Ctrl+K (⌘K on Mac) or / to find accounts, applications, end users and recent audit events from anywhere."],
               ["Account", "Your administrator profile and sessions. Additional administrators are created by an existing one."],
             ]}
           />
@@ -469,6 +471,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
               [<code key="2">GET /api/console/me</code>, "Your account."],
               [<code key="3">/api/console/apps</code>, "Create, list, read and update applications, and rotate secrets."],
               [<code key="4">/api/console/apps/{"{id}"}/users</code>, "End users of an application."],
+              [<code key="7">GET /api/console/apps/{"{id}"}/end-users</code>, "Paged end users with q, status, sort and direction."],
+              [<code key="8">POST /api/console/apps/{"{id}"}/end-users/invitations</code>, "Invite up to 50 users per request. Each gets a temporary password and a verification link."],
+              [<code key="9">GET /api/console/search?q=</code>, "Search your applications and their end users."],
               [<code key="5">/api/console/apps/{"{id}"}/roles, /permissions</code>, "Roles, permissions and user assignments."],
               [<code key="6">/api/console/sessions</code>, "Your active sessions."],
             ]}
@@ -481,7 +486,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
               [<code key="2">GET /api/sa/analytics/overview</code>, "Platform analytics."],
               [<code key="3">/api/sa/accounts</code>, "List, create administrators, view and update accounts."],
               [<code key="4">/api/sa/apps</code>, "View and update any application, rotate secrets, manage its users."],
-              [<code key="5">GET /api/sa/users, /api/sa/audit-logs</code>, "End users and the audit log."],
+              [<code key="5">GET /api/sa/users, /api/sa/audit-logs</code>, "End users and the audit log. Both accept q and paging; users also accept status, sort and direction."],
+              [<code key="6">GET /api/sa/search?q=</code>, "Search accounts, applications, end users and recent audit events."],
             ]}
           />
         </Section>

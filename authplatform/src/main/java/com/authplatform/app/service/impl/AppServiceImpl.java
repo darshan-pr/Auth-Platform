@@ -130,6 +130,26 @@ public class AppServiceImpl implements AppService {
   }
 
   @Transactional(readOnly = true)
+  public com.authplatform.common.dto.PageResult<AppDtos.AppResponse> search(
+      UUID owner, String query, String sort, String direction, int page, int size) {
+    int safeSize = Math.min(Math.max(size, 1), 100);
+    Sort.Direction dir = directionOf(direction);
+    Sort order;
+    if ("name".equals(sort)) order = Sort.by(new Sort.Order(dir, "name").ignoreCase());
+    else if (List.of("status", "requireEmailVerification", "createdAt").contains(sort))
+      order = Sort.by(new Sort.Order(dir, sort));
+    else order = Sort.by(Sort.Direction.DESC, "createdAt");
+    var pageable = PageRequest.of(Math.max(page, 0), safeSize, order.and(Sort.by("id")));
+    return com.authplatform.common.dto.PageResult.of(
+        apps.search(owner, com.authplatform.user.service.Like.contains(query), pageable)
+            .map(app -> response(app, false)));
+  }
+
+  private static Sort.Direction directionOf(String direction) {
+    return "desc".equalsIgnoreCase(direction) ? Sort.Direction.DESC : Sort.Direction.ASC;
+  }
+
+  @Transactional(readOnly = true)
   public List<AppDtos.AppUserView> listUsers(UUID owner, UUID appId, int page, int size) {
     apps.findByIdAndOwnerAccountId(appId, owner)
         .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
@@ -326,7 +346,8 @@ public class AppServiceImpl implements AppService {
         user.isEmailVerified(),
         user.getStatus(),
         user.getLastLoginAt(),
-        user.getCreatedAt());
+        user.getCreatedAt(),
+        user.isInvited());
   }
 
   @Transactional
@@ -379,7 +400,8 @@ public class AppServiceImpl implements AppService {
         user.isEmailVerified(),
         user.getStatus(),
         user.getLastLoginAt(),
-        user.getCreatedAt());
+        user.getCreatedAt(),
+        user.isInvited());
   }
 
   private List<String> origins(List<String> values) {

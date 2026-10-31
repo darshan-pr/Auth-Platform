@@ -145,7 +145,9 @@ export function LoginPage({ sa = false }: { sa?: boolean }) {
     step === "login-otp"
       ? message
       : step === "forgot-password"
-        ? "Enter your account email and we'll send a password reset code if the account exists."
+        ? sa
+          ? "Enter your SA account email and we'll send a password reset code if the account exists. Developer console accounts reset their password from the developer sign-in page."
+          : "Enter your account email and we'll send a password reset code if the account exists. SA accounts reset their password from the SA sign-in page."
         : step === "reset-password"
           ? message || "Enter the code from your email and choose a new password."
           : sa

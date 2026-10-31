@@ -8,7 +8,6 @@ import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -51,13 +50,17 @@ public class ConsoleAuthController {
     return noStore(ResponseEntity.ok(service.verify(request.token())));
   }
 
-  @GetMapping(value = "/verify-email", produces = MediaType.TEXT_HTML_VALUE)
-  ResponseEntity<String> verifyFromEmailLink(@RequestParam String token) {
-    service.verify(token);
-    return ResponseEntity.ok()
-        .contentType(MediaType.TEXT_HTML)
-        .body(
-            "<!doctype html><html><head><meta charset=\"utf-8\"><title>Email verified</title></head><body><h1>Email verified</h1><p>Your Auth Platform email has been verified. You can close this tab and return to the application.</p></body></html>");
+  // Links in emails sent before the console verification page existed. Scanners prefetch email
+  // links, so hand off to the page instead of consuming the single-use token on a GET.
+  @GetMapping("/verify-email")
+  ResponseEntity<Void> verifyFromEmailLink(@RequestParam String token) {
+    return ResponseEntity.status(HttpStatus.FOUND)
+        .location(
+            java.net.URI.create(
+                "/verify-email?token="
+                    + java.net.URLEncoder.encode(token, java.nio.charset.StandardCharsets.UTF_8)))
+        .header(HttpHeaders.CACHE_CONTROL, "no-store")
+        .build();
   }
 
   @PostMapping("/resend-verification")

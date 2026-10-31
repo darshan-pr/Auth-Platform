@@ -31,6 +31,9 @@ public class AppUser extends BaseEntity {
   @Column(name = "last_login_at")
   private Instant lastLoginAt;
 
+  @Column(name = "invited_at")
+  private Instant invitedAt;
+
   @Column(name = "mfa_enabled", nullable = false)
   private boolean mfaEnabled;
 
@@ -47,6 +50,18 @@ public class AppUser extends BaseEntity {
     u.name = name;
     u.status = "ACTIVE";
     return u;
+  }
+
+  public static AppUser invite(UUID appId, String email, String passwordHash, String name) {
+    AppUser u = register(appId, email, passwordHash, name);
+    u.invitedAt = Instant.now();
+    return u;
+  }
+
+  /** Replaces the temporary password of a user who has not signed in yet. */
+  public void reinvite(String passwordHash) {
+    this.passwordHash = passwordHash;
+    this.invitedAt = Instant.now();
   }
 
   public void markEmailVerified() {
@@ -99,6 +114,15 @@ public class AppUser extends BaseEntity {
 
   public Instant getLastLoginAt() {
     return lastLoginAt;
+  }
+
+  public Instant getInvitedAt() {
+    return invitedAt;
+  }
+
+  /** True from the invitation until the user's first successful sign-in. */
+  public boolean isInvited() {
+    return invitedAt != null && lastLoginAt == null;
   }
 
   public boolean isMfaEnabled() {

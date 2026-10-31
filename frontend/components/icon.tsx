@@ -11,6 +11,7 @@ type IconName =
   | "external"
   | "grid"
   | "logout"
+  | "mail"
   | "menu"
   | "plus"
   | "refresh"
@@ -34,6 +35,7 @@ const paths: Record<IconName, React.ReactNode> = {
   edit: <><path d="m15 5 4 4" /><path d="M4 20h4l11-11a2.1 2.1 0 0 0-4-4L4 16v4Z" /></>,
   external: <><path d="M14 4h6v6M20 4l-9 9" /><path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" /></>,
   grid: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
+  mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>,
   logout: <><path d="M10 17l5-5-5-5M15 12H3" /><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" /></>,
   menu: <><path d="M4 6h16M4 12h16M4 18h16" /></>,
   plus: <path d="M12 5v14M5 12h14" />,

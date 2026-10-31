@@ -1,7 +1,9 @@
 package com.authplatform.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,6 +15,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 
 class SmtpEmailSenderTest {
@@ -46,5 +49,21 @@ class SmtpEmailSenderTest {
     assertThat(serialized)
         .contains("https://api.example.com/api/public/app-icons/123")
         .doesNotContain("Content-ID:", "Content-Disposition: attachment", "filename=");
+  }
+
+  @Test
+  void retriesTransientSmtpFailuresBeforeGivingUp() {
+    JavaMailSender javaMailSender = mock(JavaMailSender.class);
+    MimeMessage mimeMessage = new MimeMessage(Session.getInstance(new Properties()));
+    when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+    doThrow(new MailSendException("421 try again later"))
+        .doNothing()
+        .when(javaMailSender)
+        .send(mimeMessage);
+    SmtpEmailSender sender = new SmtpEmailSender(javaMailSender, "noreply@example.com");
+
+    sender.send(EmailMessage.plainText("user@example.com", "Your code", "123456"));
+
+    verify(javaMailSender, times(2)).send(mimeMessage);
   }
 }

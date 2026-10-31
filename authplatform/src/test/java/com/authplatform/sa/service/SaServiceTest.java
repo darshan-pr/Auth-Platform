@@ -54,7 +54,8 @@ class SaServiceTest {
             mock(SessionService.class),
             mock(AuditService.class),
             email,
-            new EmailTemplateService(""));
+            new EmailTemplateService(""),
+            mock(com.authplatform.app.service.AppDirectory.class));
 
     service.updateUser(
         appId,
@@ -95,7 +96,8 @@ class SaServiceTest {
             sessions,
             mock(AuditService.class),
             mock(EmailSender.class),
-            new EmailTemplateService(""));
+            new EmailTemplateService(""),
+            mock(com.authplatform.app.service.AppDirectory.class));
 
     service.updateUser(
         appId,
