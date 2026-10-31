@@ -130,10 +130,10 @@ variable "budget_limit_usd" {
   default     = 130
 }
 
-variable "github_repo" {
-  description = "owner/name of the repository whose main branch may deploy through GitHub Actions."
+variable "github_oidc_subject_prefix" {
+  description = "Immutable OIDC subject prefix of the repo (gh api repos/OWNER/REPO/actions/oidc/customization/sub). Binds trust to the numeric owner and repo IDs."
   type        = string
-  default     = "darshan-pr/Auth-Platform-V2"
+  default     = "repo:darshan-pr@167526810/Auth-Platform-V2@1441012065"
 }
 
 variable "budget_email" {

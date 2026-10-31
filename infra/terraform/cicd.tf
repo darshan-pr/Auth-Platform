@@ -19,11 +19,11 @@ data "aws_iam_policy_document" "github_assume" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # Only workflows running on the main branch of this repository.
+    # Only workflows running on the main branch of this repository (immutable subject).
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:ref:refs/heads/main"]
+      values   = ["${var.github_oidc_subject_prefix}:ref:refs/heads/main"]
     }
   }
 }
