@@ -1,22 +1,8 @@
 import Link from "next/link";
 import { ArchitectureDiagram } from "./architecture-diagram";
+import { AnimatedLogo } from "./animated-logo";
+import { AuthLinks, SignedOutOnly } from "./auth-links";
 import styles from "./landing-page.module.css";
-
-const routeSnippet = `import { createAuthHandlers } from "@authplatform/auth-nextjs";
-
-const handlers = createAuthHandlers();
-
-export const GET = handlers.GET;
-export const POST = handlers.POST;`;
-
-const pageSnippet = `"use client";
-import { useRouter } from "next/navigation";
-import { SignIn } from "@authplatform/auth-react";
-
-export default function SignInPage() {
-  const router = useRouter();
-  return <SignIn onSuccess={() => router.replace("/dashboard")} />;
-}`;
 
 const features = [
   ["Sign-up and sign-in", "Email and password accounts for each application, with accessible, branded React components."],
@@ -57,19 +43,12 @@ export function LandingPage() {
                 and permissions as a hosted service, with a console to run all of it.
               </p>
               <div className={styles.ctas}>
-                <Link className={styles.primary} href="/signup">Sign up</Link>
-                <Link className={styles.secondary} href="/login">Sign in</Link>
+                <AuthLinks classes={{ signUp: styles.primary, signIn: styles.secondary, console: styles.primary, sa: styles.secondary }} signUpFirst />
                 <Link className={styles.textLink} href="/docs">Read the documentation</Link>
               </div>
             </div>
 
-            <div aria-label="Example integration" className={styles.code} role="group">
-              <div className={styles.codeFile}>app/api/auth/[...path]/route.ts</div>
-              <pre><code>{routeSnippet}</code></pre>
-              <div className={styles.codeFile}>app/sign-in/page.tsx</div>
-              <pre><code>{pageSnippet}</code></pre>
-              <div className={styles.codeNote}>The SDK packages are not on npm yet. Installation instructions are coming soon.</div>
-            </div>
+            <div className={styles.logoWrap}><AnimatedLogo /></div>
           </div>
         </div>
       </section>
@@ -144,7 +123,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className={styles.cta}>
+      <SignedOutOnly><section className={styles.cta}>
         <div className={styles.container}>
           <div className={styles.ctaInner}>
             <div>
@@ -157,7 +136,7 @@ export function LandingPage() {
             </div>
           </div>
         </div>
-      </section>
+      </section></SignedOutOnly>
     </>
   );
 }

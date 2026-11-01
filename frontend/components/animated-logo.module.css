@@ -1,0 +1,111 @@
+.stage {
+  position: relative;
+  display: block;
+  width: min(100%, 440px);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  padding: 0;
+  color: var(--navy, #0f1e33);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  --verified: #16a34a;
+}
+
+.stage:focus-visible {
+  outline: 2px solid var(--blue, #1769aa);
+  outline-offset: 6px;
+}
+
+.logo {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.lines {
+  stroke: currentColor;
+  stroke-width: 12;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.halo {
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(22, 163, 74, 0.16), rgba(22, 163, 74, 0) 68%);
+  opacity: 0;
+  animation: halo 1.2s ease-out 2.9s both;
+}
+
+.ring {
+  transform-box: view-box;
+  transform-origin: 256px 256px;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* Alternate directions; the rings finish one after another, then the check resolves. */
+.inner { animation-name: spin-forward, fade-in; animation-duration: 2s, 0.5s; }
+.middle { animation-name: spin-backward, fade-in; animation-duration: 2.3s, 0.5s; }
+.outer { animation-name: spin-forward, fade-in; animation-duration: 2.6s, 0.5s; }
+
+.core {
+  animation: core-verified 0.45s ease-out 2.75s both;
+}
+
+.pulse {
+  stroke: var(--verified);
+  stroke-width: 6;
+  opacity: 0;
+  transform-box: view-box;
+  transform-origin: 256px 256px;
+  animation: pulse 1s ease-out 2.9s both;
+}
+
+.dot {
+  fill: currentColor;
+  stroke: none;
+  transform-box: view-box;
+  transform-origin: 256px 256px;
+  animation: dot-in 0.5s ease-out 0.2s both, dot-out 0.35s ease-in 2.7s forwards;
+}
+
+.check {
+  stroke: var(--verified);
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transform-box: view-box;
+  transform-origin: 256px 256px;
+  animation: check-draw 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) 2.8s both;
+}
+
+@keyframes spin-forward { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes spin-backward { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dot-in { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes dot-out { to { transform: scale(0); opacity: 0; } }
+@keyframes core-verified { from { stroke: currentColor; } to { stroke: var(--verified); } }
+@keyframes check-draw {
+  0% { stroke-dashoffset: 1; transform: scale(0.55) rotate(-18deg); }
+  70% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 0; transform: scale(1) rotate(0deg); }
+}
+@keyframes pulse {
+  0% { opacity: 0.55; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+@keyframes halo { from { opacity: 0; } to { opacity: 1; } }
+
+/* No motion: show the finished, verified mark immediately. */
+@media (prefers-reduced-motion: reduce) {
+  .ring, .core, .pulse, .dot, .check, .halo { animation: none; }
+  .dot, .pulse { display: none; }
+  .core { stroke: var(--verified); }
+  .check { stroke-dashoffset: 0; }
+  .halo { opacity: 1; }
+}

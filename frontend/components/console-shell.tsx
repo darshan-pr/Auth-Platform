@@ -136,7 +136,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
 
   return <div className="console-frame">
     <header className="topbar">
-      <div className="brand"><img alt="" className="brand-logo" src="/auth-platform-icon-white.png" /><span>Auth<span className="brand-accent"> Platform</span></span></div>
+      <Link aria-label="Auth Platform home page" className="brand" href="/" title="Back to the Auth Platform home page"><img alt="" className="brand-logo" src="/auth-platform-icon-white.png" /><span>Auth<span className="brand-accent"> Platform</span></span></Link>
       <GlobalSearch nav={currentNav} scope={isConsole ? "console" : "sa"} />
       <div className="topbar-tools"><div className="account-wrap"><button aria-label={`Account menu for ${displayName}`} className="account-trigger" onClick={() => setAccountMenu(!accountMenu)} title={displayName} type="button"><span aria-hidden="true" className="account-avatar">{displayInitials}</span><span className="account-display-name">{displayName}</span></button>{accountMenu && <div className="account-menu"><div className="account-menu-name">{displayName}</div><div className="account-menu-role">darshanpr26@gmail.com</div><div className="account-menu-role">{isConsole ? "Developer workspace" : "Platform administration"}</div><Link className="account-menu-link" href={isConsole ? "/console/account" : "/account"} onClick={() => setAccountMenu(false)}>Account</Link><button onClick={signOut} type="button">Sign out</button></div>}</div></div>
     </header>

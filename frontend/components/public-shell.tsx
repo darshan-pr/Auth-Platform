@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { AuthLinks, FooterAuthLinks } from "./auth-links";
 import styles from "./public-shell.module.css";
 
 export function PublicShell({ children }: { children: ReactNode }) {
@@ -19,8 +20,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
             <Link href="/docs">Documentation</Link>
           </nav>
           <div className={styles.actions}>
-            <Link className={styles.signIn} href="/login">Sign in</Link>
-            <Link className={styles.signUp} href="/signup">Sign up</Link>
+            <AuthLinks classes={{ signIn: styles.signIn, signUp: styles.signUp }} />
           </div>
         </div>
       </header>
@@ -33,9 +33,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
           </div>
           <nav aria-label="Footer" className={styles.footerLinks}>
             <Link href="/docs">Documentation</Link>
-            <Link href="/login">Sign in</Link>
-            <Link href="/signup">Sign up</Link>
-            <Link href="/sa/login">Platform administration</Link>
+            <FooterAuthLinks />
           </nav>
         </div>
       </footer>

@@ -732,3 +732,6 @@ button.global-search:focus-visible { outline: 2px solid #78b6ff; outline-offset:
 .invite-issues ul { max-height: 200px; margin: 8px 0 0; padding: 0; overflow-y: auto; list-style: none; }
 .invite-issues li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
 @media (max-width: 720px) { .invite-single { grid-template-columns: 1fr; } .search-backdrop { padding-top: 4vh; } }
+
+a.brand { color: inherit; text-decoration: none; }
+a.brand:focus-visible { outline: 2px solid #78b6ff; outline-offset: 3px; border-radius: 6px; }

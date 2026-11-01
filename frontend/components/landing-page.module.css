@@ -14,7 +14,7 @@
 .heroGrid {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  align-items: start;
+  align-items: center;
   gap: 56px;
 }
 
@@ -95,46 +95,11 @@
   margin-left: 8px;
 }
 
-/* Code panel */
-.code {
-  overflow: hidden;
-  background: #0f1a2b;
-  border: 1px solid #1f2e45;
-  border-radius: 8px;
-}
-
-.codeFile {
-  padding: 9px 18px;
-  color: #93a4bd;
-  background: #142238;
-  border-bottom: 1px solid #1f2e45;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-}
-
-.code pre {
-  margin: 0;
-  padding: 16px 18px 18px;
-  overflow-x: auto;
-}
-
-.code pre + .codeFile {
-  border-top: 1px solid #1f2e45;
-}
-
-.code code {
-  color: #e3eaf5;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12.5px;
-  line-height: 1.7;
-  white-space: pre;
-}
-
-.codeNote {
-  padding: 10px 18px;
-  color: #93a4bd;
-  border-top: 1px solid #1f2e45;
-  font-size: 12.5px;
+/* Animated logo */
+.logoWrap {
+  display: grid;
+  place-items: center;
+  padding: 8px 0;
 }
 
 /* Sections */
@@ -362,7 +327,4 @@
     margin-left: 0;
   }
 
-  .code code {
-    font-size: 12px;
-  }
 }
