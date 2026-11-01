@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ApiError, api, consoleApi } from "../lib/api";
-import type { SessionInfo } from "../lib/types";
+import type { Account, SessionInfo } from "../lib/types";
 import { GlobalSearch } from "./global-search";
 import { Icon } from "./icon";
 import { SessionDialog } from "./session-dialog";
@@ -24,10 +24,6 @@ const developerNav = [
   { href: "/console/account", label: "Account" },
 ];
 
-const displayName = "Darshan PR";
-const displayParts = displayName.split(/\s+/).filter(Boolean);
-const displayInitials = (displayParts.length > 1 ? displayParts.slice(0, 2).map((part) => part[0]).join("") : displayParts[0].slice(0, 2)).toUpperCase();
-
 export function ConsoleShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -40,6 +36,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
   const [resourcesOpen, setResourcesOpen] = useState(true);
   const [authChecking, setAuthChecking] = useState(true);
   const [authCheckError, setAuthCheckError] = useState("");
+  const [account, setAccount] = useState<Pick<Account, "name" | "email"> | null>(null);
   const [resourceLabel, setResourceLabel] = useState("");
   const [parentResourceLabel, setParentResourceLabel] = useState("");
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
@@ -51,9 +48,10 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
   const checkAuth = useCallback(async () => {
     setAuthChecking(true);
     setAuthCheckError("");
+    setAccount(null);
     try {
-      if (isConsole) await consoleApi.me();
-      else await api.analytics();
+      const currentAccount = isConsole ? await consoleApi.me() : await api.me();
+      setAccount(currentAccount);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         router.replace(isConsole ? "/login" : "/sa/login");
@@ -64,6 +62,10 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
       setAuthChecking(false);
     }
   }, [isConsole, router]);
+
+  const displayName = account?.name.trim() || account?.email || "Account";
+  const displayParts = displayName.split(/\s+/).filter(Boolean);
+  const displayInitials = (displayParts.length > 1 ? displayParts.slice(0, 2).map((part) => part[0]).join("") : displayParts[0].slice(0, 2)).toUpperCase();
 
   useEffect(() => {
     void checkAuth();
@@ -138,7 +140,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
     <header className="topbar">
       <Link aria-label="Auth Platform home page" className="brand" href="/" title="Back to the Auth Platform home page"><img alt="" className="brand-logo" src="/auth-platform-icon-white.png" /><span>Auth<span className="brand-accent"> Platform</span></span></Link>
       <GlobalSearch nav={currentNav} scope={isConsole ? "console" : "sa"} />
-      <div className="topbar-tools"><div className="account-wrap"><button aria-label={`Account menu for ${displayName}`} className="account-trigger" onClick={() => setAccountMenu(!accountMenu)} title={displayName} type="button"><span aria-hidden="true" className="account-avatar">{displayInitials}</span><span className="account-display-name">{displayName}</span></button>{accountMenu && <div className="account-menu"><div className="account-menu-name">{displayName}</div><div className="account-menu-role">darshanpr26@gmail.com</div><div className="account-menu-role">{isConsole ? "Developer workspace" : "Platform administration"}</div><Link className="account-menu-link" href={isConsole ? "/console/account" : "/account"} onClick={() => setAccountMenu(false)}>Account</Link><button onClick={signOut} type="button">Sign out</button></div>}</div></div>
+      <div className="topbar-tools"><div className="account-wrap"><button aria-label={`Account menu for ${displayName}`} className="account-trigger" onClick={() => setAccountMenu(!accountMenu)} title={displayName} type="button"><span aria-hidden="true" className="account-avatar">{displayInitials}</span><span className="account-display-name">{displayName}</span></button>{accountMenu && <div className="account-menu"><div className="account-menu-name">{displayName}</div><div className="account-menu-role">{account?.email}</div><div className="account-menu-role">{isConsole ? "Developer workspace" : "Platform administration"}</div><Link className="account-menu-link" href={isConsole ? "/console/account" : "/account"} onClick={() => setAccountMenu(false)}>Account</Link><button onClick={signOut} type="button">Sign out</button></div>}</div></div>
     </header>
     <div className="contextbar">
       <button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} type="button"><Icon name="menu" size={21} /></button>
